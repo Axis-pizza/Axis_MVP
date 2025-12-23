@@ -261,7 +261,10 @@ export default function PortfolioPage() {
                    <RechartsTooltip 
                       contentStyle={{ backgroundColor: '#000', border: '1px solid #333', borderRadius: '8px' }}
                       itemStyle={{ color: '#fff' }}
-                      formatter={(value: number) => [`$${value.toFixed(2)}`, "Value"]}
+                      formatter={(value) => {
+                        const n = typeof value === "number" ? value : Number(value ?? 0);
+                        return [`$${n.toFixed(2)}`, "Value"] as const;
+                      }}
                    />
                    <Legend verticalAlign="bottom" height={36}/>
                  </PieChart>

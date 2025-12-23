@@ -27,6 +27,7 @@ export interface VaultAsset {
 export interface Vault {
   id: string;
   name: string;
+  symbol: string; 
   creator: string;
   tvl: number;
   status: VaultStatus;
@@ -91,6 +92,7 @@ export const INITIAL_VAULTS: Vault[] = [
   {
     id: 'v1',
     name: 'Solana Blue Chip',
+    symbol: 'SBC',    
     creator: '0xAnsem...Fast',
     tvl: 250000,
     status: 'PUBLIC',
@@ -104,6 +106,7 @@ export const INITIAL_VAULTS: Vault[] = [
   {
     id: 'v2',
     name: 'Meme Super Cycle',
+    symbol: 'MEME', 
     creator: 'MemeLord.sol',
     tvl: 45000,
     status: 'BOOTSTRAP',
