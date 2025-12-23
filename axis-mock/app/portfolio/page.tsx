@@ -19,7 +19,7 @@ import {
 import { toast } from "sonner";
 
 // ローカルAPI
-const API_URL = "http://localhost:8787";
+const API_URL = " https://axis-api.yusukekikuta-05.workers.dev";
 
 export default function PortfolioPage() {
   const router = useRouter();

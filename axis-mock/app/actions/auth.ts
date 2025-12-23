@@ -8,7 +8,7 @@ export async function sendOtpEmail(email: string) {
 
   try {
     // DBに保存 (Backend API経由)
-    const dbRes = await fetch("http://localhost:8787/auth/store-otp", {
+    const dbRes = await fetch("https://axis-api.yusukekikuta-05.workers.dev/auth/store-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, code }),

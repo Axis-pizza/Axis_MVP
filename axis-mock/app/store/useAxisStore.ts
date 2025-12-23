@@ -8,7 +8,7 @@ import { Token, INITIAL_VAULTS, VaultStatus } from '../data/mockData';
 import { toast } from 'sonner';
 
 // APIのURL (ローカル開発用)
-const API_URL = 'http://localhost:8787';
+const API_URL = 'https://axis-api.yusukekikuta-05.workers.dev';
 
 // Devnet接続の設定
 const NETWORK = 'devnet';

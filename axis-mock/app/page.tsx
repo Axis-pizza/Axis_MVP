@@ -12,7 +12,7 @@ import { toast, Toaster } from "sonner";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { sendOtpEmail } from "@/app/actions/auth";
 
-const API_URL = "http://localhost:8787";
+const API_URL = "https://axis-api.yusukekikuta-05.workers.dev";
 
 export default function Home() {
   const { isRegistered, registerUser, login } = useAxisStore();

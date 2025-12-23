@@ -76,7 +76,7 @@ export function CreateVaultForm() {
     const fetchTokens = async () => {
       setIsTokensLoading(true);
       try {
-        const res = await fetch("http://localhost:8787/tokens");
+        const res = await fetch(" https://axis-api.yusukekikuta-05.workers.dev/tokens");
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
         setAvailableTokens(data.slice(0, 300)); 
