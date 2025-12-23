@@ -1,2 +1,4 @@
-import { defineCloudflareConfig } from "@opennextjs/cloudflare";
-export default defineCloudflareConfig();
+name = "axis-mock"
+main = ".open-next/worker.js"
+compatibility_date = "2025-12-23"
+compatibility_flags = ["nodejs_compat"]
