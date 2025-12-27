@@ -27,7 +27,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
+// const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!; // これをコメントアウト
+const GOOGLE_CLIENT_ID = "862680354-qf4s464d0msju7rtra43dpbdfgl2e44b.apps.googleusercontent.com"; // 直接書く
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "https://axis-api.yusukekikuta-05.workers.dev";
 
@@ -785,6 +786,9 @@ export default function LandingPage() {
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <div className="fixed top-0 left-0 z-[9999] w-full bg-red-600 text-white p-4 font-mono text-lg font-bold">
+      DEBUG: CLIENT_ID is [{process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}]
+    </div>
       <WalletContextProvider>
         {isRegistered ? (
           <AppLayout>
