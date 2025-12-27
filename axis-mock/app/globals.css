@@ -119,11 +119,19 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  html {
+    height: 100%; /* これを追加 */
+    background-color: #050505; /* バウンス時の隙間対策 */
+  }
+
   body {
     @apply bg-neutral-950 text-white font-serif; /* font-serif でTimes New Roman系に */
     /* グラデーション背景: 左上から右下へ、深い黒からダークグレーへ */
     background: radial-gradient(circle at 50% 0%, #1a1a1a 0%, #050505 100%);
-    min-height: 100vh;
+    height: 100%;
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
   }
 }
 ::-webkit-scrollbar {
@@ -135,4 +143,83 @@
 ::-webkit-scrollbar-thumb {
   background: #333; 
   border-radius: 4px;
+}
+
+/* モーダル全体の背景と枠線 */
+.wallet-adapter-modal-wrapper {
+  background-color: #09090b !important; /* bg-zinc-950 */
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 32px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  font-family: var(--font-serif), serif !important; /* サイトのフォントに合わせる */
+  padding: 2rem !important;
+  max-width: 380px !important;
+}
+
+/* タイトル "Connect Wallet" */
+.wallet-adapter-modal-title {
+  color: white !important;
+  font-weight: 700 !important;
+  font-size: 1.5rem !important;
+  letter-spacing: -0.02em !important;
+  text-transform: uppercase !important;
+  margin-bottom: 1.5rem !important;
+}
+
+/* 閉じるボタン */
+.wallet-adapter-modal-button-close {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 8px !important;
+}
+.wallet-adapter-modal-button-close svg {
+  fill: #737373 !important; /* text-neutral-500 */
+}
+.wallet-adapter-modal-button-close:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+.wallet-adapter-modal-button-close:hover svg {
+  fill: white !important;
+}
+
+/* ウォレットリストの各ボタン */
+.wallet-adapter-button {
+  font-family: inherit !important;
+  font-weight: 500 !important;
+  height: 56px !important; /* h-14 */
+  border-radius: 12px !important; /* rounded-xl */
+  background-color: #1c1c1c !important;
+  color: white !important;
+  transition: all 0.2s !important;
+  justify-content: flex-start !important;
+  padding-left: 1.5rem !important;
+}
+
+/* ボタンホバー時 */
+.wallet-adapter-button:not([disabled]):hover {
+  background-color: #2a2a2a !important;
+  transform: scale(0.98) !important;
+}
+
+/* アイコンサイズ調整 */
+.wallet-adapter-button-start-icon {
+  width: 24px !important;
+  height: 24px !important;
+  margin-right: 1rem !important;
+}
+
+/* "More options" 等のテキスト */
+.wallet-adapter-modal-list-more {
+  color: #737373 !important;
+}
+.wallet-adapter-modal-list-more svg {
+  fill: #737373 !important;
+}
+
+/* --- オーバーレイ (背景の暗転) --- */
+.wallet-adapter-modal-overlay {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(4px) !important;
 }

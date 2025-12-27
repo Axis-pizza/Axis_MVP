@@ -1,15 +1,21 @@
-import type { Metadata } from "next";
-// Google Fontsから高級感のあるフォントを導入（任意）
-// ここでは標準のTimes New Roman系を使うため特に追加なしですが、
-// layoutのclassNameで明示的に指定します。
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import AppWalletProvider from "@/components/providers/AppWalletProvider";
-import { Navbar } from "@/components/layout/Navbar";
-import { Toaster } from "@/components/ui/sonner";
+// 先ほど作ったProvidersをインポート
+import { Providers } from "@/components/providers/Providers";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { BugReportWidget } from "@/components/layout/BugReportWidget";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#000000",
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
-  title: "Axis Protocol",
+  title: "Axis",
   description: "The Next Gen ETF Protocol on Solana",
 };
 
@@ -20,16 +26,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="font-serif antialiased min-h-screen">
-        <AppWalletProvider>
-          <Navbar />
-          {/* ★修正: ヘッダーの高さ分(pt-24)の余白を設けて被りを防ぐ */}
-          <main className="pt-24 px-4 md:px-8 max-w-7xl mx-auto">
+      <body className="font-serif antialiased min-h-screen bg-black text-white">
+        {/* ★すべてをProvidersでラップする */}
+        <Providers>
+          
+          <main className="pt-24 px-4 md:px-8 max-w-7xl mx-auto pb-32">
             {children}
-            <BugReportWidget />
           </main>
-          <Toaster />
-        </AppWalletProvider>
+
+          {/* ★これらがProvidersの内側にあることが超重要です */}
+          <BottomNav />
+          <BugReportWidget />
+          
+        </Providers>
       </body>
     </html>
   );

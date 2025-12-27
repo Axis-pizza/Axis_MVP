@@ -37,9 +37,18 @@ export interface Vault {
   created_at?: number;
 }
 
+export interface UserProfile {
+  id?: string;
+  username: string;
+  bio: string;
+  pfpUrl: string;
+  badges: string[]; // 'monkedao', 'madlads' etc.
+}
+
 interface AxisStore {
   // --- User Info ---
-  user: any | null; // ★追加: ユーザー情報オブジェクト全体
+  user: any | null; 
+  userProfile: UserProfile | null;
   email: string | null;
   inviteCode: string | null;
   walletAddress: string | null;
@@ -47,7 +56,7 @@ interface AxisStore {
   isConnected: boolean;
   walletProvider: any | null;
   referralCode: string | null;
-
+  
   // --- App Data ---
   vaults: Vault[];
   usdcBalance: number;
@@ -89,6 +98,8 @@ interface AxisStore {
   // Tokens & UI
   fetchTokenList: () => Promise<void>;
   toggleSidebar: (isOpen: boolean) => void;
+
+  registerWithWallet: () => Promise<boolean>;
 }
 
 // Helper: Mock Price
@@ -106,6 +117,7 @@ export const useAxisStore = create<AxisStore>()(
       // --- Initial State ---
       user: null,
       email: null,
+      userProfile: null,
       inviteCode: null,
       walletAddress: null,
       isRegistered: false,
@@ -128,11 +140,9 @@ export const useAxisStore = create<AxisStore>()(
 
       // 1. ウォレット接続
       connectWallet: async (address) => {
-        set({ 
-          isConnected: true, 
-          walletAddress: address 
-        });
+        set({ isConnected: true, walletAddress: address });
         await get().fetchBalances();
+        await get().fetchUserProfile(); // 接続時に登録状態を確認
       },
 
       // 2. 切断
@@ -349,6 +359,140 @@ export const useAxisStore = create<AxisStore>()(
         }));
       },
 
+      fetchUserProfile: async () => {
+        const { walletAddress } = get();
+        if (!walletAddress) return;
+
+        try {
+          const res = await fetch(`${API_URL}/user?wallet=${walletAddress}`);
+          if (res.ok) {
+            const data = await res.json();
+            
+            // データが空 {} または username がない場合は未登録とみなす
+            const isRegistered = !!(data && data.username);
+
+            set({
+                isRegistered,
+                userProfile: {
+                    username: data.username || "",
+                    bio: data.bio || "",
+                    pfpUrl: data.pfpUrl || "",
+                    badges: data.badges || []
+                }
+            });
+          } else {
+             // エラー時は未登録扱い
+             set({ isRegistered: false });
+          }
+        } catch (e) {
+          console.error("Fetch profile failed:", e);
+        }
+      },
+
+      // ★ 新規: ウォレットでアカウント作成 (POST /auth/social-login)
+      registerWithWallet: async () => {
+        const { walletAddress } = get();
+        if (!walletAddress) return false;
+
+        try {
+          const res = await fetch(`${API_URL}/auth/social-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              provider: 'solana',
+              wallet_address: walletAddress
+            })
+          });
+          
+          const data = await res.json();
+          if (data.success) {
+            set({ isRegistered: true });
+            return true;
+          }
+          return false;
+        } catch (e) {
+          console.error("Registration failed:", e);
+          return false;
+        }
+      },
+
+      updateUserProfile: async (data) => {
+        // isRegistered を取得
+        const { walletAddress, userProfile, isRegistered, registerWithWallet } = get();
+        
+        if (!walletAddress) {
+            toast.error("Wallet not connected");
+            return false;
+        }
+
+        // ===============================================
+        // 1. 未登録（Guest）なら、先に登録APIを叩く
+        // ===============================================
+        if (!isRegistered) {
+            console.log("User is Guest. Registering first...");
+            const regSuccess = await registerWithWallet();
+            
+            if (!regSuccess) {
+                toast.error("Failed to create account.");
+                return false;
+            }
+            // 登録成功したらそのまま下の更新処理へ進む
+        }
+
+        // ===============================================
+        // 2. プロフィール更新 (POST /user)
+        // ===============================================
+        const newProfile = { ...userProfile, ...data } as UserProfile;
+
+        try {
+          const res = await fetch(`${API_URL}/user`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              wallet_address: walletAddress,
+              name: newProfile.username,
+              bio: newProfile.bio,
+              avatar_url: newProfile.pfpUrl,
+              badges: newProfile.badges 
+            })
+          });
+
+          const result = await res.json();
+
+          if (!res.ok) {
+            console.error("Update failed:", result);
+            toast.error(result.error || "Failed to update profile");
+            return false;
+          }
+
+          // State更新
+          set({ userProfile: newProfile, isRegistered: true });
+          
+          // 互換性のため user オブジェクトも同期
+          set((state) => ({
+              user: state.user ? { ...state.user, name: newProfile.username, avatar_url: newProfile.pfpUrl } : state.user
+          }));
+          
+          return true;
+
+        } catch (e) {
+          console.error("Network Error:", e);
+          toast.error("Connection error.");
+          return false;
+        }
+      },
+
+      // ★ 新規: バッジ追加 (営業デモ用: APIを呼ばずにStateだけ更新でも可)
+      addBadge: (badgeId) => {
+        const { userProfile } = get();
+        if (!userProfile) return;
+        if (!userProfile.badges.includes(badgeId)) {
+            const newBadges = [...userProfile.badges, badgeId];
+            set({ userProfile: { ...userProfile, badges: newBadges } });
+            // 必要ならここで updateUserProfile を呼んで永続化
+        }
+      },
+
       // --- Other Actions ---
 
       fetchTokenList: async () => {
@@ -380,8 +524,9 @@ export const useAxisStore = create<AxisStore>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ 
         isRegistered: state.isRegistered,
-        user: state.user, // ユーザー情報も永続化
+        user: state.user,
         email: state.email,
+        userProfile: state.userProfile,
         referralCode: state.referralCode,
         walletAddress: state.walletAddress,
         isConnected: state.isConnected,

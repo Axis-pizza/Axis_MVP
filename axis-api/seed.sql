@@ -1,0 +1,47 @@
+-- 既存データをクリア
+DELETE FROM vaults;
+
+-- 30件のETFデータを挿入
+INSERT INTO vaults (id, name, symbol, description, creator, strategy_type, management_fee, min_liquidity, composition, image_url, status, tvl, apy) VALUES 
+-- 1. Majors & Blue Chips
+('v01', 'Solana Blue Chip', 'SOL-BLUE', 'Exposure to the top assets in the Solana ecosystem by market cap.', 'Axis Official', 'Monthly', 0.95, 1000, '[{"token":{"symbol":"SOL"},"weight":50},{"token":{"symbol":"JUP"},"weight":25},{"token":{"symbol":"PYTH"},"weight":25}]', 'https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=1000', 'PUBLIC', 1250000, 12.5),
+('v02', 'Liquid Staking Index', 'LST-MAX', 'Maximizing yield through a basket of liquid staked SOL tokens.', 'Axis Official', 'Daily', 0.50, 100, '[{"token":{"symbol":"jitoSOL"},"weight":40},{"token":{"symbol":"mSOL"},"weight":40},{"token":{"symbol":"bSOL"},"weight":20}]', 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?q=80&w=1000', 'PUBLIC', 850000, 8.4),
+('v03', 'Bitcoin on Solana', 'BTC-SOL', 'Wrapped Bitcoin assets bridged to Solana for DeFi usage.', 'Whale_0x', 'Weekly', 1.00, 5000, '[{"token":{"symbol":"WBTC"},"weight":80},{"token":{"symbol":"SOL"},"weight":20}]', 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?q=80&w=1000', 'PUBLIC', 2100000, 5.2),
+('v04', 'Ethereum Proxy', 'ETH-SOL', 'Wrapped Ethereum exposure with Solana speed.', 'BridgeMaster', 'Monthly', 1.00, 2000, '[{"token":{"symbol":"WETH"},"weight":100}]', 'https://images.unsplash.com/photo-1622630998477-20aa696fa4f5?q=80&w=1000', 'PUBLIC', 980000, 4.8),
+('v05', 'Stablecoin Yield', 'USD-Y', 'Low risk stablecoin farming across lending protocols.', 'SafeHarbor', 'Daily', 0.20, 10000, '[{"token":{"symbol":"USDC"},"weight":50},{"token":{"symbol":"USDT"},"weight":50}]', 'https://images.unsplash.com/photo-1604594849809-dfedbc827105?q=80&w=1000', 'PUBLIC', 5400000, 6.5),
+
+-- 2. DeFi & Infrastructure
+('v06', 'DeFi Powerhouse', 'DEFI-X', 'Top decentralized finance protocols on Solana.', 'DeFi_Dad', 'Weekly', 1.50, 500, '[{"token":{"symbol":"JUP"},"weight":40},{"token":{"symbol":"RAY"},"weight":30},{"token":{"symbol":"ORCA"},"weight":30}]', 'https://images.unsplash.com/photo-1620321023374-d1a68fddadb3?q=80&w=1000', 'PUBLIC', 450000, 18.2),
+('v07', 'Oracle Network', 'DATA-Z', 'Infrastructure focus on Oracle networks.', 'DataNerd', 'Monthly', 1.20, 1000, '[{"token":{"symbol":"PYTH"},"weight":100}]', 'https://images.unsplash.com/photo-1558494949-ef526b0042a0?q=80&w=1000', 'PUBLIC', 320000, 11.5),
+('v08', 'DEX Dominance', 'DEX-5', 'Basket of the leading DEX governance tokens.', 'SwapKing', 'Weekly', 1.50, 500, '[{"token":{"symbol":"JUP"},"weight":50},{"token":{"symbol":"RAY"},"weight":30},{"token":{"symbol":"ORCA"},"weight":20}]', 'https://images.unsplash.com/photo-1640340434855-6084b1f4901c?q=80&w=1000', 'PUBLIC', 670000, 22.4),
+('v09', 'Lending Aggregator', 'LEND-A', 'Exposure to lending protocol governance.', 'YieldFarmer', 'Weekly', 1.00, 1000, '[{"token":{"symbol":"KMNO"},"weight":50},{"token":{"symbol":"SLND"},"weight":50}]', 'https://images.unsplash.com/photo-1565514020176-db8b7eb34393?q=80&w=1000', 'PUBLIC', 150000, 9.8),
+('v10', 'Perp Traders', 'PERP-T', 'Focus on perpetual exchange tokens.', 'LeverageGuy', 'Daily', 2.00, 1000, '[{"token":{"symbol":"JUP"},"weight":40},{"token":{"symbol":"DRIFT"},"weight":60}]', 'https://images.unsplash.com/photo-1611974765270-ca12586343bb?q=80&w=1000', 'PUBLIC', 280000, 25.1),
+
+-- 3. DePIN & AI
+('v11', 'DePIN Revolution', 'DEPIN', 'Decentralized Physical Infrastructure Networks.', 'HeliumFan', 'Monthly', 1.50, 500, '[{"token":{"symbol":"HNT"},"weight":40},{"token":{"symbol":"RENDER"},"weight":40},{"token":{"symbol":"MOBILE"},"weight":20}]', 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000', 'PUBLIC', 890000, 32.5),
+('v12', 'AI Computation', 'AI-COMP', 'GPU rendering and AI compute resources.', 'GPU_Miner', 'Weekly', 1.50, 1000, '[{"token":{"symbol":"RENDER"},"weight":80},{"token":{"symbol":"IO"},"weight":20}]', 'https://images.unsplash.com/photo-1677442136019-21780ecad995?q=80&w=1000', 'PUBLIC', 1200000, 45.2),
+('v13', 'Connectivity Index', 'CONN-X', 'Mobile and IoT connectivity tokens.', '5G_Believer', 'Monthly', 1.00, 200, '[{"token":{"symbol":"HNT"},"weight":50},{"token":{"symbol":"MOBILE"},"weight":50}]', 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1000', 'PUBLIC', 340000, 15.4),
+('v14', 'Storage Solutions', 'STORE', 'Decentralized storage networks.', 'FileSaver', 'Monthly', 1.00, 500, '[{"token":{"symbol":"SHDW"},"weight":100}]', 'https://images.unsplash.com/photo-1544197150-b99a580bbcbf?q=80&w=1000', 'PUBLIC', 120000, 8.2),
+('v15', 'Mapping & Data', 'MAP-D', 'Decentralized mapping and data collection.', 'Mapper', 'Quarterly', 1.50, 500, '[{"token":{"symbol":"HIVE"},"weight":100}]', 'https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?q=80&w=1000', 'PUBLIC', 95000, 12.1),
+
+-- 4. Memes & High Risk
+('v16', 'Dog Coin Index', 'DOGE-S', 'The premier dog coins on Solana.', 'DogFather', 'Hourly', 2.50, 100, '[{"token":{"symbol":"BONK"},"weight":50},{"token":{"symbol":"WIF"},"weight":50}]', 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=1000', 'PUBLIC', 4500000, 420.69),
+('v17', 'Cat Coin Index', 'CAT-S', 'Feline dominance strategies.', 'CatLover', 'Hourly', 2.50, 100, '[{"token":{"symbol":"POPCAT"},"weight":50},{"token":{"symbol":"MEW"},"weight":50}]', 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=1000', 'PUBLIC', 2300000, 150.2),
+('v18', 'Meme Trend Follower', 'MEME-T', 'Algorithmic trading of trending memes.', 'AlgoTrader', 'Daily', 3.00, 1000, '[{"token":{"symbol":"WIF"},"weight":40},{"token":{"symbol":"POPCAT"},"weight":30},{"token":{"symbol":"BONK"},"weight":30}]', 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?q=80&w=1000', 'PUBLIC', 1800000, 88.8),
+('v19', 'Community Takeover', 'CTO-X', 'Community driven meme projects.', 'DiamondHands', 'Weekly', 2.00, 100, '[{"token":{"symbol":"WEN"},"weight":100}]', 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=1000', 'PUBLIC', 560000, 69.4),
+('v20', 'Degen Plays', 'YOLO', 'Extremely high risk micro-caps.', 'DegenGod', 'Hourly', 5.00, 10, '[{"token":{"symbol":"BONK"},"weight":20},{"token":{"symbol":"WIF"},"weight":20},{"token":{"symbol":"SOL"},"weight":60}]', 'https://images.unsplash.com/photo-1642104704074-907c0698cbd9?q=80&w=1000', 'PUBLIC', 12000, 999.9),
+
+-- 5. Creator & Private
+-- ★ ここを修正しました (Ansem's -> Ansem''s)
+('v21', 'Ansem''s Picks', 'ANSEM', 'Mirroring the top influencer wallet.', 'Ansem', 'Weekly', 2.00, 10000, '[{"token":{"symbol":"SOL"},"weight":50},{"token":{"symbol":"WIF"},"weight":50}]', 'https://pbs.twimg.com/profile_images/1760439923830849536/XqaF4fD__400x400.jpg', 'PUBLIC', 8500000, 350.0),
+('v22', 'MonkeDAO Treasury', 'MNK-T', 'Managed by MonkeDAO governance.', 'MonkeDAO', 'Monthly', 0.50, 5000, '[{"token":{"symbol":"SOL"},"weight":80},{"token":{"symbol":"USDC"},"weight":20}]', 'https://i.seadn.io/gae/yNi-XdGxsgQCPpqSio4o311gdFZqb4wkqoQAdw-PlIZdJtWoJNkjdnVpyAEunp6cxUH9mDU6agHe9C9H7jSK0AGSrMMt3g?auto=format&dpr=1&w=384', 'PUBLIC', 3200000, 18.5),
+('v23', 'Mad Lads Fund', 'MAD-F', 'The xNFT ecosystem fund.', 'Armani', 'Monthly', 0.80, 5000, '[{"token":{"symbol":"SOL"},"weight":70},{"token":{"symbol":"WORM"},"weight":30}]', 'https://i.seadn.io/g/9e900e84-1d6e-4171-a477-9a0715b3c34a/48b1d7d025110d70b61884451006509a7442d76f.jpg?auto=format&dpr=1&w=384', 'PUBLIC', 4100000, 24.2),
+('v24', 'Superteam Earn', 'SUPER', 'Yield generated for Superteam grants.', 'Superteam', 'Weekly', 0.00, 1000, '[{"token":{"symbol":"USDC"},"weight":100}]', 'https://pbs.twimg.com/profile_images/1458097561848418306/s4a2dYy-_400x400.jpg', 'PUBLIC', 500000, 5.5),
+('v25', 'Private Whale 1', 'WHALE1', 'Private strategy.', '0xWhale', 'Monthly', 0.00, 100000, '[{"token":{"symbol":"BTC"},"weight":50},{"token":{"symbol":"ETH"},"weight":50}]', null, 'BOOTSTRAP', 10000000, 0.0),
+
+-- 6. New & Experimental
+('v26', 'NFT Fi Index', 'NFT-X', 'Tokens related to NFT infrastructure.', 'NFT_Guru', 'Monthly', 1.50, 500, '[{"token":{"symbol":"TNSR"},"weight":50},{"token":{"symbol":"HADES"},"weight":50}]', 'https://images.unsplash.com/photo-1645731569808-1662c2620577?q=80&w=1000', 'PUBLIC', 230000, 14.2),
+('v27', 'Gaming Guild', 'GAME', 'Metaverse and gaming tokens.', 'GamerDAO', 'Weekly', 1.20, 200, '[{"token":{"symbol":"ATLAS"},"weight":50},{"token":{"symbol":"POLIS"},"weight":50}]', 'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?q=80&w=1000', 'PUBLIC', 150000, 18.9),
+('v28', 'Launchpad Alpha', 'LAUNCH', 'Tokens from recent IDOs.', 'AlphaHunter', 'Daily', 2.00, 1000, '[{"token":{"symbol":"JUP"},"weight":100}]', 'https://images.unsplash.com/photo-1516110833967-0b5716ca1387?q=80&w=1000', 'PUBLIC', 450000, 120.5),
+('v29', 'Retirement Fund', 'SAFE-R', 'Ultra low risk strategy.', 'Boomer', 'Yearly', 0.10, 5000, '[{"token":{"symbol":"USDC"},"weight":100}]', 'https://images.unsplash.com/photo-1565514020176-db8b7eb34393?q=80&w=1000', 'PUBLIC', 80000, 4.2),
+('v30', 'Solana Summer 2.0', 'SOL-2', 'Leveraged long SOL strategy.', 'BullMarket', 'Daily', 2.00, 1000, '[{"token":{"symbol":"SOL"},"weight":100}]', 'https://images.unsplash.com/photo-1614332287897-cdc485fa562d?q=80&w=1000', 'PUBLIC', 920000, 45.8);

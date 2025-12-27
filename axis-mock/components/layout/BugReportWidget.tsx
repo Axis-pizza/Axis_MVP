@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Megaphone, ImagePlus, Loader2, MessageSquareWarning } from "lucide-react"; // Bug -> Megaphoneに変更
+import { ImagePlus, Loader2, MessageSquareWarning, X } from "lucide-react";
 import { toast } from "sonner";
 import { submitBugReport } from "@/app/actions/submit-bug";
+// ★Contextフックをインポート
+import { useBugReport } from "@/components/providers/BugReportProvider";
 
 export function BugReportWidget() {
-  const [isOpen, setIsOpen] = useState(false);
+  // ★Contextから状態と関数を取得
+  const { isOpen, close } = useBugReport();
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +51,7 @@ export function BugReportWidget() {
 
     if (result.success) {
       toast.success("Bug report sent! Thank you.");
-      setIsOpen(false);
+      close(); // ★Contextのcloseを使用
       setDiscord("");
       setDescription("");
       setScreenshot(null);
@@ -56,18 +60,27 @@ export function BugReportWidget() {
     }
   };
 
+  // 開いていない時は何もレンダリングしない（トリガーボタンはBottomNav等に任せる、もしくは必要ならここに追加）
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
-      
-      {/* --- Modal Form --- */}
-      {isOpen && (
-        <Card className="w-[350px] bg-[#1E1E24] border-white/10 shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300">
+    // z-indexを非常に高く設定 (BottomNavやSheetより上に来るように)
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center pointer-events-none">
+        {/* 背景クリックで閉じるためのオーバーレイ */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto" onClick={close} />
+
+        <Card className="pointer-events-auto w-full max-w-[350px] mb-6 sm:mb-0 bg-[#1E1E24] border-white/10 shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300 relative mx-4">
+          <div className="absolute right-4 top-4">
+             <button onClick={close} className="text-neutral-400 hover:text-white"><X size={18}/></button>
+          </div>
+          
           <div className="p-5 space-y-4">
             <h3 className="text-xl font-bold text-white flex items-center gap-2">
               <MessageSquareWarning className="text-white" /> Report a Bug
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* ... 中身は元のコードと同じ ... */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-neutral-300">
                   Discord (required)
@@ -119,32 +132,10 @@ export function BugReportWidget() {
                 >
                   {isSubmitting ? <Loader2 className="animate-spin" /> : "Submit"}
                 </Button>
-                
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full bg-[#2B4B64] hover:bg-[#233d52] text-white/80"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Cancel
-                </Button>
               </div>
-
             </form>
           </div>
         </Card>
-      )}
-
-      {/* --- ★ Trigger Button (Updated Style) --- */}
-      {!isOpen && (
-        <Button
-          onClick={() => setIsOpen(true)}
-          className="h-12 px-6 rounded-full bg-white text-black font-bold shadow-[0_0_15px_rgba(255,255,255,0.4)] hover:shadow-[0_0_25px_rgba(255,255,255,0.7)] hover:bg-neutral-200 border border-white/50 transition-all duration-300 hover:-translate-y-1 flex items-center gap-2"
-        >
-          <Megaphone size={18} className="text-neutral-800" />
-          <span>Bug Report</span>
-        </Button>
-      )}
     </div>
   );
 }
