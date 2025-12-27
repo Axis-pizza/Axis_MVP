@@ -4,13 +4,24 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TinderCard from "react-tinder-card";
 import { useAxisStore } from "@/app/store/useAxisStore";
-import { 
-  Sparkles, TrendingUp, ArrowRight, X, Heart, Info, RotateCcw, Wallet, Loader2, 
-  List, Grid, ArrowUpDown, Search // 追加
+import {
+  Sparkles,
+  TrendingUp,
+  ArrowRight,
+  X,
+  Heart,
+  Info,
+  RotateCcw,
+  Wallet,
+  Loader2,
+  List,
+  Grid,
+  ArrowUpDown,
+  Search,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area"; // リストのスクロール用
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -19,35 +30,31 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"; // ソート用
+} from "@/components/ui/select";
 
 export function ExplorePage() {
   const router = useRouter();
   const { vaults, fetchVaults, isLoading: isStoreLoading } = useAxisStore();
-  
+
   const [isNavigating, setIsNavigating] = useState(false);
-  
-  // ★ 追加: 表示モードの管理 ('swipe' | 'list')
-  const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
-  // ★ 追加: ソート順 ('apy' | 'tvl' | 'newest')
+
+  const [viewMode, setViewMode] = useState<"swipe" | "list">("swipe");
+
   const [sortBy, setSortBy] = useState("apy");
 
   useEffect(() => {
     fetchVaults();
   }, [fetchVaults]);
 
-  // DBデータの整形とソート
   const db = useMemo(() => {
     if (!vaults) return [];
     let data = [...vaults];
 
-    // Listモード用のソートロジック
-    if (viewMode === 'list') {
-      if (sortBy === 'apy') data.sort((a, b) => (b.apy || 0) - (a.apy || 0));
-      else if (sortBy === 'tvl') data.sort((a, b) => (b.tvl || 0) - (a.tvl || 0));
-      else if (sortBy === 'newest') data.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+    if (viewMode === "list") {
+      if (sortBy === "apy") data.sort((a, b) => (b.apy || 0) - (a.apy || 0));
+      else if (sortBy === "tvl") data.sort((a, b) => (b.tvl || 0) - (a.tvl || 0));
+      else if (sortBy === "newest") data.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
     } else {
-      // SwipeモードはAPY順（デフォルト）
       data.sort((a, b) => (b.apy || 0) - (a.apy || 0));
     }
     return data;
@@ -58,7 +65,10 @@ export function ExplorePage() {
   const isSwipingRef = useRef(false);
 
   const childRefs = useMemo(
-    () => Array(db.length).fill(0).map(() => React.createRef<any>()),
+    () =>
+      Array(db.length)
+        .fill(0)
+        .map(() => React.createRef<any>()),
     [db.length]
   );
 
@@ -73,19 +83,20 @@ export function ExplorePage() {
     }
   }, [db.length, isStoreLoading]);
 
-  // --- Handlers (Swipe Logic) ---
   const swipe = async (dir: string) => {
     const idx = currentIndexRef.current;
     if (isSwipingRef.current || idx < 0 || idx >= db.length) return;
     isSwipingRef.current = true;
     const cardRef = childRefs[idx];
-    if (cardRef && cardRef.current) await cardRef.current.swipe(dir); 
+    if (cardRef && cardRef.current) await cardRef.current.swipe(dir);
   };
 
   const onSwipe = (direction: string, name: string, index: number) => {
     currentIndexRef.current -= 1;
     if (direction === "right") {
-      toast.success(`Added ${name} to Watchlist`, { icon: <Heart className="w-4 h-4 text-pink-500 fill-pink-500" /> });
+      toast.success(`Added ${name} to Watchlist`, {
+        icon: <Heart className="h-4 w-4 fill-pink-500 text-pink-500" />,
+      });
     }
   };
 
@@ -98,234 +109,296 @@ export function ExplorePage() {
     setIsFinished(false);
     currentIndexRef.current = db.length - 1;
     isSwipingRef.current = false;
-    setViewMode('swipe'); // スワイプモードに戻す
+    setViewMode("swipe");
     fetchVaults();
   };
 
   const handleCardClick = (id: string) => {
     if (!isSwipingRef.current) {
-        setIsNavigating(true);
-        router.push(`/vault/${id}`);
+      setIsNavigating(true);
+      router.push(`/vault/${id}`);
     }
   };
 
-  // --- UI Components ---
-
   if (isStoreLoading && db.length === 0) {
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center min-h-[60vh]">
-            <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-4" />
-            <p className="text-neutral-500 font-serif text-sm animate-pulse">Scanning On-chain Vaults...</p>
-        </div>
+      <div className="flex h-full min-h-[60vh] w-full flex-col items-center justify-center">
+        <Loader2 className="mb-4 h-8 w-8 animate-spin text-emerald-500" />
+        <p className="animate-pulse font-serif text-sm text-neutral-500">
+          Scanning On-chain Vaults...
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center w-full h-[100dvh] relative overflow-hidden ">
-      
-      {/* Loading Overlay */}
+    <div className="relative flex h-[100dvh] w-full flex-col items-center overflow-hidden">
       <AnimatePresence>
         {isNavigating && (
           <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black"
           >
-             <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
-             <p className="text-neutral-400 font-serif text-sm animate-pulse tracking-widest uppercase">Opening Vault...</p>
+            <Loader2 className="mb-4 h-10 w-10 animate-spin text-emerald-500" />
+            <p className="animate-pulse font-serif text-sm tracking-widest text-neutral-400 uppercase">
+              Opening Vault...
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Header (共通) */}
-      <div className="absolute top-0 left-0 w-full pt-[max(2.5rem,env(safe-area-inset-top))] pb-4 px-6 flex items-center justify-between z-20 pointer-events-none">
+      <div className="pointer-events-none absolute top-0 left-0 z-20 flex w-full items-center justify-between px-6 pt-[max(2.5rem,env(safe-area-inset-top))] pb-4">
         <div>
-            <h2 className="text-white font-serif text-2xl font-bold italic tracking-tighter drop-shadow-lg">
-                Axis Discover
-            </h2>
-            <p className="text-[10px] text-neutral-400 uppercase tracking-[0.2em] mt-1 font-medium">
-                {viewMode === 'swipe' ? "Swipe to Explore" : "Compare Strategies"}
-            </p>
+          <h2 className="font-serif text-2xl font-bold tracking-tighter text-white italic drop-shadow-lg">
+            Axis Discover
+          </h2>
+          <p className="mt-1 text-[10px] font-medium tracking-[0.2em] text-neutral-400 uppercase">
+            {viewMode === "swipe" ? "Swipe to Explore" : "Compare Strategies"}
+          </p>
         </div>
-        
-        {/* View Toggle Button (Always accessible) */}
+
         <div className="pointer-events-auto">
-            <Button
-                variant="outline"
-                size="icon"
-                className="rounded-full bg-white/5 border-white/10 text-white hover:bg-white/10 w-10 h-10 backdrop-blur-md"
-                onClick={() => setViewMode(prev => prev === 'swipe' ? 'list' : 'swipe')}
-            >
-                {viewMode === 'swipe' ? <List size={18} /> : <Grid size={18} />}
-            </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 rounded-full border-white/10 bg-white/5 text-white backdrop-blur-md hover:bg-white/10"
+            onClick={() => setViewMode((prev) => (prev === "swipe" ? "list" : "swipe"))}
+          >
+            {viewMode === "swipe" ? <List size={18} /> : <Grid size={18} />}
+          </Button>
         </div>
       </div>
 
-      {/* Content Area */}
-      <div className="flex-1 w-full relative pt-32 pb-0">
+      <div className="relative w-full flex-1 pt-32 pb-0">
         <AnimatePresence mode="wait">
-          
-          {/* ==================== SWIPE VIEW ==================== */}
-          {viewMode === 'swipe' && (
+          {viewMode === "swipe" && (
             <motion.div
-                key="swipe-view"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="w-full h-full flex flex-col items-center justify-start max-w-md mx-auto relative"
+              key="swipe-view"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="relative mx-auto flex h-full w-full max-w-md flex-col items-center justify-start"
             >
-                {!isFinished ? (
-                     <div className="relative w-full h-[55vh] min-h-[420px] flex justify-center items-center">
-                        {db.map((vault, index) => (
-                            <TinderCard
-                                ref={childRefs[index]}
-                                className="absolute w-[85%] max-w-[320px] h-full"
-                                key={vault.id}
-                                onSwipe={(dir) => onSwipe(dir, vault.name, index)}
-                                onCardLeftScreen={() => onCardLeftScreen(vault.name, index)}
-                                preventSwipe={["up", "down"]}
-                                swipeRequirementType="position"
-                                swipeThreshold={100}
-                            >
-                                {/* Card Design (既存のまま) */}
-                                <div 
-                                    onClick={() => handleCardClick(vault.id)}
-                                    className="relative w-full h-full bg-[#111] border border-white/10 rounded-[24px] shadow-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform select-none group"
-                                >
-                                    <div className="absolute top-4 right-4 z-20">
-                                        <div className="bg-black/60 backdrop-blur-md border border-white/10 text-white px-3 py-1.5 rounded-full shadow-lg flex flex-col items-end">
-                                            <span className="text-[8px] font-bold text-emerald-400 uppercase leading-none mb-0.5">APY</span>
-                                            <span className="text-base font-mono font-bold tracking-tight">+{vault.apy ? vault.apy.toFixed(1) : "12.5"}%</span>
-                                        </div>
-                                    </div>
-                                    <div className="h-[45%] w-full relative overflow-hidden bg-neutral-900">
-                                        {vault.image_url ? (
-                                            <img src={vault.image_url} alt={vault.name} className="w-full h-full object-cover opacity-90" />
-                                        ) : (
-                                            <div className={`w-full h-full bg-gradient-to-br ${index % 2 === 0 ? "from-indigo-900 to-black" : "from-emerald-900 to-black"} flex items-center justify-center`}>
-                                                <span className="text-7xl font-serif text-white/10 font-bold">{vault.symbol ? vault.symbol[0] : "A"}</span>
-                                            </div>
-                                        )}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent" />
-                                    </div>
-                                    <div className="p-5 h-[55%] flex flex-col justify-between bg-[#111]">
-                                        <div>
-                                            <h3 className="text-xl font-serif font-bold text-white leading-tight mb-1">{vault.name}</h3>
-                                            <p className="text-neutral-500 font-mono text-[10px] uppercase tracking-wider mb-4">{vault.symbol} // {vault.creator ? "USER" : "OFFICIAL"}</p>
-                                            <div className="space-y-2">
-                                                <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-widest flex items-center gap-1.5"><TrendingUp size={10} className="text-emerald-500" /> Composition</p>
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {vault.composition?.slice(0, 3).map((comp: any, i: number) => (
-                                                        <Badge key={i} variant="secondary" className="bg-white/5 text-neutral-300 border border-white/5 text-[9px] px-2 h-5">{comp.token?.symbol || "Unknown"} <span className="ml-1 text-emerald-400">{comp.weight}%</span></Badge>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-end justify-between border-t border-white/5 pt-3">
-                                            <div><span className="text-[8px] text-neutral-600 uppercase font-bold block mb-0.5">Min Inv.</span><span className="text-lg font-mono text-white">${(vault.min_liquidity || 0).toLocaleString()}</span></div>
-                                            <ArrowRight size={16} className="text-white"/>
-                                        </div>
-                                    </div>
-                                </div>
-                            </TinderCard>
-                        ))}
-
-                        {/* Control Buttons */}
-                        <div className="absolute -bottom-20 flex items-center gap-6">
-                            <button onClick={() => swipe('left')} className="w-12 h-12 rounded-full border border-white/10 bg-[#111] flex items-center justify-center text-neutral-500 hover:text-red-500 transition-colors"><X size={20} /></button>
-                            <button onClick={() => swipe('right')} className="w-12 h-12 rounded-full border border-white/10 bg-[#111] flex items-center justify-center text-neutral-500 hover:text-emerald-400 transition-colors"><Heart size={20} /></button>
-                        </div>
-                     </div>
-                ) : (
-                    // --- Finished / All Caught Up Screen ---
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                        className="flex flex-col items-center justify-center text-center max-w-[280px] px-6 py-8 bg-[#111] border border-white/10 rounded-[12px] shadow-2xl mt-12"
+              {!isFinished ? (
+                <div className="relative flex h-[55vh] min-h-[420px] w-full items-center justify-center">
+                  {db.map((vault, index) => (
+                    <TinderCard
+                      ref={childRefs[index]}
+                      className="absolute h-full w-[85%] max-w-[320px]"
+                      key={vault.id}
+                      onSwipe={(dir) => onSwipe(dir, vault.name, index)}
+                      onCardLeftScreen={() => onCardLeftScreen(vault.name, index)}
+                      preventSwipe={["up", "down"]}
+                      swipeRequirementType="position"
+                      swipeThreshold={100}
                     >
-                        <h2 className="text-xl font-serif font-bold text-white mb-2">All Caught Up</h2>
-                        <p className="text-neutral-400 text-[10px] leading-relaxed mb-6">Create your own strategy or<br/>compare all vaults in list view.</p>
-                        <div className="flex flex-col gap-3 w-full">
-                            <Button onClick={() => setViewMode('list')} className="h-10 w-full rounded-lg bg-emerald-500 text-black font-bold hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 text-xs">
-                                <List size={14} /> Browse All Vaults
-                            </Button>
-                            <Button onClick={() => router.push('/create')} variant="outline" className="h-10 w-full rounded-lg border-white/10 text-white hover:bg-white/5 gap-2 text-xs"><Sparkles size={14} /> Create with AI</Button>
-                            <button onClick={resetCards} className="mt-2 text-[9px] text-neutral-500 hover:text-white uppercase tracking-widest font-bold"><RotateCcw size={10} className="inline mr-1"/> Replay</button>
+                      <div
+                        onClick={() => handleCardClick(vault.id)}
+                        className="group relative h-full w-full cursor-pointer overflow-hidden rounded-[24px] border border-white/10 bg-[#111] shadow-2xl transition-transform select-none active:scale-[0.98]"
+                      >
+                        <div className="absolute top-4 right-4 z-20">
+                          <div className="flex flex-col items-end rounded-full border border-white/10 bg-black/60 px-3 py-1.5 text-white shadow-lg backdrop-blur-md">
+                            <span className="mb-0.5 text-[8px] leading-none font-bold text-emerald-400 uppercase">
+                              APY
+                            </span>
+                            <span className="font-mono text-base font-bold tracking-tight">
+                              +{vault.apy ? vault.apy.toFixed(1) : "12.5"}%
+                            </span>
+                          </div>
                         </div>
-                    </motion.div>
-                )}
-            </motion.div>
-          )}
-
-          {/* ==================== LIST VIEW (Catalog) ==================== */}
-          {viewMode === 'list' && (
-            <motion.div
-                key="list-view"
-                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-                className="w-full h-full flex flex-col px-4 max-w-md mx-auto"
-            >
-                {/* Sort & Filter Controls */}
-                <div className="flex items-center justify-between mb-4 px-2">
-                    <p className="text-xs text-neutral-500 font-bold">{db.length} Vaults Found</p>
-                    <Select value={sortBy} onValueChange={setSortBy}>
-                        <SelectTrigger className="w-[110px] h-8 text-[10px] bg-white/5 border-white/10 text-white rounded-lg">
-                            <ArrowUpDown size={10} className="mr-2" />
-                            <SelectValue placeholder="Sort" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#1c1c1e] border-white/10 text-white">
-                            <SelectItem value="apy">Highest APY</SelectItem>
-                            <SelectItem value="tvl">Highest TVL</SelectItem>
-                            <SelectItem value="newest">Newest</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Scrollable List */}
-                <ScrollArea className="flex-1 -mx-4 px-4 pb-20">
-                    <div className="space-y-3 pb-32">
-                        {db.map((vault) => (
-                            <div 
-                                key={vault.id}
-                                onClick={() => handleCardClick(vault.id)}
-                                className="bg-[#111] border border-white/5 rounded-xl p-4 flex items-center justify-between active:scale-[0.98] transition-transform cursor-pointer hover:bg-white/5 group"
+                        <div className="relative h-[45%] w-full overflow-hidden bg-neutral-900">
+                          {vault.image_url ? (
+                            <img
+                              src={vault.image_url}
+                              alt={vault.name}
+                              className="h-full w-full object-cover opacity-90"
+                            />
+                          ) : (
+                            <div
+                              className={`h-full w-full bg-gradient-to-br ${index % 2 === 0 ? "from-indigo-900 to-black" : "from-emerald-900 to-black"} flex items-center justify-center`}
                             >
-                                <div className="flex items-center gap-4">
-                                    {/* Icon */}
-                                    <div className="w-10 h-10 rounded-full bg-neutral-900 border border-white/5 flex items-center justify-center overflow-hidden flex-shrink-0">
-                                        {vault.image_url ? (
-                                            <img src={vault.image_url} alt="" className="w-full h-full object-cover opacity-80" />
-                                        ) : (
-                                            <span className="font-serif font-bold text-white text-sm">{vault.symbol[0]}</span>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Info */}
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <h4 className="text-white font-bold text-sm truncate">{vault.name}</h4>
-                                            {vault.apy && vault.apy > 20 && (
-                                                <Badge className="bg-emerald-500/10 text-emerald-400 border-0 text-[9px] h-4 px-1">Hot</Badge>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2 text-[10px] text-neutral-500 mt-0.5">
-                                            <span className="bg-white/5 px-1.5 py-0.5 rounded text-neutral-400 border border-white/5">{vault.symbol}</span>
-                                            <span>• Min ${vault.min_liquidity?.toLocaleString()}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Metrics (Right Side) */}
-                                <div className="text-right flex-shrink-0 pl-2">
-                                    <div className="text-emerald-400 font-mono font-bold text-base leading-tight">
-                                        +{vault.apy ? vault.apy.toFixed(1) : "0.0"}%
-                                    </div>
-                                    <div className="text-[10px] text-neutral-600 font-medium uppercase tracking-wider mt-0.5">
-                                        APY
-                                    </div>
-                                </div>
+                              <span className="font-serif text-7xl font-bold text-white/10">
+                                {vault.symbol ? vault.symbol[0] : "A"}
+                              </span>
                             </div>
-                        ))}
-                    </div>
-                </ScrollArea>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent" />
+                        </div>
+                        <div className="flex h-[55%] flex-col justify-between bg-[#111] p-5">
+                          <div>
+                            <h3 className="mb-1 font-serif text-xl leading-tight font-bold text-white">
+                              {vault.name}
+                            </h3>
+                            <p className="mb-4 font-mono text-[10px] tracking-wider text-neutral-500 uppercase">
+                              {vault.symbol} // {vault.creator ? "USER" : "OFFICIAL"}
+                            </p>
+                            <div className="space-y-2">
+                              <p className="flex items-center gap-1.5 text-[9px] font-bold tracking-widest text-neutral-400 uppercase">
+                                <TrendingUp size={10} className="text-emerald-500" /> Composition
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {vault.composition?.slice(0, 3).map((comp: any, i: number) => (
+                                  <Badge
+                                    key={i}
+                                    variant="secondary"
+                                    className="h-5 border border-white/5 bg-white/5 px-2 text-[9px] text-neutral-300"
+                                  >
+                                    {comp.token?.symbol || "Unknown"}{" "}
+                                    <span className="ml-1 text-emerald-400">{comp.weight}%</span>
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-end justify-between border-t border-white/5 pt-3">
+                            <div>
+                              <span className="mb-0.5 block text-[8px] font-bold text-neutral-600 uppercase">
+                                Min Inv.
+                              </span>
+                              <span className="font-mono text-lg text-white">
+                                ${(vault.min_liquidity || 0).toLocaleString()}
+                              </span>
+                            </div>
+                            <ArrowRight size={16} className="text-white" />
+                          </div>
+                        </div>
+                      </div>
+                    </TinderCard>
+                  ))}
+
+                  <div className="absolute -bottom-20 flex items-center gap-6">
+                    <button
+                      onClick={() => swipe("left")}
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[#111] text-neutral-500 transition-colors hover:text-red-500"
+                    >
+                      <X size={20} />
+                    </button>
+                    <button
+                      onClick={() => swipe("right")}
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[#111] text-neutral-500 transition-colors hover:text-emerald-400"
+                    >
+                      <Heart size={20} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="mt-12 flex max-w-[280px] flex-col items-center justify-center rounded-[12px] border border-white/10 bg-[#111] px-6 py-8 text-center shadow-2xl"
+                >
+                  <h2 className="mb-2 font-serif text-xl font-bold text-white">All Caught Up</h2>
+                  <p className="mb-6 text-[10px] leading-relaxed text-neutral-400">
+                    Create your own strategy or
+                    <br />
+                    compare all vaults in list view.
+                  </p>
+                  <div className="flex w-full flex-col gap-3">
+                    <Button
+                      onClick={() => setViewMode("list")}
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 text-xs font-bold text-black transition-all hover:bg-emerald-400"
+                    >
+                      <List size={14} /> Browse All Vaults
+                    </Button>
+                    <Button
+                      onClick={() => router.push("/create")}
+                      variant="outline"
+                      className="h-10 w-full gap-2 rounded-lg border-white/10 text-xs text-white hover:bg-white/5"
+                    >
+                      <Sparkles size={14} /> Create with AI
+                    </Button>
+                    <button
+                      onClick={resetCards}
+                      className="mt-2 text-[9px] font-bold tracking-widest text-neutral-500 uppercase hover:text-white"
+                    >
+                      <RotateCcw size={10} className="mr-1 inline" /> Replay
+                    </button>
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           )}
 
+          {viewMode === "list" && (
+            <motion.div
+              key="list-view"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="mx-auto flex h-full w-full max-w-md flex-col px-4"
+            >
+              <div className="mb-4 flex items-center justify-between px-2">
+                <p className="text-xs font-bold text-neutral-500">{db.length} Vaults Found</p>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="h-8 w-[110px] rounded-lg border-white/10 bg-white/5 text-[10px] text-white">
+                    <ArrowUpDown size={10} className="mr-2" />
+                    <SelectValue placeholder="Sort" />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-[#1c1c1e] text-white">
+                    <SelectItem value="apy">Highest APY</SelectItem>
+                    <SelectItem value="tvl">Highest TVL</SelectItem>
+                    <SelectItem value="newest">Newest</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <ScrollArea className="-mx-4 flex-1 px-4 pb-20">
+                <div className="space-y-3 pb-32">
+                  {db.map((vault) => (
+                    <div
+                      key={vault.id}
+                      onClick={() => handleCardClick(vault.id)}
+                      className="group flex cursor-pointer items-center justify-between rounded-xl border border-white/5 bg-[#111] p-4 transition-transform hover:bg-white/5 active:scale-[0.98]"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/5 bg-neutral-900">
+                          {vault.image_url ? (
+                            <img
+                              src={vault.image_url}
+                              alt=""
+                              className="h-full w-full object-cover opacity-80"
+                            />
+                          ) : (
+                            <span className="font-serif text-sm font-bold text-white">
+                              {vault.symbol[0]}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="truncate text-sm font-bold text-white">{vault.name}</h4>
+                            {vault.apy && vault.apy > 20 && (
+                              <Badge className="h-4 border-0 bg-emerald-500/10 px-1 text-[9px] text-emerald-400">
+                                Hot
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-neutral-500">
+                            <span className="rounded border border-white/5 bg-white/5 px-1.5 py-0.5 text-neutral-400">
+                              {vault.symbol}
+                            </span>
+                            <span>• Min ${vault.min_liquidity?.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-shrink-0 pl-2 text-right">
+                        <div className="font-mono text-base leading-tight font-bold text-emerald-400">
+                          +{vault.apy ? vault.apy.toFixed(1) : "0.0"}%
+                        </div>
+                        <div className="mt-0.5 text-[10px] font-medium tracking-wider text-neutral-600 uppercase">
+                          APY
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     </div>

@@ -3,11 +3,9 @@
 import nodemailer from "nodemailer";
 
 export async function sendOtpEmail(email: string) {
-  // 6桁のコード生成
   const code = Math.floor(100000 + Math.random() * 900000).toString();
 
   try {
-    // DBに保存 (Backend API経由)
     const dbRes = await fetch("https://axis-api.yusukekikuta-05.workers.dev/auth/store-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -16,7 +14,6 @@ export async function sendOtpEmail(email: string) {
 
     if (!dbRes.ok) throw new Error("Database error");
 
-    // メール送信
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -41,11 +38,10 @@ export async function sendOtpEmail(email: string) {
             <p style="color: #666; font-size: 12px;">This code will expire in 10 minutes.</p>
           </div>
         </div>
-      `
+      `,
     });
 
     return { success: true };
-
   } catch (error) {
     console.error("Auth Error:", error);
     return { success: false, message: "Failed to send code." };

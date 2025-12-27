@@ -12,7 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-  SheetClose
+  SheetClose,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useBugReport } from "@/components/providers/BugReportProvider";
@@ -24,10 +24,9 @@ export function BottomNav() {
   const { connected } = useWallet();
   const { setVisible } = useWalletModal();
   const { open: openBugReport } = useBugReport();
-  
-  // Menu (Sheet) のState
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // Settings (Modal) のState
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleWalletClick = () => {
@@ -62,93 +61,94 @@ export function BottomNav() {
 
   return (
     <>
-      {/* SettingsModal を Sheet の外に配置。これで Sheet が閉じても消えません */}
       <SettingsModal open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
 
-      <div className="fixed bottom-0 left-0 w-full z-50 px-6 pb-8 pt-4 bg-gradient-to-t from-black via-black/90 to-transparent pointer-events-none">
-        <div className="pointer-events-auto max-w-md mx-auto bg-[#111]/90 backdrop-blur-xl border border-white/10 rounded-full h-16 flex items-center justify-between px-2 shadow-2xl relative">
-          
-          <div className="flex items-center justify-around flex-1 h-full px-2">
+      <div className="pointer-events-none fixed bottom-0 left-0 z-50 w-full bg-gradient-to-t from-black via-black/90 to-transparent px-6 pt-4 pb-8">
+        <div className="pointer-events-auto relative mx-auto flex h-16 max-w-md items-center justify-between rounded-full border border-white/10 bg-[#111]/90 px-2 shadow-2xl backdrop-blur-xl">
+          <div className="flex h-full flex-1 items-center justify-around px-2">
             {navItems.map((item) => (
               <button
                 key={item.label}
                 onClick={item.action}
                 className={cn(
-                  "relative flex flex-col items-center justify-center w-12 h-12 rounded-full transition-all duration-300",
-                  item.isActive 
-                    ? "text-white bg-white/10" 
-                    : "text-neutral-500 hover:text-white hover:bg-white/5",
-                  item.highlight && !item.isActive && "text-emerald-400 animate-pulse"
+                  "relative flex h-12 w-12 flex-col items-center justify-center rounded-full transition-all duration-300",
+                  item.isActive
+                    ? "bg-white/10 text-white"
+                    : "text-neutral-500 hover:bg-white/5 hover:text-white",
+                  item.highlight && !item.isActive && "animate-pulse text-emerald-400"
                 )}
               >
                 <item.icon size={20} strokeWidth={item.isActive ? 2.5 : 2} />
                 {item.isActive && (
-                  <span className="absolute -bottom-1 w-1 h-1 bg-white rounded-full" />
+                  <span className="absolute -bottom-1 h-1 w-1 rounded-full bg-white" />
                 )}
               </button>
             ))}
 
-            {/* Menu Sheet */}
             <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
               <SheetTrigger asChild>
-                <button className="flex flex-col items-center justify-center w-12 h-12 rounded-full text-neutral-500 hover:text-white hover:bg-white/5 transition-all">
+                <button className="flex h-12 w-12 flex-col items-center justify-center rounded-full text-neutral-500 transition-all hover:bg-white/5 hover:text-white">
                   <Menu size={20} />
                 </button>
               </SheetTrigger>
-              <SheetContent side="bottom" className="bg-[#09090b] border-t border-white/10 rounded-t-[32px] p-6 pb-12 z-[100]">
+              <SheetContent
+                side="bottom"
+                className="z-[100] rounded-t-[32px] border-t border-white/10 bg-[#09090b] p-6 pb-12"
+              >
                 <SheetHeader className="mb-6 text-left">
-                  <SheetTitle className="text-white font-serif text-xl">Menu</SheetTitle>
+                  <SheetTitle className="font-serif text-xl text-white">Menu</SheetTitle>
                 </SheetHeader>
-                
+
                 <div className="grid grid-cols-2 gap-4">
-                   {/* Bug Report */}
-                   <div className="col-span-2 bg-white/5 rounded-2xl p-4 border border-white/5 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
-                              <Bug size={18} />
-                          </div>
-                          <div className="text-sm">
-                              <p className="text-white font-bold">Report a Bug</p>
-                              <p className="text-neutral-500 text-xs">Found something wrong?</p>
-                          </div>
+                  <div className="col-span-2 flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10 text-orange-500">
+                        <Bug size={18} />
                       </div>
-                      <SheetClose asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="border-white/10 bg-black/20 text-xs hover:bg-white/10 hover:text-white"
-                          onClick={openBugReport}
-                        >
-                          Report
-                        </Button>
-                      </SheetClose>
-                   </div>
-
-                   {/* Settings Button */}
-                   {/* クリックしたら Menu を閉じて、Settings を開く */}
-                   <button 
-                      onClick={() => {
-                        setIsMenuOpen(false); // Menuを閉じる
-                        setIsSettingsOpen(true); // Settingsを開く
-                      }}
-                      className="col-span-2 group relative p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-left flex items-center justify-between"
-                   >
-                      <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 rounded-full bg-neutral-500/10 flex items-center justify-center text-neutral-400 group-hover:text-white transition-colors">
-                              <Settings size={18} />
-                          </div>
-                          <div>
-                              <p className="text-white font-bold">Settings</p>
-                              <p className="text-neutral-500 text-xs">RPC, Explorer, Currency</p>
-                          </div>
+                      <div className="text-sm">
+                        <p className="font-bold text-white">Report a Bug</p>
+                        <p className="text-xs text-neutral-500">Found something wrong?</p>
                       </div>
-                      <ChevronRight size={16} className="text-neutral-600 group-hover:text-white transition-colors" />
-                   </button>
+                    </div>
+                    <SheetClose asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-white/10 bg-black/20 text-xs hover:bg-white/10 hover:text-white"
+                        onClick={openBugReport}
+                      >
+                        Report
+                      </Button>
+                    </SheetClose>
+                  </div>
 
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsSettingsOpen(true);
+                    }}
+                    className="group relative col-span-2 flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:bg-white/10"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-500/10 text-neutral-400 transition-colors group-hover:text-white">
+                        <Settings size={18} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-white">Settings</p>
+                        <p className="text-xs text-neutral-500">RPC, Explorer, Currency</p>
+                      </div>
+                    </div>
+                    <ChevronRight
+                      size={16}
+                      className="text-neutral-600 transition-colors group-hover:text-white"
+                    />
+                  </button>
                 </div>
 
                 <div className="mt-8 text-center">
-                   <p className="text-[10px] text-neutral-600 uppercase tracking-widest">Axis Protocol v0.1.0</p>
+                  <p className="text-[10px] tracking-widest text-neutral-600 uppercase">
+                    Axis Protocol v0.1.0
+                  </p>
                 </div>
               </SheetContent>
             </Sheet>

@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, Compass, PlusCircle, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
@@ -34,22 +41,18 @@ export function AppSidebar() {
   const [open, setOpen] = useState(false);
 
   return (
-    // ★修正点: md:hidden を削除し、常に表示されるように変更しました
-    <div className=""> 
+    <div className="">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          {/* ★修正点: ボタンからも md:hidden を削除 */}
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
             <Menu />
           </Button>
         </SheetTrigger>
-        
-        <SheetContent side="left" className="p-0 bg-neutral-950 border-neutral-800 text-white w-72">
-          <SheetHeader className="p-6 border-b border-neutral-800">
+
+        <SheetContent side="left" className="w-72 border-neutral-800 bg-neutral-950 p-0 text-white">
+          <SheetHeader className="border-b border-neutral-800 p-6">
             <SheetTitle className="text-xl font-bold text-white">Axis Protocol</SheetTitle>
-            <SheetDescription className="text-neutral-500 text-xs">
-              Navigation
-            </SheetDescription>
+            <SheetDescription className="text-xs text-neutral-500">Navigation</SheetDescription>
           </SheetHeader>
 
           <div className="flex flex-col gap-1 p-4">
@@ -59,12 +62,12 @@ export function AppSidebar() {
                 href={route.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
-                  pathname === route.href ? "text-white bg-white/10" : "text-neutral-400"
+                  "group flex w-full cursor-pointer justify-start rounded-lg p-3 text-sm font-medium transition hover:bg-white/10 hover:text-white",
+                  pathname === route.href ? "bg-white/10 text-white" : "text-neutral-400"
                 )}
               >
-                <div className="flex items-center flex-1">
-                  <route.icon className={cn("h-5 w-5 mr-3", route.color)} />
+                <div className="flex flex-1 items-center">
+                  <route.icon className={cn("mr-3 h-5 w-5", route.color)} />
                   {route.label}
                 </div>
               </Link>

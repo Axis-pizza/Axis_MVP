@@ -16,7 +16,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { HTTPException } from 'hono/http-exception'
 
 
-// Cloudflare Workersの環境変数の型定義
 type Bindings = {
   axis_db: D1Database
   FAUCET_PRIVATE_KEY: string
@@ -28,7 +27,6 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>()
 
-// CORS設定
 app.use('/*', cors({
   origin: '*',
   allowHeaders: ['Content-Type', 'Authorization'],
@@ -42,7 +40,6 @@ const USDC_MINT = new PublicKey("Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr");
 app.onError((err, c) => {
   console.error(`[Global Error] ${err.message}`, err);
 
-  // HonoのHTTPException (意図的に投げたエラー) の場合
   if (err instanceof HTTPException) {
     return c.json({
       success: false,
@@ -50,11 +47,9 @@ app.onError((err, c) => {
     }, err.status);
   }
 
-  // それ以外の予期せぬシステムエラー (DB接続ミスなど)
   return c.json({
     success: false,
     error: 'Internal Server Error',
-    debug: err.message // 開発中は含めておくと便利 (本番では消す)
   }, 500);
 });
 
@@ -128,7 +123,6 @@ ${TOKEN_CONTEXT_STR}
 
 
 app.get('/auth/twitter', async (c) => {
-  // ★ .trim() を使用して余計な改行やスペースを削除
   const clientId = c.env.TWITTER_CLIENT_ID.trim();
   const clientSecret = c.env.TWITTER_CLIENT_SECRET.trim();
 
@@ -139,16 +133,14 @@ app.get('/auth/twitter', async (c) => {
   );
 
   const state = crypto.randomUUID();
-  const codeVerifier = crypto.randomUUID(); // PKCE用
+  const codeVerifier = crypto.randomUUID();
 
-  // Twitterの認証URL生成 (配列でスコープを渡す正しい形式)
   const url = await twitter.createAuthorizationURL(state, codeVerifier, [
     "users.read", 
     "tweet.read", 
     "offline.access"
   ]);
 
-  // Cookieにstateとverifierを一時保存 (検証用)
   setCookie(c, "twitter_oauth_state", state, {
     path: "/",
     secure: process.env.NODE_ENV === "production",
@@ -168,7 +160,6 @@ app.get('/auth/twitter', async (c) => {
   return c.redirect(url.toString());
 });
 
-// 2. コールバック (Twitterから戻ってくる場所)
 app.get('/auth/twitter/callback', async (c) => {
   const url = new URL(c.req.url);
   const code = url.searchParams.get("code");
@@ -194,19 +185,15 @@ app.get('/auth/twitter/callback', async (c) => {
     console.log("[Debug] Exchanging authorization code...");
     const tokens = await twitter.validateAuthorizationCode(code, storedCodeVerifier);
     
-    // ★修正箇所: tokens.accessToken が関数の可能性があるためチェックして取得
-    // arcticのバージョンによって プロパティ(v1) か メソッド(v2) か異なるため、両対応にしておくと安全です
     const accessToken = typeof tokens.accessToken === 'function' 
         ? tokens.accessToken() 
         : tokens.accessToken;
 
     console.log(`[Debug] Access Token Length: ${accessToken.length}`);
     
-    // ユーザー情報取得
     console.log("[Debug] Fetching user info...");
     const response = await fetch("https://api.twitter.com/2/users/me?user.fields=profile_image_url", {
       headers: {
-        // ★修正済み変数をここで使う
         Authorization: `Bearer ${accessToken}`,
       },
     });

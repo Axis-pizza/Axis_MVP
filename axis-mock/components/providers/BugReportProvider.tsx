@@ -23,7 +23,6 @@ export function BugReportProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// カスタムフック
 export function useBugReport() {
   const context = useContext(BugReportContext);
   if (context === undefined) {

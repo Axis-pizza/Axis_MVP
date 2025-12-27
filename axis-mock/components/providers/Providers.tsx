@@ -8,9 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AppWalletProvider>
-      <BugReportProvider>
-        {children}
-      </BugReportProvider>
+      <BugReportProvider>{children}</BugReportProvider>
     </AppWalletProvider>
   );
 }
