@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useBugReport } from "@/components/providers/BugReportProvider";
 import { SettingsModal } from "@/components/settings/SettingsModal";
+import { toast } from "sonner";
 
 export function BottomNav() {
   const router = useRouter();
@@ -24,18 +25,27 @@ export function BottomNav() {
   const { connected } = useWallet();
   const { setVisible } = useWalletModal();
   const { open: openBugReport } = useBugReport();
-
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isConnectingForPortfolio, setIsConnectingForPortfolio] = useState(false);
 
   const handleWalletClick = () => {
-    if (!connected) {
-      setVisible(true);
-    } else {
+    if (connected) {
       router.push("/portfolio");
+    } else {
+      setIsConnectingForPortfolio(true);
+      setVisible(true);
+      toast.info("Connect wallet to view portfolio");
     }
   };
+
+  useEffect(() => {
+    if (connected && isConnectingForPortfolio) {
+      router.push("/portfolio");
+      setIsConnectingForPortfolio(false);
+      toast.success("Wallet connected successfully");
+    }
+  }, [connected, isConnectingForPortfolio, router]);
 
   const navItems = [
     {
