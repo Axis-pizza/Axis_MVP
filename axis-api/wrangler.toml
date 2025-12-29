@@ -1,5 +1,5 @@
 name = "axis-api"
-main = "src/index.ts"
+main = "src/app.ts"
 compatibility_date = "2024-04-01"
 
 [[d1_databases]]
