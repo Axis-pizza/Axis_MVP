@@ -1,0 +1,15 @@
+{
+  "name": "axis-mvp-monorepo",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter axis-api dev",
+    "deploy:api": "pnpm --filter axis-api deploy",
+    "typegen:api": "pnpm --filter axis-api cf-typegen",
+    "dev:mock": "pnpm --filter axis-mock dev",
+    "build:mock": "pnpm --filter axis-mock build",
+    "start:mock": "pnpm --filter axis-mock start",
+    "lint:mock": "pnpm --filter axis-mock lint",
+    "dev": "pnpm --recursive --parallel dev"
+  },
+  "packageManager": "pnpm@10.10.0"
+}
