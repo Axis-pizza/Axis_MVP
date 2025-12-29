@@ -116,7 +116,7 @@ export function ExplorePage() {
   const handleCardClick = (id: string) => {
     if (!isSwipingRef.current) {
       setIsNavigating(true);
-      router.push(`/vault/${id}`);
+      router.push(`/vault?id=${id}`);
     }
   };
 

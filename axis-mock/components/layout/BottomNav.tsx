@@ -52,7 +52,7 @@ export function BottomNav() {
       label: "Explore",
       icon: Search,
       action: () => router.push("/"),
-      isActive: pathname === "/" || pathname.startsWith("/vault/"),
+      isActive: pathname === "/" || pathname.startsWith("/vault"),
     },
     {
       label: "Create",

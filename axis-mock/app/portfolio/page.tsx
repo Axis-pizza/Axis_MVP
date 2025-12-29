@@ -376,7 +376,7 @@ export default function PortfolioPage() {
               myPositions.map((pos) => (
                 <div
                   key={pos.vaultId}
-                  onClick={() => router.push(`/vault/${pos.vaultId}`)}
+                  onClick={() => router.push(`/vault?id=${pos.vaultId}`)}
                   className="flex items-center justify-between rounded-2xl border border-white/5 bg-[#111] p-4 transition-transform active:scale-[0.98]"
                 >
                   <div className="flex items-center gap-4">

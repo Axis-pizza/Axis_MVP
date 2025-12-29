@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAxisStore, Vault } from "@/app/store/useAxisStore";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Button } from "@/components/ui/button";
@@ -31,10 +31,10 @@ const generateChartData = () => {
   return data;
 };
 
-export default function VaultDetailPage() {
-  const params = useParams();
+function VaultDetailContent() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
   const router = useRouter();
-  const { id } = params;
 
   const { vaults, usdcBalance, fetchVaults, depositToVault } = useAxisStore();
   const { publicKey } = useWallet();
@@ -52,8 +52,10 @@ export default function VaultDetailPage() {
   }, [fetchVaults, vaults.length]);
 
   useEffect(() => {
-    const found = vaults.find((v) => v.id === id);
-    if (found) setVault(found);
+    if (id) {
+      const found = vaults.find((v) => v.id === id);
+      if (found) setVault(found);
+    }
   }, [vaults, id]);
 
   const tokenPrice = 124.53;
@@ -366,5 +368,17 @@ export default function VaultDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VaultDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="animate-spin text-emerald-500" />
+      </div>
+    }>
+      <VaultDetailContent />
+    </Suspense>
   );
 }

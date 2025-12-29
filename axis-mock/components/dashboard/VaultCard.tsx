@@ -116,7 +116,7 @@ export function VaultCard({
       <CardFooter className="p-4 pt-0">
         <Button
           className="w-full flex-1 border border-white/10 bg-white/5 font-serif text-white transition-all hover:bg-white/10"
-          onClick={() => router.push(`/vault/${contract}`)}
+          onClick={() => router.push(`/vault?id=${contract}`)}
         >
           View Details
         </Button>

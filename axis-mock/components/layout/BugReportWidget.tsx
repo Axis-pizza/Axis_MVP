@@ -7,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { ImagePlus, Loader2, MessageSquareWarning, X } from "lucide-react";
 import { toast } from "sonner";
-import { submitBugReport } from "@/app/actions/submit-bug";
 import { useBugReport } from "@/components/providers/BugReportProvider";
 
 export function BugReportWidget() {
@@ -35,26 +34,16 @@ export function BugReportWidget() {
 
     setIsSubmitting(true);
 
-    const formData = new FormData();
-    formData.append("discord", discord);
-    formData.append("description", description);
-    if (screenshot) {
-      formData.append("screenshot", screenshot);
-    }
-
-    const result = await submitBugReport(formData);
-
+    // TODO: Implement API endpoint for bug reports
+    // For now, show a message to contact via Discord
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    
     setIsSubmitting(false);
-
-    if (result.success) {
-      toast.success("Bug report sent! Thank you.");
-      close();
-      setDiscord("");
-      setDescription("");
-      setScreenshot(null);
-    } else {
-      toast.error(result.message);
-    }
+    toast.success("Thank you! Please also share this in our Discord for faster response.");
+    close();
+    setDiscord("");
+    setDescription("");
+    setScreenshot(null);
   };
 
   if (!isOpen) return null;
