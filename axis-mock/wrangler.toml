@@ -1,6 +1,8 @@
-name = "axisfe"
-main = ".open-next/worker.js"
-compatibility_date = "2025-12-23"
-compatibility_flags = ["nodejs_compat"]
+name = "axis-mock"
+main = ".open-next/worker.js" # OpenNextを使っている場合
+compatibility_date = "2024-09-23"
 
-assets = { directory = ".open-next/assets", binding = "ASSETS" }
+[build]
+command = "npx @opennextjs/cloudflare build"
+
+pages_build_output_dir = ".open-next/assets"
