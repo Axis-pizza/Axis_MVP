@@ -3,14 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "format": "prettier --write ."
-  },
+  "dev": "next dev",
+  "build": "npx @opennextjs/cloudflare build",
+  "start": "next start",
+  "lint": "next lint"
+},
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@opennextjs/cloudflare": "^1.14.7",
