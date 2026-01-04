@@ -51,8 +51,8 @@ export function BottomNav() {
     {
       label: "Explore",
       icon: Search,
-      action: () => router.push("/"),
-      isActive: pathname === "/" || pathname.startsWith("/vault/"),
+      action: () => router.push("/pages"),
+      isActive: pathname === "/pages" || pathname.startsWith("/vault/"),
     },
     {
       label: "Create",

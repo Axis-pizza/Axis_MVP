@@ -214,3 +214,71 @@
   background-color: rgba(0, 0, 0, 0.8) !important;
   backdrop-filter: blur(4px) !important;
 }
+@keyframes toast-shake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+
+
+/* 1. アニメーションの定義 (これが消えていました) */
+@keyframes toast-shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(4px); }
+  50% { transform: translateX(-4px); }
+  75% { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+
+/* 2. ベースのスタイル + アニメーション適用 */
+.axis-toast {
+  /* ここでアニメーションを呼び出し */
+  animation: toast-shake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  
+  border-radius: 12px;
+  font-weight: 500;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* デフォルトのボーダー設定（透明にしておく） */
+  border: 1px solid var(--normal-border);
+}
+
+/* 3. 配色設定（高級感のあるダークテーマ） */
+
+/* Success: 成功 (深緑背景 + 緑枠) */
+[data-sonner-toast][data-type="success"] {
+  --normal-bg: linear-gradient(135deg, #05180e, #031109);
+  --normal-border: #15803d; 
+  --normal-text: #dcfce7;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.15);
+}
+
+/* Error: エラー (深紅背景 + 赤枠) */
+[data-sonner-toast][data-type="error"] {
+  --normal-bg: linear-gradient(135deg, #1a0505, #120303);
+  --normal-border: #b91c1c;
+  --normal-text: #fee2e2;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+/* Info: 情報 (濃紺背景 + 青枠) */
+[data-sonner-toast]:has([data-type="info"]) {
+  --normal-bg: linear-gradient(135deg, #050b18, #020617);
+  --normal-border: #1d4ed8;
+  --normal-text: #dbeafe;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Warning: 警告 (焦げ茶背景 + 黄枠) */
+[data-sonner-toast]:has([data-type="warning"]) {
+  --normal-bg: linear-gradient(135deg, #1c1303, #160f02);
+  --normal-border: #a16207;
+  --normal-text: #fef3c7;
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.15);
+}
+

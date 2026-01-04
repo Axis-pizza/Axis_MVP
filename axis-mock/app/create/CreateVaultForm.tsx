@@ -1,645 +1,634 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import {
   Sparkles,
-  ArrowRight,
-  Upload,
-  Loader2,
-  Settings2,
+  Zap,
+  Shield,
+  Wallet,
   Trash2,
-  Image as ImageIcon,
-  CheckCircle2,
-  X,
+  ArrowLeft,
+  Plus,
+  Search,
   AlertTriangle,
+  X,
+  BrainCircuit,
+  ImageIcon,
+  CheckCircle2,
+  Upload
+  
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast, Toaster } from "sonner";
-import ReactMarkdown from "react-markdown";
 
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  uiAction?: "NONE" | "REQUEST_LOGO" | "SHOW_PREVIEW";
-  isTyping?: boolean;
-};
-
-interface Token {
-  address: string;
-  symbol: string;
-  name: string;
-  logoURI: string;
-}
-
-const MOCK_TOKENS: Token[] = [
-  {
-    address: "So11111111111111111111111111111111111111112",
-    symbol: "SOL",
-    name: "Solana",
-    logoURI: "https://assets.coingecko.com/coins/images/4128/large/solana.png",
-  },
-  {
-    address: "JUPyiwrYJFskUPiHa7hkeR8VUtkOp66YWug2yPnTxk3",
-    symbol: "JUP",
-    name: "Jupiter",
-    logoURI: "https://static.jup.ag/jup/icon.png",
-  },
-  {
-    address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-    symbol: "BONK",
-    name: "Bonk",
-    logoURI: "https://assets.coingecko.com/coins/images/28600/large/bonk.jpg",
-  },
-  {
-    address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-    symbol: "USDC",
-    name: "USD Coin",
-    logoURI: "https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png",
-  },
+// --- Constants ---
+const MAX_ASSETS = 10;
+const COLOR_PALETTE = [
+  "#9945FF", "#22C55E", "#F97316", "#3B82F6", 
+  "#EF4444", "#EAB308", "#EC4899", "#14B8A6",
 ];
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://axis-api.yusukekikuta-05.workers.dev";
+// --- Types ---
+interface Token {
+  address: string
+  symbol: string
+  name: string
+  logoURI: string | null
+}
 
-const Typewriter = ({ text, onComplete }: { text: string; onComplete?: () => void }) => {
-  const [displayedText, setDisplayedText] = useState("");
-  const indexRef = useRef(0);
-  useEffect(() => {
-    setDisplayedText("");
-    indexRef.current = 0;
-    const intervalId = setInterval(() => {
-      setDisplayedText((prev) => prev + text.charAt(indexRef.current));
-      indexRef.current++;
-      if (indexRef.current >= text.length) {
-        clearInterval(intervalId);
-        if (onComplete) onComplete();
-      }
-    }, 20);
-    return () => clearInterval(intervalId);
-  }, [text]);
-  return <ReactMarkdown>{displayedText}</ReactMarkdown>;
+interface CompositionItem {
+  token: Token;
+  weight: number;
+  color: string;
+}
+
+// --- Helper Components ---
+
+// 1. Simulation Chart
+const SimulationChart = ({ isAggressive }: { isAggressive: boolean }) => {
+  const width = 300;
+  const height = 150;
+  const solPoints = "0,120 50,110 100,115 150,90 200,80 250,85 300,70";
+  const etfPoints = isAggressive
+    ? "0,120 50,100 100,110 150,60 200,70 250,40 300,10"
+    : "0,120 50,115 100,105 150,95 200,85 250,75 300,60";
+
+  return (
+    <div className="relative w-full h-48 bg-white/5 rounded-xl border border-white/10 p-4 overflow-hidden">
+      <div className="absolute top-2 left-4 text-xs font-bold text-neutral-500">Backtest Simulation (1Y)</div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+        <line x1="0" y1="120" x2="300" y2="120" stroke="#333" strokeWidth="1" strokeDasharray="4" />
+        <path d={`M${solPoints}`} fill="none" stroke="#666" strokeWidth="2" strokeDasharray="4" opacity="0.5" />
+        <text x="280" y="65" fill="#666" fontSize="10">SOL</text>
+        <motion.path 
+          d={`M${etfPoints}`} 
+          fill="none" 
+          stroke={isAggressive ? "#F97316" : "#22C55E"} 
+          strokeWidth="3"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 2, ease: "easeInOut" }}
+        />
+      </svg>
+    </div>
+  );
 };
 
-export function CreateWithAI() {
+// ✅ 2. 3D Holographic Card (Auto-Rotating)
+const ThreeDCard = ({ name, ticker, logo }: { name: string, ticker: string, logo: string | null }) => {
+  return (
+    <div className="flex justify-center perspective-1000 py-8 min-h-[450px] items-center">
+      <motion.div
+        animate={{
+          rotateY: [0, 160, 200, 360],
+        }}
+        transition={{
+          duration: 6,
+          times: [0, 0.35, 0.45, 1],
+          ease: [0.22, 1, 0.36, 1],
+          repeat: Infinity,
+        }}
+        whileHover={{
+          rotateX: 6,
+          rotateY: 6,
+        }}
+        className="relative w-72 h-[420px] rounded-3xl preserve-3d"
+        style={{ transformStyle: "preserve-3d" }}
+      >
+
+        {/* --- FRONT SIDE --- */}
+        <div 
+          className="absolute inset-0 w-full h-full backface-hidden rounded-3xl border border-white/10 overflow-hidden shadow-2xl bg-[#0a0a0a]"
+          style={{ backfaceVisibility: "hidden" }}
+        >
+           {/* Background & Effects */}
+           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-30 mix-blend-overlay" />
+           <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-black" />
+           
+           {/* Moving Glare (Animation synced with rotation) */}
+           <motion.div 
+             animate={{ x: ["-100%", "200%"] }}
+             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", repeatDelay: 1 }}
+             className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent skew-x-12"
+           />
+
+           {/* Content */}
+           <div className="relative z-10 flex flex-col items-center justify-between h-full p-8 py-10">
+              <div className="flex flex-col items-center">
+                 <div className="relative w-24 h-24 rounded-full border-4 border-white/10 p-1 mb-6 shadow-xl bg-black">
+                    {logo ? (
+                       <img src={logo} className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                       <div className="w-full h-full rounded-full bg-emerald-500/20 flex items-center justify-center">
+                          <span className="text-3xl font-bold text-emerald-500">{ticker[0]}</span>
+                       </div>
+                    )}
+                 </div>
+                 
+                 <h3 className="text-2xl font-serif font-bold text-white text-center leading-tight drop-shadow-md">{name}</h3>
+                 <Badge variant="outline" className="mt-3 border-emerald-500/50 text-emerald-400 bg-emerald-500/10 px-3 py-1">
+                   {ticker}
+                 </Badge>
+              </div>
+
+              <div className="w-full space-y-3 bg-white/5 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
+                 <div className="flex justify-between text-xs border-b border-white/10 pb-2">
+                    <span className="text-neutral-500">Structure</span>
+                    <span className="font-mono">Tokenized Index</span>
+                 </div>
+                 <div className="flex justify-between text-xs border-b border-white/10 pb-2">
+                    <span className="text-neutral-500">Engine</span>
+                    <span className="flex items-center gap-1 text-emerald-400 font-bold"><Zap size={10}/> Jito MEV</span>
+                 </div>
+                 <div className="flex justify-between text-xs">
+                    <span className="text-neutral-500">Network</span>
+                    <span className="flex items-center gap-1">Solana</span>
+                 </div>
+              </div>
+              
+              <div className="text-[9px] text-neutral-600 font-mono tracking-widest mt-2">
+                 AXIS PROTOCOL • VERIFIED
+              </div>
+           </div>
+           
+           {/* Border Glow */}
+           <div className="absolute inset-0 rounded-3xl border border-emerald-500/30 z-20" />
+        </div>
+
+        {/* --- BACK SIDE --- */}
+        <div 
+          className="absolute inset-0 w-full h-full backface-hidden rounded-3xl border border-white/10 overflow-hidden shadow-xl bg-[#050505] flex items-center justify-center"
+          style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+        >
+           {/* Back Pattern */}
+           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+           <div className="absolute inset-0 flex items-center justify-center opacity-10">
+              <BrainCircuit size={150} />
+           </div>
+           
+           <div className="relative z-10 text-center">
+              <div className="text-3xl font-serif font-bold text-white mb-2">Axis.</div>
+              <div className="text-[10px] text-emerald-500 font-mono tracking-[0.3em]">QUANTUM VAULT</div>
+           </div>
+
+           {/* Back Glare */}
+           <motion.div 
+             animate={{ x: ["200%", "-100%"] }}
+             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", repeatDelay: 1 }}
+             className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent -skew-x-12"
+           />
+           <div className="absolute inset-0 rounded-3xl border border-white/5" />
+        </div>
+
+      </motion.div>
+    </div>
+  );
+};
+
+
+// --- Main Component ---
+export default function CreateWizard() {
   const router = useRouter();
   const { publicKey } = useWallet();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState(0);
-
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "init",
-      role: "assistant",
-      content:
-        "Welcome. I am Axis AI. Let's create your ETF.\nFirst, **what is the Name** for your new Vault?",
-      uiAction: "NONE",
-      isTyping: true,
-    },
+  // --- Global State ---
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [isDeploying, setIsDeploying] = useState(false);
+  
+  // Data State
+  const [name, setName] = useState("");
+  const [ticker, setTicker] = useState("");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [composition, setComposition] = useState<CompositionItem[]>([
+    { 
+      token: {
+        address: "So11111111111111111111111111111111111111112",
+        symbol: "SOL",
+        name: "Solana",
+        logoURI: "https://assets.coingecko.com/coins/images/4128/large/solana.png"
+      }, 
+      weight: 100,
+      color: "#9945FF"
+    }, 
   ]);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    symbol: "",
-    description: "",
-    imageUrl: null as string | null,
-    composition: [] as { token: Token; weight: number }[],
-    strategy: { fee: 0.95, rebalance: 2.0, rebalanceType: "Weekly" },
-  });
+  // Token Selection State
+  const [allTokens, setAllTokens] = useState<Token[]>([]);
+  const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  // Simulation State
+  const [simData, setSimData] = useState({ roi: "0%", stdDev: "0%", type: "balanced" });
 
+  // --- Initial Load ---
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+    const loadTokens = async () => {
+      try {
+        const res = await fetch("https://api.jup.ag/tokens/v2/tag?query=verified", {
+          headers: { "x-api-key": process.env.NEXT_PUBLIC_JUP_API_KEY! }
+        });
+        if (!res.ok) throw new Error("API Error");
+        const raw = await res.json();
+        setAllTokens(raw.map((t: any) => ({
+          address: t.id || t.mint, symbol: t.symbol, name: t.name, logoURI: t.icon || null,
+        })));
+      } catch (err) { console.error(err); }
+    };
+    loadTokens();
+  }, []);
 
-  useEffect(() => {
-    if (formData.imageUrl && step === 2) {
-      setTimeout(() => {
-        const aiMsg: Message = {
-          id: Date.now().toString(),
-          role: "assistant",
-          content:
-            "Logo received. Looking good.\nNow, tell me your **investment strategy** (e.g. 'High risk Solana ecosystem').",
-          uiAction: "NONE",
-          isTyping: true,
-        };
-        setMessages((prev) => [...prev, aiMsg]);
-        setStep(3);
-      }, 1000);
-    }
-  }, [formData.imageUrl, step]);
-
-  const processMockAI = (userInput: string) => {
-    let responseText = "";
-    let nextStep = step;
-    let uiAction: "NONE" | "REQUEST_LOGO" | "SHOW_PREVIEW" = "NONE";
-    let updatedData: any = {};
-
-    switch (step) {
-      case 0:
-        updatedData = { name: userInput };
-        responseText = `**"${userInput}"**. Great name.\nNext, what should be the **Ticker Symbol**? (e.g. AXIS)`;
-        nextStep = 1;
-        break;
-      case 1:
-        updatedData = { symbol: userInput.toUpperCase().slice(0, 5) };
-        responseText = `Got it, **$${userInput.toUpperCase().slice(0, 5)}**.\nPlease upload a logo for your vault.`;
-        uiAction = "REQUEST_LOGO";
-        nextStep = 2;
-        break;
-      case 2:
-        responseText =
-          "Okay, we can add the logo later.\nWhat is your **investment strategy**? (e.g. 'Aggressive growth')";
-        nextStep = 3;
-        break;
-      case 3:
-        updatedData = { description: userInput };
-        responseText = `Understood: "${userInput}".\n\nI have designed a portfolio based on your strategy. You can edit the composition below.`;
-        uiAction = "SHOW_PREVIEW";
-        updatedData.composition = [
-          { token: MOCK_TOKENS[0], weight: 40 },
-          { token: MOCK_TOKENS[1], weight: 30 },
-          { token: MOCK_TOKENS[2], weight: 30 },
-        ];
-        nextStep = 4;
-        break;
-      case 4:
-        responseText = "Is there anything you'd like to adjust? You can use the 'Edit' button.";
-        uiAction = "SHOW_PREVIEW";
-        break;
-    }
-    return { responseText, nextStep, uiAction, updatedData };
-  };
-
-  const sendMessage = async (overrideInput?: string) => {
-    const textToSend = overrideInput || input;
-    if (!textToSend.trim()) return;
-
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: textToSend };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsLoading(true);
-
-    setTimeout(() => {
-      const result = processMockAI(textToSend);
-      if (Object.keys(result.updatedData).length > 0) {
-        setFormData((prev) => ({ ...prev, ...result.updatedData }));
-      }
-      setStep(result.nextStep);
-
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: result.responseText,
-        uiAction: result.uiAction,
-        isTyping: true,
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-      setIsLoading(false);
-    }, 800);
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- Handlers ---
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData((prev) => ({ ...prev, imageUrl: reader.result as string }));
-        toast.success("Logo uploaded!");
-      };
+      reader.onloadend = () => setLogoPreview(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
 
-  const handleDeploy = async () => {
-    if (!publicKey) return toast.error("Connect wallet first.");
-
-    const totalWeight = formData.composition.reduce((sum, c) => sum + c.weight, 0);
-    if (totalWeight !== 100)
-      return toast.error(`Total weight must be 100%. Current: ${totalWeight}%`);
-
-    const toastId = toast.loading("Deploying Vault config to Database...");
-
-    try {
-      const payload = {
-        name: formData.name,
-        symbol: formData.symbol,
-        description: formData.description,
-        creator: publicKey.toBase58(),
-        strategy: formData.strategy.rebalanceType,
-        fee: formData.strategy.fee,
-        minLiquidity: 1000,
-        imageUrl: formData.imageUrl,
-        composition: formData.composition.map((c) => ({
-          token_address: c.token.address,
-          symbol: c.token.symbol,
-          weight: c.weight,
-        })),
-      };
-
-      const response = await fetch(`${API_BASE_URL}/vaults`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create vault");
-      }
-
-      const data = await response.json();
-
-      toast.success("Vault Created Successfully!", { id: toastId });
-
-      setTimeout(() => router.push("/"), 1000);
-    } catch (error: any) {
-      console.error("Deploy Error:", error);
-      toast.error(error.message || "Something went wrong", { id: toastId });
-    }
+  const addToken = (token: Token) => {
+    if (composition.length >= MAX_ASSETS) return toast.error("Max assets reached");
+    if (composition.find(c => c.token.address === token.address)) return toast.error("Already added");
+    
+    setComposition(prev => [...prev, { token, weight: 0, color: COLOR_PALETTE[prev.length % 8] }]);
+    setIsTokenModalOpen(false);
   };
 
-  const handleTypingComplete = (msgId: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, isTyping: false } : m)));
-  };
-
-  const updateWeight = (address: string, newWeight: number) => {
-    setFormData((prev) => {
-      const otherWeights = prev.composition
-        .filter((c) => c.token.address !== address)
-        .reduce((sum, c) => sum + c.weight, 0);
-      const maxAllowed = 100 - otherWeights;
-      const clampedWeight = Math.min(newWeight, maxAllowed);
-      return {
-        ...prev,
-        composition: prev.composition.map((c) =>
-          c.token.address === address ? { ...c, weight: clampedWeight } : c
-        ),
-      };
+  const updateWeight = (address: string, newVal: number) => {
+    setComposition(prev => {
+      const otherWeight = prev.filter(c => c.token.address !== address).reduce((s, c) => s + c.weight, 0);
+      return prev.map(c => c.token.address === address ? { ...c, weight: Math.min(newVal, 100 - otherWeight) } : c);
     });
   };
 
-  const removeToken = (address: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      composition: prev.composition.filter((c) => c.token.address !== address),
-    }));
+  // ✅ AI Strategy with Duplicate Prevention & No Overlap
+  const applyAiStrategy = (type: 'aggressive' | 'balanced') => {
+    if (allTokens.length === 0) return toast.error("Loading tokens...");
+
+    const targetSymbols = type === 'aggressive'
+      ? ["BONK", "WIF", "JUP", "PYTH", "RAY", "POPCAT", "SOL"]
+      : ["SOL", "mSOL", "JitoSOL", "USDC", "USDT", "INF"];
+
+    let candidates: Token[] = [];
+    const usedAddresses = new Set<string>();
+
+    for (const sym of targetSymbols) {
+      const found = allTokens.find(t => t.symbol.toUpperCase() === sym.toUpperCase());
+      if (found && !usedAddresses.has(found.address)) {
+        candidates.push(found);
+        usedAddresses.add(found.address);
+      }
+      if (candidates.length >= 4) break;
+    }
+    
+    // Fallback if no tokens found
+    if (candidates.length === 0) {
+        const sol = allTokens.find(t => t.symbol === "SOL");
+        if (sol) candidates.push(sol);
+    }
+
+    const newComp = candidates.map((token, idx) => {
+      let weight = 0;
+      if (type === 'aggressive') {
+        if (idx === 0) weight = 40; else if (idx === 1) weight = 30; else if (idx === 2) weight = 20; else weight = 10;
+      } else {
+        if (idx === 0) weight = 60; else if (idx === 1) weight = 30; else weight = 10;
+      }
+      return { token, weight, color: COLOR_PALETTE[idx % 8] };
+    });
+
+    const total = newComp.reduce((s, c) => s + c.weight, 0);
+    if (total !== 100 && newComp.length > 0) newComp[0].weight += (100 - total);
+
+    setComposition(newComp);
+    
+    if (type === 'aggressive') {
+      setSimData({ roi: "+42.5%", stdDev: "High", type: "aggressive" });
+      toast.success("Applied: High Yield Degen Strategy");
+    } else {
+      setSimData({ roi: "+18.2%", stdDev: "Low", type: "balanced" });
+      toast.success("Applied: Balanced Foundation Strategy");
+    }
   };
 
-  const currentTotalWeight = useMemo(() => {
-    return formData.composition.reduce((sum, c) => sum + c.weight, 0);
-  }, [formData.composition]);
+  const handleNext = () => {
+    if (step === 1) {
+      if (!name || !ticker) return toast.error("Please fill in Name and Ticker");
+      setStep(2);
+    } else if (step === 2) {
+      const total = composition.reduce((s, c) => s + c.weight, 0);
+      if (total !== 100) return toast.error(`Total weight must be 100% (Current: ${total}%)`);
+      setStep(3); 
+    } else if (step === 3) {
+      setStep(4);
+    }
+  };
+
+  const handleDeploy = async () => {
+    if (!publicKey) return toast.error("Connect Wallet");
+    setIsDeploying(true);
+    
+    try {
+        const payload = {
+          name,
+          symbol: ticker,
+          description: "",
+          creator: publicKey.toBase58(),
+          strategy: "Weekly",
+          fee: 0.95,
+          minLiquidity: 1000,
+          composition: composition.map(c => ({
+            mint: c.token.address,
+            symbol: c.token.symbol,
+            weight: c.weight,
+          })),
+          imageUrl: logoPreview,
+        };
+    
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_AXIS_API_BASE_URL}/vaults`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
+    
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || "Failed");
+    
+        toast.success("Vault Created Successfully!");
+        router.push(`/vaults/${data.id}`);
+    
+      } catch (err: any) {
+        console.error("Deploy Error:", err);
+        toast.error(err.message || "Deployment failed");
+      } finally {
+        setIsDeploying(false);
+      }
+  };
 
   return (
-    <div className="fixed inset-0 z-[60] flex h-[100dvh] w-full flex-col overflow-hidden overscroll-none font-sans text-white">
-      <Toaster
-        position="top-right"
-        theme="dark"
-        richColors
-        toastOptions={{
-          style: { zIndex: 99999 },
-        }}
+    <div className="min-h-screen w-full  text-white font-sans pb-32">
+      <Toaster 
+      position="top-right"
+      duration={1200}
+      toastOptions={{
+        className: "axis-toast",
+      }}
       />
 
-      <div className="z-50 flex flex-none items-center justify-between border-b border-white/10 px-4 py-3 backdrop-blur-md">
+      <header className="flex items-center justify-between px-6 py-4 sticky top-0 z-50  backdrop-blur">
         <div className="flex items-center gap-2">
-          <Sparkles className="animate-pulse text-emerald-400" size={16} />
-          <span className="font-serif text-base font-bold tracking-wide">Axis AI (Demo)</span>
+           {step > 1 && (
+             <Button variant="ghost" size="icon" onClick={() => setStep(s => Math.max(1, s-1) as any)} className="mr-1 -ml-2">
+               <ArrowLeft size={20} />
+             </Button>
+           )}
+           <h1 className="text-xl font-serif font-bold">Create Vault</h1>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-neutral-400 hover:text-white"
-          onClick={() => router.back()}
-        >
-          <X size={20} />
-        </Button>
-      </div>
-
-      <div className="scrollbar-hide mx-auto w-full max-w-lg flex-1 overflow-y-auto">
-        <div className="space-y-6 px-4 py-6 pb-4">
-          <AnimatePresence initial={false}>
-            {messages.map((msg) => (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`flex max-w-[85%] flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
-                >
-                  <div
-                    className={`rounded-2xl px-4 py-3 text-[15px] leading-relaxed shadow-sm ${
-                      msg.role === "user"
-                        ? "rounded-br-none border border-white/10 bg-[#222] text-white"
-                        : "pl-0 text-neutral-200"
-                    }`}
-                  >
-                    {msg.role === "assistant" && msg.isTyping ? (
-                      <Typewriter
-                        text={msg.content}
-                        onComplete={() => handleTypingComplete(msg.id)}
-                      />
-                    ) : (
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    )}
-                  </div>
-
-                  {msg.role === "assistant" && !msg.isTyping && (
-                    <div className="animate-in fade-in mt-2 w-full pl-0">
-                      {msg.uiAction === "REQUEST_LOGO" && (
-                        <div className="mt-1">
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            accept="image/*"
-                            onChange={handleImageUpload}
-                          />
-                          <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            variant="outline"
-                            size="sm"
-                            className="h-9 rounded-full border-white/20 bg-white/5 text-neutral-300 hover:bg-white/10 hover:text-white"
-                          >
-                            {formData.imageUrl ? (
-                              <CheckCircle2 size={14} className="mr-2 text-emerald-500" />
-                            ) : (
-                              <Upload size={14} className="mr-2" />
-                            )}
-                            {formData.imageUrl ? "Logo Uploaded" : "Upload Logo"}
-                          </Button>
-                        </div>
-                      )}
-
-                      {msg.uiAction === "SHOW_PREVIEW" && (
-                        <motion.div
-                          initial={{ scale: 0.95 }}
-                          animate={{ scale: 1 }}
-                          className="mt-3 w-full"
-                        >
-                          <Card className="group relative overflow-hidden rounded-3xl border border-white/10 bg-[#0A0A0A] shadow-2xl">
-                            <div className="pointer-events-none absolute top-0 right-0 h-32 w-32 rounded-full bg-emerald-500/10 blur-[50px]" />
-                            <CardContent className="p-5">
-                              <div className="mb-5 flex items-center gap-4">
-                                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-                                  {formData.imageUrl ? (
-                                    <img
-                                      src={formData.imageUrl}
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    <ImageIcon className="text-neutral-700" size={20} />
-                                  )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <h3 className="truncate font-serif text-lg font-bold text-white">
-                                    {formData.name || "Untitled"}
-                                  </h3>
-                                  <Badge
-                                    variant="outline"
-                                    className="mt-1 border-white/10 font-mono text-[10px] text-neutral-400"
-                                  >
-                                    {formData.symbol || "TICKER"}
-                                  </Badge>
-                                </div>
-                              </div>
-
-                              <div className="mb-4 flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3 text-xs text-neutral-400">
-                                <div>
-                                  Fee: <span className="font-mono text-emerald-400">0.95%</span>
-                                </div>
-                                <div>
-                                  Rebal:{" "}
-                                  <span className="font-mono text-white">
-                                    {formData.strategy.rebalanceType}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="mb-6 space-y-2">
-                                <ScrollArea className="h-[120px] pr-2">
-                                  {(formData.composition || []).map((c, i) => (
-                                    <div
-                                      key={i}
-                                      className="flex items-center justify-between border-b border-white/5 py-2 text-sm last:border-0"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-medium text-neutral-300">
-                                          {c.token.symbol}
-                                        </span>
-                                      </div>
-                                      <span className="font-mono text-xs text-white">
-                                        {c.weight}%
-                                      </span>
-                                    </div>
-                                  ))}
-                                </ScrollArea>
-                              </div>
-
-                              <div className="flex gap-2">
-                                <Button
-                                  onClick={() => setIsEditModalOpen(true)}
-                                  variant="outline"
-                                  className="h-10 flex-1 rounded-xl border-white/10 bg-white/5 text-neutral-300 hover:bg-white/10"
-                                >
-                                  <Settings2 size={16} />
-                                </Button>
-                                <Button
-                                  onClick={handleDeploy}
-                                  className="h-10 flex-[3] rounded-xl bg-white font-serif font-bold text-black hover:bg-neutral-200"
-                                >
-                                  <Sparkles size={16} className="mr-2" /> Deploy
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          <div ref={messagesEndRef} className="h-1" />
+        <div className="flex gap-1">
+           {[1,2,3,4].map(i => (
+             <div key={i} className={`h-1.5 w-8 rounded-full transition-colors ${i <= step ? "bg-emerald-500" : "bg-white/10"}`} />
+           ))}
         </div>
-      </div>
+      </header>
 
-      <div className="z-50 flex-none border-t border-white/10 bg-[#000000] p-4 pb-8">
-        <div className="relative mx-auto w-full max-w-lg">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !isLoading && sendMessage()}
-            placeholder="Type message..."
-            className="h-12 rounded-full border-white/10 bg-[#1A1A1A] pr-12 pl-5 text-white shadow-lg placeholder:text-neutral-600 focus:border-white/30"
-            disabled={isLoading}
-          />
-          <Button
-            onClick={() => sendMessage()}
-            size="icon"
-            disabled={!input.trim() || isLoading}
-            className="absolute top-1.5 right-1.5 h-9 w-9 rounded-full bg-white text-black transition-all hover:bg-emerald-400 disabled:bg-neutral-800 disabled:opacity-50"
-          >
-            <ArrowRight size={16} />
-          </Button>
-        </div>
-      </div>
-
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="z-[99999] max-h-[85vh] w-[95%] overflow-y-auto rounded-3xl border-white/10 bg-[#09090b] text-white sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl">Edit Strategy</DialogTitle>
-            <DialogDescription className="text-xs text-neutral-500">
-              Adjust allocations. Total must be 100%.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-neutral-500">Name</span>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                  className="h-10 rounded-xl border-white/10 bg-white/5"
-                />
-              </div>
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-neutral-500">Symbol</span>
-                <Input
-                  value={formData.symbol}
-                  onChange={(e) => setFormData((p) => ({ ...p, symbol: e.target.value }))}
-                  className="h-10 rounded-xl border-white/10 bg-white/5"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-neutral-500">Rebalance Freq.</span>
-                <Select
-                  value={formData.strategy.rebalanceType}
-                  onValueChange={(val) =>
-                    setFormData((p) => ({ ...p, strategy: { ...p.strategy, rebalanceType: val } }))
-                  }
-                >
-                  <SelectTrigger className="h-10 rounded-xl border-white/10 bg-white/5 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="z-[100000] border-white/10 bg-[#111] text-white">
-                    <SelectItem value="Daily">Daily</SelectItem>
-                    <SelectItem value="Weekly">Weekly</SelectItem>
-                    <SelectItem value="Monthly">Monthly</SelectItem>
-                    <SelectItem value="Threshold">Threshold</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-neutral-500">Management Fee</span>
-                <div className="flex h-10 cursor-not-allowed items-center rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-neutral-400">
-                  0.95% (Fixed)
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-500 uppercase">
-                  Assets & Weight
-                </span>
-                <div
-                  className={`rounded-md px-2 py-1 font-mono text-xs font-bold ${currentTotalWeight === 100 ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}
-                >
-                  Total: {currentTotalWeight}%
-                </div>
-              </div>
-
-              {(formData.composition || []).map((c) => {
-                const otherWeight = currentTotalWeight - c.weight;
-                const maxForThis = 100 - otherWeight;
-                return (
-                  <div
-                    key={c.token.address}
-                    className="space-y-3 rounded-2xl border border-white/5 bg-white/5 p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <img src={c.token.logoURI} alt="" className="h-5 w-5 rounded-full" />
-                        <span className="text-sm font-bold">{c.token.symbol}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm">{c.weight}%</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeToken(c.token.address)}
-                          className="h-6 w-6 text-neutral-500 hover:bg-red-500/10 hover:text-red-500"
-                        >
-                          <Trash2 size={12} />
-                        </Button>
-                      </div>
-                    </div>
-                    <Slider
-                      value={[c.weight]}
-                      max={Math.max(c.weight, maxForThis)}
-                      step={1}
-                      onValueChange={(v) => updateWeight(c.token.address, v[0])}
-                      className="flex-1 py-1"
-                    />
-                  </div>
-                );
-              })}
-
-              {currentTotalWeight < 100 && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg bg-yellow-500/10 p-2 text-xs text-yellow-500">
-                  <AlertTriangle size={12} />
-                  <span>You need {100 - currentTotalWeight}% more to reach 100%.</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter className="mt-6">
-            <Button
-              onClick={() => setIsEditModalOpen(false)}
-              disabled={currentTotalWeight !== 100}
-              className="h-12 w-full rounded-xl bg-white font-bold text-black hover:bg-neutral-200 disabled:opacity-50"
+      <main className="max-w-2xl mx-auto p-6">
+        <AnimatePresence mode="wait">
+          
+          {step === 1 && (
+            <motion.div 
+              key="step1"
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              className="space-y-8"
             >
-              Save Changes
-            </Button>
-          </DialogFooter>
+              <div className="text-center space-y-2">
+                <h2 className="text-3xl font-serif">Define Identity</h2>
+                <p className="text-neutral-400 text-sm">Give your fund a face and a name.</p>
+              </div>
+              <div className="flex justify-center">
+                <div 
+                  onClick={() => document.getElementById('logo-upload')?.click()}
+                  className="w-32 h-32 rounded-full bg-white/5 border-2 border-dashed border-white/10 hover:border-emerald-500/50 flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden group"
+                >
+                  {logoPreview ? (
+                    <img src={logoPreview} className="w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <ImageIcon className="text-neutral-500 mb-2 group-hover:text-emerald-400" size={32} />
+                      <span className="text-[10px] uppercase font-bold text-neutral-500 group-hover:text-emerald-400">Upload Logo</span>
+                    </>
+                  )}
+                  <input id="logo-upload" type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                   <label className="text-xs font-bold text-neutral-500 uppercase">Vault Name</label>
+                   <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Citadel Solana Fund" className="h-12 bg-white/5 border-white/10 text-lg rounded-xl focus:border-emerald-500/50" />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-xs font-bold text-neutral-500 uppercase">Ticker Symbol</label>
+                   <Input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} placeholder="e.g. CTDL" className="h-12 bg-white/5 border-white/10 text-lg font-mono rounded-xl focus:border-emerald-500/50" />
+                </div>
+
+                <div className="flex justify-end pt-2">
+      <Button
+        onClick={handleNext}
+        className="h-12 px-8 bg-white text-black hover:bg-neutral-200 font-bold shadow-xl"
+      >
+        Next
+      </Button>
+    </div>
+
+              </div>
+            </motion.div>
+          )}
+
+          {step === 2 && (
+            <motion.div 
+              key="step2"
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+               <div className="text-center space-y-1">
+                <h2 className="text-2xl font-serif">Portfolio Composition</h2>
+                <p className="text-neutral-400 text-sm">Select assets or ask AI for a strategy.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                 <button onClick={() => applyAiStrategy('balanced')} className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all text-left group">
+                    <div className="mb-2 p-2 bg-purple-500/20 w-fit rounded-lg text-purple-400 group-hover:scale-110 transition-transform"><Sparkles size={20}/></div>
+                    <div className="font-bold text-sm">Safe / Balanced</div>
+                 </button>
+                 <button onClick={() => applyAiStrategy('aggressive')} className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-orange-500/10 hover:border-orange-500/30 transition-all text-left group">
+                    <div className="mb-2 p-2 bg-orange-500/20 w-fit rounded-lg text-orange-400 group-hover:scale-110 transition-transform"><Zap size={20}/></div>
+                    <div className="font-bold text-sm">Degen / Aggressive</div>
+                 </button>
+              </div>
+
+              <div className="space-y-4">
+                 <div className="flex justify-between items-center px-1">
+                    <span className="text-xs font-bold text-neutral-500 uppercase">Allocation ({composition.length}/{MAX_ASSETS})</span>
+                    <Button variant="ghost" size="sm" onClick={() => setIsTokenModalOpen(true)} className="text-xs text-emerald-400 hover:text-emerald-300">
+                      <Plus size={14} className="mr-1"/> Add Asset
+                    </Button>
+                 </div>
+                 
+                 <div className="space-y-4">
+                  {composition.map(item => (
+                    <div key={item.token.address} className="bg-[#121212] p-4 rounded-2xl border border-white/5">
+                       <div className="flex justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                             {item.token.logoURI && <img src={item.token.logoURI} className="w-6 h-6 rounded-full"/>}
+                             <span className="font-bold">{item.token.symbol}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                             <span className="font-mono">{item.weight}%</span>
+                             <button onClick={() => setComposition(p => p.filter(x => x.token.address !== item.token.address))} className="text-neutral-600 hover:text-red-500"><Trash2 size={14}/></button>
+                          </div>
+                       </div>
+                       <Slider value={[item.weight]} max={100} step={1} onValueChange={(v) => updateWeight(item.token.address, v[0])} className="py-1" />
+                    </div>
+                  ))}
+                 </div>
+                 <div className={`p-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold ${composition.reduce((s,c)=>s+c.weight,0) === 100 ? "bg-emerald-500/10 text-emerald-400" : "bg-yellow-500/10 text-yellow-500"}`}>
+                    {composition.reduce((s,c)=>s+c.weight,0) === 100 ? <CheckCircle2 size={16}/> : <AlertTriangle size={16}/>}
+                    Total Allocation: {composition.reduce((s,c)=>s+c.weight,0)}%
+                 </div>
+
+                 <div className="flex justify-end pt-2">
+      <Button
+        onClick={handleNext}
+        className="h-12 px-8 bg-white text-black hover:bg-neutral-200 font-bold shadow-xl"
+      >
+        Next
+      </Button>
+    </div>
+
+              </div>
+            </motion.div>
+          )}
+
+          {step === 3 && (
+             <motion.div 
+               key="step3"
+               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+               className="space-y-8"
+             >
+                <div className="text-center space-y-1">
+                  <h2 className="text-2xl font-serif">AI Performance Projection</h2>
+                  <p className="text-neutral-400 text-sm">Simulating 1-year historic performance...</p>
+                </div>
+                <SimulationChart isAggressive={simData.type === 'aggressive'} />
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
+                      <div className="text-neutral-500 text-xs uppercase font-bold mb-1">Proj. 1Y ROI</div>
+                      <div className="text-2xl font-mono font-bold text-emerald-400">{simData.roi}</div>
+                   </div>
+                   <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
+                      <div className="text-neutral-500 text-xs uppercase font-bold mb-1">Volatility</div>
+                      <div className={`text-2xl font-mono font-bold ${simData.type === 'aggressive' ? "text-orange-400" : "text-blue-400"}`}>{simData.stdDev}</div>
+                   </div>
+                </div>
+                <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-900/20 to-black border border-emerald-500/20">
+                   <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm mb-2">
+                      <BrainCircuit size={16} /> Axis AI Analysis
+                   </div>
+                   <p className="text-xs text-neutral-300 leading-relaxed">
+                      This composition outperforms holding SOL by utilizing Jito MEV capture. 
+                      Standard deviation is within expected range for {simData.type} strategy.
+                   </p>
+                </div>
+                <div className="flex justify-end pt-2">
+      <Button
+        onClick={handleNext}
+        className="h-12 px-8 bg-white text-black hover:bg-neutral-200 font-bold shadow-xl"
+      >
+        Generate ETF Card
+      </Button>
+    </div>
+             </motion.div>
+          )}
+
+          {step === 4 && (
+             <motion.div 
+             key="step4"
+             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+             className="space-y-8 py-4"
+           >
+              <div className="text-center">
+                <h2 className="text-2xl font-serif mb-2">Ready to Deploy?</h2>
+                <p className="text-neutral-400 text-sm">Review your vault details.</p>
+              </div>
+
+              {/* 3D Auto-Rotating Card */}
+              <ThreeDCard name={name} ticker={ticker} logo={logoPreview} />
+
+              <div className="text-center text-xs text-neutral-500">
+                 By clicking deploy, you accept the terms of service.<br/>
+                 Estimated Gas: ~0.02 SOL
+              </div>
+
+              
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="outline" onClick={() => setStep(2)}>
+                  Edit
+                </Button>
+                <Button
+                  onClick={handleDeploy}
+                  disabled={isDeploying}
+                  className="bg-emerald-500 text-black font-bold"
+                >
+                  Deploy
+                </Button>
+              </div>
+
+           </motion.div>
+          )}
+
+        </AnimatePresence>
+      </main>
+
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#050505] border-t border-white/10 z-50 pb-safe"> 
+     {/* ここにbottomnavの要素を入れていく */}
+      </div>
+
+      <Dialog open={isTokenModalOpen} onOpenChange={setIsTokenModalOpen}>
+        <DialogContent className="bg-[#121212] border-white/10 text-white max-w-md w-[95%] rounded-2xl top-[40%]">
+          <DialogHeader><DialogTitle>Select Asset</DialogTitle></DialogHeader>
+          <div className="relative mt-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={16} />
+            <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="pl-9 bg-black/20 border-white/10 rounded-xl" />
+          </div>
+          <ScrollArea className="h-[300px] mt-4 pr-2">
+             <div className="space-y-1">
+                {allTokens.filter(t => t.symbol.toLowerCase().includes(searchQuery.toLowerCase())).map((token, i) => (
+                    <button key={`${token.address}-${i}`} onClick={() => addToken(token)} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-white/5 text-left">
+                       <div className="flex items-center gap-3">
+                          {token.logoURI ? <img src={token.logoURI} className="w-8 h-8 rounded-full"/> : <div className="w-8 h-8 rounded-full bg-white/10"/>}
+                          <div><div className="font-bold text-sm">{token.symbol}</div><div className="text-xs text-neutral-500">{token.name}</div></div>
+                       </div>
+                       {composition.find(c=>c.token.address===token.address) && <span className="text-xs text-emerald-500">Added</span>}
+                    </button>
+                ))}
+             </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
