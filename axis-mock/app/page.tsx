@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAxisStore } from "@/app/store/useAxisStore";
+import { useRouter } from "next/navigation";
 import { ExplorePage } from "@/components/pages/ExplorePage";
 import { Button } from "@/components/ui/button";
 import { toast, Toaster } from "sonner";
@@ -21,15 +22,18 @@ import {
   Heart,
   Send,
   Wallet,
-  SlidersHorizontal,
   ArrowRight,
+  BrainCircuit,
+  Zap,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { AppLayout } from "@/components/layout/AppLayout";
+import HeroManyBuilders from "@/components/visuals/HeroManyBuilders";
+import {InviteGateModal} from "@/components/layout/InviteGateModal";
+import { motion, AnimatePresence } from "framer-motion";
 
 const GOOGLE_CLIENT_ID = "862680354-qf4s464d0msju7rtra43dpbdfgl2e44b.apps.googleusercontent.com";
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://axis-api.yusukekikuta-05.workers.dev";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://axis-api.yusukekikuta-05.workers.dev";
 
 const WalletContextProvider = ({ children }: { children: React.ReactNode }) => {
   const network = WalletAdapterNetwork.Devnet;
@@ -50,7 +54,7 @@ const WalletContextProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const AuthModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+const AuthModal = ({ isOpen, onClose, inviteCode }: { isOpen: boolean; onClose: () => void; inviteCode?: string }) => {
   const { login } = useAxisStore();
   const { publicKey, signMessage, connected } = useWallet();
   const { setVisible } = useWalletModal();
@@ -69,7 +73,7 @@ const AuthModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
       const res = await fetch(`${API_BASE_URL}/auth/social-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, inviteCode }), 
       });
 
       if (!res.ok) {
@@ -256,49 +260,36 @@ const AuthModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
   );
 };
 
+// ==========================================
+// 修正箇所: HeroSection
+// ==========================================
 const HeroSection = ({ onOpenAuth }: { onOpenAuth: () => void }) => {
-  const [selectedSector, setSelectedSector] = useState("Solana High Yield");
-
   return (
     <section className="relative flex h-screen w-full snap-start flex-col items-center overflow-hidden px-6 pt-32 pb-20">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-neutral-900/50 via-black to-black" />
+      <div className="absolute inset-0 from-neutral-900/50" />
+      
+      {/* 修正: HeroManyBuilders を背景レイヤー (z-0) に配置し、
+        pointer-events-none を付与してクリックを透過させる 
+      */}
+      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
+        <HeroManyBuilders />
+      </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 100 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1.5 }}
-        className="absolute bottom-[-40vh] left-1/2 h-[150vw] w-[150vw] -translate-x-1/2 overflow-hidden rounded-full border border-white/10 bg-[#000] shadow-[0_0_100px_rgba(20,241,149,0.1)] md:h-[80vw] md:w-[80vw]"
-      >
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)] bg-[size:4rem_4rem]" />
-
-        <motion.div
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ duration: 3, repeat: Infinity }}
-          className="absolute top-[30%] left-[40%] h-2 w-2 rounded-full bg-[#14F195] blur-[2px]"
-        />
-        <motion.div
-          animate={{ opacity: [0.3, 0.8, 0.3] }}
-          transition={{ duration: 4, repeat: Infinity, delay: 1 }}
-          className="absolute top-[45%] left-[60%] h-1.5 w-1.5 rounded-full bg-cyan-400 blur-[1px]"
-        />
-      </motion.div>
-
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-lg flex-col items-center justify-start text-center md:justify-center">
+      <div className="relative z-20 pointer-events-auto mx-auto flex h-full w-full max-w-lg flex-col items-center justify-start text-center md:justify-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className="mt-10 mb-12 space-y-6 md:mt-0"
         >
-          <h1 className="text-4xl leading-[1.1] font-bold tracking-tight text-white md:text-6xl">
-            INVEST SMARTER.
+          <h1 className="text-7xl leading-[1.1] font-bold tracking-tight text-white md:text-6xl">
+            Your Strategy.
             <br />
-            <span className="text-neutral-500">EARN MORE.</span>
+            <span className="text-neutral-500">Your ETF.</span>
           </h1>
           <p className="px-8 text-xs leading-relaxed font-medium tracking-widest text-neutral-400 uppercase md:text-sm">
-            Book your position in top performing
-            <br className="hidden md:block" /> on-chain strategies with AI.
+            Create Your 
+            <br className="hidden md:block" /> on-chain index Funds.
           </p>
         </motion.div>
 
@@ -306,40 +297,30 @@ const HeroSection = ({ onOpenAuth }: { onOpenAuth: () => void }) => {
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, duration: 0.5 }}
-          className="group relative w-full"
+          className="group relative w-full cursor-pointer"
+          onClick={onOpenAuth}
         >
-          <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-[#14F195] to-cyan-500 opacity-20 blur transition duration-500 group-hover:opacity-40" />
+          <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-[#14F195] to-cyan-500 opacity-30 blur transition duration-500 group-hover:opacity-60" />
 
-          <div className="relative flex items-center rounded-2xl border border-white/10 bg-[#09090b] p-1 shadow-2xl">
+          <div className="relative flex items-center rounded-2xl border border-white/10 bg-[#09090b] p-1 shadow-2xl transition-colors group-hover:bg-[#111]">
+            
             <div className="pr-3 pl-4 text-[#14F195]">
               <Sparkles size={20} fill="currentColor" className="text-[#14F195]/20" />
             </div>
 
-            <div
-              className="relative flex h-12 flex-1 cursor-pointer flex-col justify-center rounded-lg px-2 transition-colors hover:bg-white/5"
-              onClick={onOpenAuth}
-            >
-              <span className="text-[10px] font-bold tracking-wider text-neutral-500 uppercase">
-                Select Strategy
+            <div className="relative flex h-14 flex-1 flex-col justify-center px-2">
+              <span className="text-[10px] font-bold tracking-wider text-[#14F195] uppercase">
+                Start Building
               </span>
-              <div className="flex items-center gap-2 text-sm font-medium text-white">
-                {selectedSector}
+              <div className="flex items-center gap-1 text-sm font-bold text-white">
+                Create Your ETF
+                <span className="ml-1 block h-4 w-0.5 animate-pulse bg-[#14F195]" />
               </div>
             </div>
 
-            <button className="flex h-12 w-12 items-center justify-center border-l border-white/5 text-neutral-400 transition-colors hover:text-white">
-              <SlidersHorizontal size={18} />
-            </button>
-          </div>
-
-          <div className="mt-4">
-            <Button
-              onClick={onOpenAuth}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-xl border-0 bg-[#14F195] text-sm font-bold tracking-wide text-black shadow-[0_0_20px_rgba(20,241,149,0.2)] transition-all hover:bg-[#10c479] active:scale-95"
-            >
-              EXPLORE VAULTS
-              <ArrowRight size={16} />
-            </Button>
+            <div className="flex h-12 w-12 items-center justify-center border-l border-white/5 text-neutral-400 transition-colors group-hover:text-white">
+              <ArrowRight size={20} />
+            </div>
           </div>
         </motion.div>
       </div>
@@ -469,96 +450,156 @@ const SwipeSection = () => {
     </section>
   );
 };
-const ChatSection = () => {
+
+const ThreeDCard = () => {
   return (
-    <section className="relative flex h-screen w-full snap-start flex-col items-center justify-center overflow-hidden border-t border-white/5 px-6">
-      <div className="absolute top-20 left-0 z-10 w-full text-center">
-        <motion.h2
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="mb-2 font-serif text-4xl text-white"
-        >
-          Create your ETF
-        </motion.h2>
-        <motion.p
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-xs tracking-widest text-neutral-500 uppercase"
-        >
-          Chat with AI Agent
-        </motion.p>
-      </div>
-      <div className="z-10 mt-10 w-full max-w-md space-y-4">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="flex items-end gap-4"
-        >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs text-white">
-            AI
-          </div>
-          <div className="max-w-[80%] rounded-2xl rounded-bl-sm border border-white/10 bg-neutral-900 p-4">
-            <p className="text-sm font-light text-neutral-300">
-              How can I help you structure your portfolio today?
-            </p>
-          </div>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.8 }}
-          className="flex flex-row-reverse items-end gap-4"
-        >
-          <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-white p-4 text-black">
-            <p className="text-sm font-medium">
-              I want a low-risk vault with stablecoins and blue-chip exposure.
-            </p>
-          </div>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ delay: 1.5 }}
-          className="flex items-end gap-4"
-        >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs text-white">
-            AI
-          </div>
-          <div className="w-full max-w-[90%] rounded-2xl rounded-bl-sm border border-white/10 bg-neutral-900 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Loader2 className="h-3 w-3 animate-spin text-neutral-500" />
-              <span className="text-xs tracking-wider text-neutral-500 uppercase">
-                Analyzing Market...
-              </span>
-            </div>
-            <div className="flex h-16 w-full items-end gap-1 opacity-50">
-              {[40, 60, 35, 70, 50, 80].map((h, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ height: 0 }}
-                  whileInView={{ height: `${h}%` }}
-                  transition={{ duration: 0.5, delay: 1.8 + i * 0.1 }}
-                  className="flex-1 rounded-t-sm bg-white/20"
-                />
-              ))}
-            </div>
-          </div>
-        </motion.div>
-      </div>
+    <div className="flex items-center justify-center perspective-[1000px] py-10">
       <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        whileInView={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="absolute bottom-12 flex h-14 w-[90%] max-w-md items-center justify-between rounded-full border border-white/10 bg-neutral-900/80 px-6 backdrop-blur"
+        animate={{
+          rotateY: [0, 360],
+        }}
+        transition={{
+          duration: 20, // ランディングページ用にゆっくり回転させます
+          ease: "linear",
+          repeat: Infinity,
+        }}
+        whileHover={{
+          scale: 1.05,
+        }}
+        className="relative h-[420px] w-72 rounded-3xl"
+        style={{ transformStyle: "preserve-3d" }}
       >
-        <span className="text-sm text-neutral-600">Type your strategy...</span>
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10">
-          <Send size={14} className="text-white" />
+        {/* --- FRONT SIDE --- */}
+        <div
+          className="absolute inset-0 h-full w-full overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0a] shadow-2xl"
+          style={{ backfaceVisibility: "hidden" }}
+        >
+          {/* Background & Effects */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-black" />
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
+
+          {/* Moving Glare */}
+          <motion.div
+            animate={{ x: ["-100%", "200%"] }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              ease: "easeInOut",
+              repeatDelay: 1,
+            }}
+            className="absolute inset-0 skew-x-12 bg-gradient-to-tr from-transparent via-white/20 to-transparent"
+          />
+
+          {/* Content */}
+          <div className="relative z-10 flex h-full flex-col items-center justify-between p-8 py-10">
+            <div className="flex flex-col items-center">
+              {/* Logo Placeholder */}
+              <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-full border-4 border-white/10 bg-black p-1 shadow-xl">
+                <span className="text-4xl font-bold text-[#14F195]">A</span>
+              </div>
+
+              <h3 className="text-center font-serif text-2xl font-bold leading-tight text-white drop-shadow-md">
+                Axis High Yield
+              </h3>
+              
+              {/* Badge-like element */}
+              <div className="mt-3 rounded-md border border-[#14F195]/50 bg-[#14F195]/10 px-3 py-1 text-xs font-bold text-[#14F195]">
+                AXIS
+              </div>
+            </div>
+
+            {/* Stats Box */}
+            <div className="w-full space-y-3 rounded-xl border border-white/5 bg-white/5 p-4 backdrop-blur-sm">
+              <div className="flex justify-between border-b border-white/10 pb-2 text-xs">
+                <span className="text-neutral-500">Structure</span>
+                <span className="font-mono text-white">Tokenized Index</span>
+              </div>
+              <div className="flex justify-between border-b border-white/10 pb-2 text-xs">
+                <span className="text-neutral-500">Engine</span>
+                <span className="flex items-center gap-1 font-bold text-[#14F195]">
+                  <Zap size={10} /> Jito MEV
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-neutral-500">Network</span>
+                <span className="flex items-center gap-1 text-white">Solana</span>
+              </div>
+            </div>
+
+            <div className="mt-2 font-mono text-[9px] tracking-widest text-neutral-600">
+              AXIS PROTOCOL • VERIFIED
+            </div>
+          </div>
+
+          {/* Border Glow */}
+          <div className="absolute inset-0 z-20 rounded-3xl border border-[#14F195]/30" />
+        </div>
+
+        {/* --- BACK SIDE --- */}
+        <div
+          className="absolute inset-0 flex h-full w-full items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-[#050505] shadow-xl"
+          style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+        >
+          {/* Back Pattern */}
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+          <div className="absolute inset-0 flex items-center justify-center opacity-10">
+            <BrainCircuit size={150} className="text-white" />
+          </div>
+
+          <div className="relative z-10 text-center">
+            <div className="mb-2 font-serif text-3xl font-bold text-white">Axis.</div>
+            <div className="font-mono text-[10px] tracking-[0.3em] text-[#14F195]">
+              QUANTUM VAULT
+            </div>
+          </div>
+
+          {/* Back Glare */}
+          <motion.div
+            animate={{ x: ["200%", "-100%"] }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              ease: "easeInOut",
+              repeatDelay: 1,
+            }}
+            className="absolute inset-0 -skew-x-12 bg-gradient-to-tr from-transparent via-white/10 to-transparent"
+          />
+          <div className="absolute inset-0 rounded-3xl border border-white/5" />
         </div>
       </motion.div>
+    </div>
+  );
+};
+
+const ChatSection = () => {
+  return (
+    <section className="relative flex min-h-screen w-full flex-col items-center justify-center border-t border-white/5  px-6">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#14F195]/5 via-[#09090b] to-[#09090b]" />
+      
+      <div className="relative z-10 mb-12 text-center">
+        <motion.h2
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="mb-4 font-serif text-3xl text-white md:text-5xl"
+        >
+          DEPLOY STRATEGIES
+          <br />
+          AS TOKENS.
+        </motion.h2>
+        <motion.p
+           initial={{ opacity: 0 }}
+           whileInView={{ opacity: 1 }}
+           transition={{ delay: 0.3 }}
+           className="text-xs uppercase tracking-widest text-neutral-500"
+        >
+          One Click Deployment · Auto-Rebalancing · Liquid
+        </motion.p>
+      </div>
+
+      <div className="relative z-10">
+        <ThreeDCard />
+      </div>
     </section>
   );
 };
@@ -776,12 +817,42 @@ export default function LandingPage() {
   const { isRegistered } = useAxisStore();
   const [isMounted, setIsMounted] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isGateOpen, setIsGateOpen] = useState(false);
+  const [verifiedCode, setVerifiedCode] = useState<string | undefined>(undefined);
+const router = useRouter();
+  
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  if (!isMounted) return <div className="min-h-screen bg-black" />;
+  useEffect(() => {
+    if (isMounted && isRegistered) {
+      router.push("/pages");
+    }
+  }, [isMounted, isRegistered, router]);
+
+  if (!isMounted || isRegistered) return <div className="min-h-screen bg-black" />;
+
+  const handleStart = () => {
+    if (isRegistered) {
+     
+      setIsAuthOpen(true);
+    } else {
+     
+      setIsGateOpen(true);
+    }
+  };
+
+ 
+  const handleGateVerified = (code: string) => {
+    setVerifiedCode(code);
+    setIsGateOpen(false);
+    
+    setTimeout(() => setIsAuthOpen(true), 300);
+  };
+
+  if (!isMounted) return <div className="min-h-screen " />;
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -791,23 +862,28 @@ export default function LandingPage() {
             <ExplorePage />
           </AppLayout>
         ) : (
-          <main className="no-scrollbar h-screen w-full snap-y snap-mandatory overflow-y-scroll scroll-smooth text-white">
+          <main className="min-h-screen w-full text-white selection:bg-[#14F195] selection:text-black">
             <header className="pointer-events-none fixed top-0 left-0 z-40 flex w-full items-center justify-between px-6 py-6 mix-blend-difference">
               <span className="font-serif text-xl font-bold tracking-tighter text-white">
                 Axis.
               </span>
-              <div className="pointer-events-auto rounded-full border border-white/20 bg-black/50 px-3 py-1 text-[10px] tracking-widest text-white uppercase backdrop-blur-md">
-                Beta
-              </div>
             </header>
 
-            <HeroSection onOpenAuth={() => setIsAuthOpen(true)} />
+            <HeroSection onOpenAuth={handleStart} />
             <StepsSection />
             <SwipeSection />
             <ChatSection />
             <FaqSection />
-
-            <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+            <InviteGateModal 
+                isOpen={isGateOpen} 
+                onClose={() => setIsGateOpen(false)} 
+                onVerified={handleGateVerified} 
+            />
+            <AuthModal 
+                isOpen={isAuthOpen} 
+                onClose={() => setIsAuthOpen(false)} 
+                inviteCode={verifiedCode}
+            />
           </main>
         )}
 

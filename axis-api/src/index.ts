@@ -16,6 +16,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { HTTPException } from 'hono/http-exception'
 
 
+
 type Bindings = {
   axis_db: D1Database
   FAUCET_PRIVATE_KEY: string
@@ -120,7 +121,103 @@ ${TOKEN_CONTEXT_STR}
 }
 `;
 
+app.get('/auth/check-invite', async (c) => {
+  const code = c.req.query('code');
+  if (!code) return c.json({ valid: false, message: "Code required" }, 400);
 
+  // invitesテーブルを確認: 存在し、かつ未使用(used_by_user_id IS NULL)
+  // または、ADMINコード（AXIS-ALPHA等）は常に有効とする場合の特例
+  if (code === 'AXIS-ALPHA' || code === 'AXIS-TEST') {
+      return c.json({ valid: true });
+  }
+
+  const invite: any = await c.env.axis_db.prepare(
+    "SELECT * FROM invite_codes WHERE code = ? AND is_used = 0"
+  ).bind(code).first();
+  
+  if (invite) {
+    return c.json({ valid: true });
+  } else {
+    return c.json({ valid: false, message: "Invalid or used code" }, 404);
+  }
+});
+
+// 2. ソーシャルログイン / ウォレットログイン (認証 + 招待コード消費)
+app.post('/auth/social-login', async (c) => {
+  try {
+    const { provider, email, wallet_address, inviteCode } = await c.req.json();
+    
+    if (!provider) return c.json({ error: "Provider required" }, 400);
+
+    let user: any = null;
+
+    // A. 既存ユーザー検索
+    if (provider === 'solana' && wallet_address) {
+      user = await c.env.axis_db.prepare("SELECT * FROM users WHERE wallet_address = ?").bind(wallet_address).first();
+    } 
+    else if ((provider === 'google' || provider === 'twitter') && email) {
+      user = await c.env.axis_db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
+    }
+
+    // B. ログイン (既存ユーザー)
+    if (user) {
+      if (provider === 'solana' && !user.wallet_address) {
+         await c.env.axis_db.prepare("UPDATE users SET wallet_address = ? WHERE id = ?").bind(wallet_address, user.id).run();
+         user.wallet_address = wallet_address;
+      }
+      return c.json({ success: true, isNew: false, user });
+    }
+
+    // C. 新規登録 (Sign Up)
+    // 招待コードのバリデーション
+    if (inviteCode && inviteCode !== 'AXIS-ALPHA' && inviteCode !== 'AXIS-TEST') {
+        const invite: any = await c.env.axis_db.prepare("SELECT * FROM invite_codes WHERE code = ? AND is_used = 0").bind(inviteCode).first();
+        if (!invite) return c.json({ error: "Invalid invite code" }, 400);
+    }
+
+    const newId = crypto.randomUUID();
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const newInviteCode = `AXIS-${randomSuffix}`;
+
+    await c.env.axis_db.prepare(
+      `INSERT INTO users (id, email, wallet_address, invite_code, invite_code_used) VALUES (?, ?, ?, ?, ?)`
+    ).bind(
+      newId, 
+      email || null, 
+      wallet_address || null, 
+      newInviteCode,
+      inviteCode || null
+    ).run();
+
+    // 招待コードを使用済みにする
+    if (inviteCode && inviteCode !== 'AXIS-ALPHA' && inviteCode !== 'AXIS-TEST') {
+        await c.env.axis_db.prepare("UPDATE invite_codes SET is_used = 1, used_by = ? WHERE code = ?")
+            .bind(newId, inviteCode).run();
+    }
+
+    // 新規ユーザーに招待枠(5個)を付与
+    const stmt = c.env.axis_db.prepare("INSERT INTO invite_codes (code, creator_id, is_used) VALUES (?, ?, 0)");
+    const batch = [];
+    for (let i = 0; i < 5; i++) {
+        const subSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+        batch.push(stmt.bind(`AXIS-${subSuffix}`, newId));
+    }
+    await c.env.axis_db.batch(batch);
+
+    const newUser = {
+      id: newId,
+      email: email || null,
+      wallet_address: wallet_address || null,
+      invite_code: newInviteCode
+    };
+
+    return c.json({ success: true, isNew: true, user: newUser });
+
+  } catch (e: any) {
+    console.error("Social Auth Error:", e);
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
 
 app.get('/auth/twitter', async (c) => {
   const clientId = c.env.TWITTER_CLIENT_ID.trim();
