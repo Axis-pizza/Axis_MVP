@@ -5,4 +5,7 @@ export type Bindings = {
   TWITTER_CLIENT_ID: string
   TWITTER_CLIENT_SECRET: string
   FRONTEND_URL: string
+  EMAIL: any
+  ADMIN_EMAIL: string
+  SENDER_EMAIL: string
 }

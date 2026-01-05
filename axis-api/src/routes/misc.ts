@@ -57,4 +57,33 @@ app.get('/verify', async (c) => {
     }
 })
 
+app.post('/submit-bug', async (c) => {
+    try {
+        const { discord, description } = await c.req.json();
+
+        if (!discord || !description) {
+            return c.json({ success: false, message: "Discord ID and Description are required." }, 400);
+        }
+
+        // Fallback or Env for Email Addresses
+        // NOTE: The 'from' address must be a verified sender in Cloudflare Email Routing
+        const adminEmail = c.env.ADMIN_EMAIL || "admin@example.com"; 
+        const senderEmail = c.env.SENDER_EMAIL || "no-reply@example.com"; 
+
+        await c.env.EMAIL.send({
+            to: adminEmail,
+            from: senderEmail,
+            subject: `[Axis Bug Report] from ${discord}`,
+            content: [
+                { type: "text/plain", value: `User: ${discord}\n\nDescription:\n${description}` }
+            ]
+        });
+
+        return c.json({ success: true, message: "Report sent successfully." });
+    } catch (e: any) {
+        console.error("Email Error:", e);
+        return c.json({ success: false, message: `Failed to send email: ${e.message}` }, 500);
+    }
+})
+
 export default app;
