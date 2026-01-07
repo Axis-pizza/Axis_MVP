@@ -1,25 +1,27 @@
 "use client";
 
 import React from "react";
-import { PrivyProvider } from "./PrivyProvider";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+import AppWalletProvider from "./AppWalletProvider";
 import { BugReportProvider } from "./BugReportProvider";
+
+// Google OAuth Client ID
+const GOOGLE_CLIENT_ID = "862680354-qf4s464d0msju7rtra43dpbdfgl2e44b.apps.googleusercontent.com";
 
 /**
  * Main Providers Component
  * 
  * Wraps the application with necessary providers:
- * - PrivyProvider: Authentication and wallet connection
+ * - GoogleOAuthProvider: Google authentication
+ * - AppWalletProvider: Solana wallet connection
  * - BugReportProvider: Bug reporting functionality
- * 
- * Note: Google OAuth has been replaced with Privy which provides
- * built-in Google authentication along with wallet connectivity
  */
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <PrivyProvider>
-      <BugReportProvider>
-        {children}
-      </BugReportProvider>
-    </PrivyProvider>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AppWalletProvider>
+        <BugReportProvider>{children}</BugReportProvider>
+      </AppWalletProvider>
+    </GoogleOAuthProvider>
   );
 }
