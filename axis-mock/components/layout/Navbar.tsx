@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { WalletSelector } from "@/components/wallet/WalletSelector";
 import { useAxisStore } from "@/app/store/useAxisStore";
 import { AppSidebar } from "./AppSidebar";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { usePrivy } from "@privy-io/react-auth";
 import { PortfolioSheet } from "@/components/wallet/PortfolioSheet";
 import { RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -15,8 +15,12 @@ import { SettingsDialog } from "@/components/settings/SettingsDialog";
 
 export function Navbar() {
   const { usdcBalance, solBalance, fetchBalances, isFaucetLoading } = useAxisStore();
-  const { connected, publicKey } = useWallet();
+  const { ready, authenticated, user } = usePrivy();
   const [isMounted, setIsMounted] = useState(false);
+  
+  // ウォレットアドレスを取得
+  const walletAccounts = user?.linkedAccounts?.filter((account: any) => account.type === 'wallet') || [];
+  const walletAddress = user?.wallet?.address || (walletAccounts.length > 0 ? (walletAccounts[0] as any).address : undefined);
 
   useEffect(() => {
     setIsMounted(true);
@@ -43,7 +47,7 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           <SettingsDialog />
 
-          {connected && (
+          {authenticated && walletAddress && (
             <div className="mr-2 hidden items-center gap-3 md:flex">
               <div className="flex flex-col items-end leading-none">
                 <span className="text-sm font-bold text-white">
@@ -67,7 +71,7 @@ export function Navbar() {
             </div>
           )}
 
-          {!connected ? (
+          {!authenticated ? (
             <WalletSelector />
           ) : (
             <PortfolioSheet>
@@ -76,7 +80,7 @@ export function Navbar() {
                 className="h-10 border-neutral-800 bg-neutral-900 px-4 font-mono text-white transition-all hover:border-emerald-500/50 hover:bg-neutral-800"
               >
                 <div className="mr-2 h-2 w-2 animate-pulse rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                {publicKey?.toString().slice(0, 4)}...{publicKey?.toString().slice(-4)}
+                {walletAddress?.slice(0, 4)}...{walletAddress?.slice(-4)}
               </Button>
             </PortfolioSheet>
           )}

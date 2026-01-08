@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useAxisStore } from "@/app/store/useAxisStore";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { usePrivy } from "@privy-io/react-auth";
 import { ExternalLink, Coins, Wallet, TrendingUp, ShieldCheck, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -23,21 +23,25 @@ export function PortfolioSheet({ children }: { children: React.ReactNode }) {
     fetchBalances,
   } = useAxisStore();
 
-  const { publicKey, disconnect } = useWallet();
+  const { user, logout } = usePrivy();
+  
+  // ウォレットアドレスを取得
+  const walletAccounts = user?.linkedAccounts?.filter((account: any) => account.type === 'wallet') || [];
+  const walletAddress = user?.wallet?.address || (walletAccounts.length > 0 ? (walletAccounts[0] as any).address : undefined);
 
   useEffect(() => {
-    if (!publicKey) return;
+    if (!walletAddress) return;
 
-    connectWallet(publicKey.toString());
-  }, [publicKey, connectWallet]);
+    connectWallet(walletAddress);
+  }, [walletAddress, connectWallet]);
 
   const handleDisconnect = async () => {
-    await disconnect();
+    await logout();
     disconnectWallet();
   };
 
   const handleClaim = async () => {
-    if (!publicKey) return;
+    if (!walletAddress) return;
 
     try {
       await claimFaucet();
@@ -49,9 +53,9 @@ export function PortfolioSheet({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const myVaults = vaults.filter((v) => v.creator === publicKey?.toString());
+  const myVaults = vaults.filter((v) => v.creator === walletAddress);
 
-  const hasClaimed = publicKey ? claimedWallets.includes(publicKey.toString()) : false;
+  const hasClaimed = walletAddress ? claimedWallets.includes(walletAddress) : false;
 
   return (
     <Sheet>
@@ -72,12 +76,12 @@ export function PortfolioSheet({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex flex-col">
               <span className="max-w-[150px] truncate font-serif text-base font-bold tracking-wide">
-                {publicKey
-                  ? `${publicKey.toString().slice(0, 4)}...${publicKey.toString().slice(-4)}`
+                {walletAddress
+                  ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
                   : "Not Connected"}
               </span>
               <span className="font-sans text-[10px] tracking-wider text-neutral-400 uppercase">
-                Connected via Solana
+                Connected via Privy
               </span>
             </div>
           </div>

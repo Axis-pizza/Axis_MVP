@@ -18,6 +18,6 @@
   },
   "packageManager": "pnpm@10.10.0",
   "devDependencies": {
-    "pnpm": "^10.27.0"
+    "pnpm": "^10.10.0"
   }
 }

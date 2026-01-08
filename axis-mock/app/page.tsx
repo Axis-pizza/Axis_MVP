@@ -6,15 +6,9 @@ import { useRouter } from "next/navigation";
 import { ExplorePage } from "@/components/pages/ExplorePage";
 import { Button } from "@/components/ui/button";
 import { toast, Toaster } from "sonner";
-import { ConnectionProvider, WalletProvider, useWallet } from "@solana/wallet-adapter-react";
-import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
-import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
-import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
-import { WalletModalProvider, useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { clusterApiUrl } from "@solana/web3.js";
-import "@solana/wallet-adapter-react-ui/styles.css";
+import { usePrivy } from "@privy-io/react-auth";
 
-import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google";
+
 import {
   Loader2,
   Sparkles,
@@ -33,233 +27,12 @@ import HeroManyBuilders from "@/components/visuals/HeroManyBuilders";
 import {InviteGateModal} from "@/components/layout/InviteGateModal";
 import { motion, AnimatePresence } from "framer-motion";
 
-const GOOGLE_CLIENT_ID = "862680354-qf4s464d0msju7rtra43dpbdfgl2e44b.apps.googleusercontent.com";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://axis-api.yusukekikuta-05.workers.dev";
 
-const WalletContextProvider = ({ children }: { children: React.ReactNode }) => {
-  const network = WalletAdapterNetwork.Devnet;
+// Wallet Context Provider is now handled by Privy in the Providers component
 
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
-
-  const wallets = useMemo(
-    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
-    [network]
-  );
-
-  return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
-  );
-};
-
-const AuthModal = ({ isOpen, onClose, inviteCode }: { isOpen: boolean; onClose: () => void; inviteCode?: string }) => {
-  const { login } = useAxisStore();
-  const { publicKey, signMessage, connected } = useWallet();
-  const { setVisible } = useWalletModal();
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [statusText, setStatusText] = useState("");
-
-  const LOGOS = {
-    solana: "https://solana.com/src/img/branding/solanaLogoMark.svg",
-    google: "https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg",
-    x: "https://upload.wikimedia.org/wikipedia/commons/5/53/X_logo_2023_original.svg",
-  };
-
-  const callBackendLogin = async (payload: any) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/social-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, inviteCode }), 
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "Authentication failed");
-      }
-      return await res.json();
-    } catch (error) {
-      console.error("Backend Auth Error:", error);
-      throw error;
-    }
-  };
-
-  const handleGoogleSuccess = async (tokenResponse: any) => {
-    setIsLoading(true);
-    setStatusText("Verifying Google account...");
-    try {
-      const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-      });
-      const userInfo = await userInfoRes.json();
-
-      const authResult = await callBackendLogin({
-        provider: "google",
-        email: userInfo.email,
-        google_id: userInfo.sub,
-      });
-
-      if (authResult.success) {
-        login(authResult.user);
-        toast.success(`Welcome back!`);
-        onClose();
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to verify Google profile.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loginToGoogle = useGoogleLogin({
-    onSuccess: handleGoogleSuccess,
-    onError: () => toast.error("Google login connection failed."),
-  });
-
-  const handleSolanaAuth = useCallback(async () => {
-    if (!connected || !publicKey) {
-      setVisible(true);
-      return;
-    }
-    setIsLoading(true);
-    setStatusText("Requesting wallet signature...");
-
-    try {
-      if (signMessage) {
-        const messageString = `Log in to Axis Protocol\nTimestamp: ${Date.now()}`;
-        const message = new TextEncoder().encode(messageString);
-        await signMessage(message);
-      }
-
-      const authResult = await callBackendLogin({
-        provider: "solana",
-        wallet_address: publicKey.toBase58(),
-      });
-
-      if (authResult.success) {
-        login(authResult.user);
-        toast.success("Wallet verified successfully!");
-        onClose();
-      }
-    } catch (error: any) {
-      console.error(error);
-      toast.error("Authentication cancelled.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [connected, publicKey, signMessage, setVisible, login, onClose]);
-
-  const handleTwitterAuth = () => {
-    setIsLoading(true);
-    setStatusText("Connecting to X...");
-
-    const width = 500;
-    const height = 600;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-
-    const popup = window.open(
-      `${API_BASE_URL}/auth/twitter`,
-      "Twitter Login",
-      `width=${width},height=${height},top=${top},left=${left}`
-    );
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === "AXIS_AUTH_SUCCESS" && event.data.provider === "twitter") {
-        const user = event.data.user;
-        login(user);
-        toast.success(`Welcome from X!`);
-        setIsLoading(false);
-        onClose();
-        window.removeEventListener("message", handleMessage);
-      }
-    };
-    window.addEventListener("message", handleMessage);
-
-    const timer = setInterval(() => {
-      if (popup?.closed) {
-        clearInterval(timer);
-        window.removeEventListener("message", handleMessage);
-        setIsLoading(false);
-      }
-    }, 1000);
-  };
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-          />
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            className="relative w-full max-w-[360px] overflow-hidden rounded-3xl border border-white/10 bg-[#09090b] p-8 shadow-2xl"
-          >
-            <button
-              onClick={onClose}
-              disabled={isLoading}
-              className="absolute top-4 right-4 text-neutral-500 hover:text-white"
-            >
-              <X size={20} />
-            </button>
-            <div className="mb-8 space-y-3 text-center">
-              <h2 className="text-2xl leading-none font-bold tracking-tight text-white">
-                CREATE YOUR
-                <br />
-                OWN ETF.
-              </h2>
-            </div>
-            <div className="space-y-3">
-              <Button
-                onClick={handleSolanaAuth}
-                disabled={isLoading}
-                className="flex h-14 w-full items-center justify-center gap-3 rounded-xl border-0 bg-white text-sm font-bold tracking-wide text-black transition-transform hover:bg-neutral-200 active:scale-95"
-              >
-                <img src={LOGOS.solana} alt="Solana" className="h-6 w-6 object-contain" />
-                {connected ? "Sign in with wallet" : "Login with Solana"}
-              </Button>
-
-              <Button
-                onClick={() => loginToGoogle()}
-                disabled={isLoading}
-                className="flex h-14 w-full items-center justify-center gap-3 rounded-xl border border-white/5 bg-[#1c1c1c] text-sm font-medium tracking-wide text-white transition-transform hover:bg-[#2a2a2a] active:scale-95"
-              >
-                <img src={LOGOS.google} alt="Google" className="h-5 w-5 object-contain" />
-                Continue with Google
-              </Button>
-
-              <Button
-                onClick={handleTwitterAuth}
-                disabled={isLoading}
-                className="flex h-14 w-full items-center justify-center gap-3 rounded-xl border border-white/5 bg-[#1c1c1c] text-sm font-medium tracking-wide text-white transition-transform hover:bg-[#2a2a2a] active:scale-95"
-              >
-                <img src={LOGOS.x} alt="X" className="h-4 w-4 object-contain invert" />
-                Continue with X
-              </Button>
-            </div>
-            {isLoading && (
-              <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-[2px]">
-                <Loader2 className="mb-2 h-8 w-8 animate-spin text-[#14F195]" />
-                <p className="animate-pulse font-mono text-xs text-neutral-400">{statusText}</p>
-              </div>
-            )}
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
-};
+// AuthModal removed - using Privy modal instead
 
 // ==========================================
 // 修正箇所: HeroSection
@@ -815,49 +588,84 @@ const StepsSection = () => {
 };
 
 export default function LandingPage() {
-  const { isRegistered } = useAxisStore();
+  const { isRegistered, login: storeLogin } = useAxisStore();
+  const { authenticated, login: privyLogin, user } = usePrivy();
   const [isMounted, setIsMounted] = useState(false);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isGateOpen, setIsGateOpen] = useState(false);
   const [verifiedCode, setVerifiedCode] = useState<string | undefined>(undefined);
-const router = useRouter();
+  const router = useRouter();
   
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Redirect to /create when authenticated
   useEffect(() => {
-    if (isMounted && isRegistered) {
-      router.push("/pages");
+    if (isMounted && authenticated && user) {
+      // Get Solana wallet address from any connected wallet
+      const walletAccounts = user.linkedAccounts?.filter((account: any) => account.type === 'wallet') || [];
+      const solanaWallet = walletAccounts.find((account: any) => 
+        account.walletClientType === 'phantom' || 
+        account.walletClientType === 'solflare' ||
+        account.address // fallback: any wallet with address
+      );
+      const solanaAddress = (solanaWallet as any)?.address;
+      
+      console.log('Auth state:', { authenticated, user, walletAccounts, solanaAddress });
+      
+      if (solanaAddress) {
+        // Register with backend if has invite code
+        if (verifiedCode) {
+          fetch(`${API_BASE_URL}/auth/social-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              provider: 'solana',
+              wallet_address: solanaAddress,
+              inviteCode: verifiedCode,
+            }),
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                storeLogin(data.user);
+                toast.success('Welcome to Axis!');
+                router.push('/create');
+              }
+            })
+            .catch(err => {
+              console.error('Registration error:', err);
+              toast.error('Registration failed');
+            });
+        } else {
+          // No invite code, just redirect
+          router.push('/create');
+        }
+      } else {
+        console.warn('No Solana wallet address found in user object');
+      }
     }
-  }, [isMounted, isRegistered, router]);
+  }, [isMounted, authenticated, user, verifiedCode, router, storeLogin]);
 
   if (!isMounted || isRegistered) return <div className="min-h-screen bg-black" />;
 
   const handleStart = () => {
-    if (isRegistered) {
-     
-      setIsAuthOpen(true);
-    } else {
-     
-      setIsGateOpen(true);
-    }
+    // Open invite gate first
+    setIsGateOpen(true);
   };
 
- 
   const handleGateVerified = (code: string) => {
     setVerifiedCode(code);
     setIsGateOpen(false);
-    
-    setTimeout(() => setIsAuthOpen(true), 300);
+    // Open Privy login modal
+    setTimeout(() => privyLogin(), 300);
   };
 
   if (!isMounted) return <div className="min-h-screen " />;
 
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <WalletContextProvider>
+    <>
         {isRegistered ? (
           <AppLayout>
             <ExplorePage />
@@ -880,16 +688,10 @@ const router = useRouter();
                 onClose={() => setIsGateOpen(false)} 
                 onVerified={handleGateVerified} 
             />
-            <AuthModal 
-                isOpen={isAuthOpen} 
-                onClose={() => setIsAuthOpen(false)} 
-                inviteCode={verifiedCode}
-            />
           </main>
         )}
 
         <Toaster position="top-center" theme="dark" />
-      </WalletContextProvider>
-    </GoogleOAuthProvider>
+    </>
   );
 }

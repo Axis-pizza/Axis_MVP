@@ -13,7 +13,7 @@ const GOOGLE_CLIENT_ID = "862680354-qf4s464d0msju7rtra43dpbdfgl2e44b.apps.google
  * 
  * Wraps the application with necessary providers:
  * - GoogleOAuthProvider: Google authentication
- * - AppWalletProvider: Solana wallet connection
+ * - AppWalletProvider: Privy authentication with multi-chain wallet support (Ethereum, Solana)
  * - BugReportProvider: Bug reporting functionality
  */
 export function Providers({ children }: { children: React.ReactNode }) {

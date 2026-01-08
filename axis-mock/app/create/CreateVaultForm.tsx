@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { usePrivy } from "@privy-io/react-auth";
 import {
   Sparkles,
   Zap,
@@ -330,7 +330,11 @@ const ThreeDCard = ({ name, ticker, logo }: { name: string, ticker: string, logo
  */
 export default function CreateWizard() {
   const router = useRouter();
-  const { publicKey } = useWallet();
+  const { user } = usePrivy();
+  
+  // ウォレットアドレスを取得
+  const walletAccounts = user?.linkedAccounts?.filter((account: any) => account.type === 'wallet') || [];
+  const walletAddress = user?.wallet?.address || (walletAccounts.length > 0 ? (walletAccounts[0] as any).address : undefined);
 
   // ==========================================
   // ステート管理
@@ -534,7 +538,7 @@ export default function CreateWizard() {
    * APIにVaultデータを送信して作成
    */
   const handleDeploy = async () => {
-    if (!publicKey) {
+    if (!walletAddress) {
       return toast.error("Connect Wallet");
     }
     
@@ -545,7 +549,7 @@ export default function CreateWizard() {
         name,
         symbol: ticker,
         description: "",
-        creator: publicKey.toBase58(),
+        creator: walletAddress,
         strategy: "Weekly",
         fee: 0.95,
         minLiquidity: 1000,

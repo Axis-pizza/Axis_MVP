@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAxisStore } from "@/app/store/useAxisStore";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { usePrivy } from "@privy-io/react-auth";
 // ... (imports)
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +64,8 @@ const COMMUNITIES = [
 
 export default function PortfolioPage() {
   const router = useRouter();
-  const { publicKey } = useWallet();
+  const { user, authenticated } = usePrivy();
+  const publicKey = user?.wallet?.address ? { toBase58: () => user.wallet!.address } : null;
   const {
     vaults,
     positions,
@@ -174,7 +175,7 @@ export default function PortfolioPage() {
   const COLORS = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"];
   const unusedInvites = myInvites.filter((i) => !i.used_by_user_id);
 
-  if (!publicKey) return null;
+  if (!authenticated || !publicKey) return null;
 
   const displayName = userProfile?.username || (isRegistered ? "Investor" : "Guest");
   const displayWallet = publicKey.toBase58().slice(0, 4) + "..." + publicKey.toBase58().slice(-4);

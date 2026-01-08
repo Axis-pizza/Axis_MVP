@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAxisStore, Vault } from "@/app/store/useAxisStore";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { usePrivy } from "@privy-io/react-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,7 +37,8 @@ function VaultDetailContent() {
   const router = useRouter();
 
   const { vaults, usdcBalance, fetchVaults, depositToVault } = useAxisStore();
-  const { publicKey } = useWallet();
+  const { user, authenticated } = usePrivy();
+  const publicKey = user?.wallet?.address ? { toBase58: () => user.wallet!.address } : null;
 
   const [vault, setVault] = useState<Vault | null>(null);
   const [chartData] = useState(generateChartData());

@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { usePrivy } from "@privy-io/react-auth";
 import { Search, Sparkles, Wallet, Menu, Bug, Settings, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -22,30 +21,29 @@ import { toast } from "sonner";
 export function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
-  const { connected } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { authenticated, login } = usePrivy();
   const { open: openBugReport } = useBugReport();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isConnectingForPortfolio, setIsConnectingForPortfolio] = useState(false);
 
   const handleWalletClick = () => {
-    if (connected) {
+    if (authenticated) {
       router.push("/portfolio");
     } else {
       setIsConnectingForPortfolio(true);
-      setVisible(true);
+      login();
       toast.info("Connect wallet to view portfolio");
     }
   };
 
   useEffect(() => {
-    if (connected && isConnectingForPortfolio) {
+    if (authenticated && isConnectingForPortfolio) {
       router.push("/portfolio");
       setIsConnectingForPortfolio(false);
       toast.success("Wallet connected successfully");
     }
-  }, [connected, isConnectingForPortfolio, router]);
+  }, [authenticated, isConnectingForPortfolio, router]);
 
   const navItems = [
     {
@@ -65,7 +63,7 @@ export function BottomNav() {
       icon: Wallet,
       action: handleWalletClick,
       isActive: pathname === "/portfolio",
-      highlight: !connected,
+      highlight: !authenticated,
     },
   ];
 
