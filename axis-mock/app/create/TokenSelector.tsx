@@ -161,11 +161,17 @@ export function TokenSelector({ selectedTokens, onSelect, onRemove }: TokenSelec
                     >
                       <div className="flex w-full items-center gap-3">
                         {/* トークンロゴ */}
-                        <img
-                          src={token.logoURI}
-                          alt={token.symbol}
-                          className="h-6 w-6 rounded-full"
-                        />
+                        {token.logoURI ? (
+                          <img
+                            src={token.logoURI}
+                            alt={token.symbol}
+                            className="h-6 w-6 rounded-full"
+                          />
+                        ) : (
+                          <div className="h-6 w-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold">
+                            {token.symbol?.[0] || '?'}
+                          </div>
+                        )}
                         
                         {/* トークン情報 */}
                         <div className="flex flex-col">
@@ -196,11 +202,17 @@ export function TokenSelector({ selectedTokens, onSelect, onRemove }: TokenSelec
             className="flex items-center gap-2 border border-neutral-700 bg-neutral-800 py-1 pr-1 pl-2 hover:bg-neutral-700"
           >
             {/* トークンロゴ */}
-            <img 
-              src={token.logoURI} 
-              alt={token.symbol} 
-              className="h-4 w-4 rounded-full" 
-            />
+            {token.logoURI ? (
+              <img 
+                src={token.logoURI} 
+                alt={token.symbol} 
+                className="h-4 w-4 rounded-full" 
+              />
+            ) : (
+              <div className="h-4 w-4 rounded-full bg-white/10 flex items-center justify-center text-[8px] font-bold">
+                {token.symbol?.[0] || '?'}
+              </div>
+            )}
             
             {/* トークンシンボル */}
             <span>{token.symbol}</span>

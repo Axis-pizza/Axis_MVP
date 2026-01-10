@@ -9,6 +9,40 @@
 const JUPITER_PRICE_API = "https://api.jup.ag/price/v2";
 
 /**
+ * フォールバック価格データ
+ * Jupiter APIが利用できない場合に使用
+ */
+const FALLBACK_PRICES: Record<string, number> = {
+  // Stablecoins
+  "USDC": 1.0,
+  "USDT": 1.0,
+  
+  // Majors
+  "SOL": 145.0,
+  "WBTC": 65000,
+  "WETH": 3500,
+  
+  // DeFi
+  "JUP": 1.15,
+  "RAY": 2.5,
+  "ORCA": 0.5,
+  "PYTH": 0.35,
+  "RENDER": 7.5,
+  "HNT": 4.5,
+  
+  // LSTs
+  "mSOL": 160.0,
+  "jitoSOL": 165.0,
+  "JitoSOL": 165.0,
+  "bSOL": 155.0,
+  
+  // Memes
+  "BONK": 0.000024,
+  "WIF": 3.0,
+  "POPCAT": 0.8,
+};
+
+/**
  * トークン価格レスポンスの型
  */
 export interface JupiterPriceData {
@@ -70,7 +104,19 @@ export const ADDRESS_TO_SYMBOL: Record<string, string> = Object.entries(TOKEN_AD
 );
 
 /**
+ * アドレスからフォールバック価格を取得
+ */
+function getFallbackPriceByAddress(address: string): number | null {
+  const symbol = ADDRESS_TO_SYMBOL[address];
+  if (symbol && FALLBACK_PRICES[symbol] !== undefined) {
+    return FALLBACK_PRICES[symbol];
+  }
+  return null;
+}
+
+/**
  * 複数トークンの価格を一括取得
+ * Jupiter APIが失敗した場合はフォールバック価格を使用
  * 
  * @param mintAddresses - トークンのミントアドレス配列
  * @returns アドレスをキーとした価格のマップ
@@ -82,24 +128,41 @@ export async function getTokenPrices(
     return {};
   }
 
+  // フォールバック価格を準備
+  const fallbackPrices: Record<string, number> = {};
+  for (const address of mintAddresses) {
+    const fallbackPrice = getFallbackPriceByAddress(address);
+    if (fallbackPrice !== null) {
+      fallbackPrices[address] = fallbackPrice;
+    }
+  }
+
   try {
     const ids = mintAddresses.join(",");
+    
+    // AbortControllerでタイムアウトを設定
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒タイムアウト
+    
     const response = await fetch(`${JUPITER_PRICE_API}?ids=${ids}`, {
       method: "GET",
       headers: {
         "Accept": "application/json",
       },
-      next: { revalidate: 60 }, // 60秒間キャッシュ
+      signal: controller.signal,
+      cache: "no-store", // SSRでのキャッシュ問題を回避
     });
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.error("Jupiter API error:", response.status, response.statusText);
-      return {};
+      console.warn("Jupiter API error:", response.status, "- using fallback prices");
+      return fallbackPrices;
     }
 
     const data: JupiterPriceResponse = await response.json();
     
-    const prices: Record<string, number> = {};
+    const prices: Record<string, number> = { ...fallbackPrices }; // フォールバックをベースに
     for (const [address, priceData] of Object.entries(data.data || {})) {
       if (priceData && priceData.price) {
         prices[address] = parseFloat(priceData.price);
@@ -108,13 +171,19 @@ export async function getTokenPrices(
 
     return prices;
   } catch (error) {
-    console.error("Failed to fetch token prices from Jupiter:", error);
-    return {};
+    // AbortErrorはタイムアウト
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn("Jupiter API timeout - using fallback prices");
+    } else {
+      console.warn("Failed to fetch token prices from Jupiter - using fallback:", error);
+    }
+    return fallbackPrices;
   }
 }
 
 /**
  * シンボルで価格を取得
+ * Jupiter APIが失敗した場合はフォールバック価格を使用
  * 
  * @param symbols - トークンシンボル配列
  * @returns シンボルをキーとした価格のマップ
@@ -122,6 +191,15 @@ export async function getTokenPrices(
 export async function getTokenPricesBySymbol(
   symbols: string[]
 ): Promise<Record<string, number>> {
+  // フォールバック価格を準備
+  const pricesBySymbol: Record<string, number> = {};
+  for (const symbol of symbols) {
+    const upperSymbol = symbol?.toUpperCase();
+    if (upperSymbol && FALLBACK_PRICES[upperSymbol] !== undefined) {
+      pricesBySymbol[upperSymbol] = FALLBACK_PRICES[upperSymbol];
+    }
+  }
+
   // シンボルからアドレスに変換（安全なアクセス）
   const addresses = symbols
     .filter((symbol): symbol is string => typeof symbol === 'string' && symbol.length > 0)
@@ -129,13 +207,12 @@ export async function getTokenPricesBySymbol(
     .filter(Boolean);
 
   if (addresses.length === 0) {
-    return {};
+    return pricesBySymbol;
   }
 
   const pricesByAddress = await getTokenPrices(addresses);
 
-  // アドレスからシンボルに変換して返す
-  const pricesBySymbol: Record<string, number> = {};
+  // アドレスからシンボルに変換して返す（APIの結果でフォールバックを上書き）
   for (const [address, price] of Object.entries(pricesByAddress)) {
     const symbol = ADDRESS_TO_SYMBOL[address];
     if (symbol) {

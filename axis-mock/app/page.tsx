@@ -596,15 +596,11 @@ export default function LandingPage() {
   const router = useRouter();
   
 
-  // Use layout effect to set mounted state synchronously
-  // This is safe because we're only tracking hydration state
-  const [isMounted] = useState(() => {
-    if (typeof window !== 'undefined') return true;
-    return false;
-  });
+  // Hydration安全なmounted状態管理
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    // Trigger re-render after hydration if needed
+    setIsMounted(true);
   }, []);
 
   // Redirect to /create when authenticated
@@ -675,7 +671,16 @@ export default function LandingPage() {
     }
   }, [isMounted, ready, authenticated, user, verifiedCode, router, storeLogin, isProcessingAuth]);
 
-  if (!isMounted || isRegistered) return <div className="min-h-screen bg-black" />;
+  // Hydration完了前はスケルトンを表示
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (isRegistered) return <div className="min-h-screen bg-black" />;
 
   const handleStart = () => {
     // Open invite gate first
@@ -691,7 +696,7 @@ export default function LandingPage() {
     }, 300);
   };
 
-  if (!isMounted) return <div className="min-h-screen " />;
+
 
   return (
     <>

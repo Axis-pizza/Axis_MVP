@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useEffect, useState, useMemo } from "react";
+import { use, useEffect, useState, useMemo, useCallback } from "react";
+import { ClientOnly } from "@/components/ui/client-only";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,34 +100,36 @@ function PriceChart() {
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={MOCK_PRICE_DATA}>
-          <defs>
-            <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-          <XAxis dataKey="time" stroke="#666" style={{ fontSize: '10px' }} />
-          <YAxis stroke="#666" style={{ fontSize: '10px' }} />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#000',
-              border: '1px solid #333',
-              borderRadius: '8px',
-            }}
-          />
-          <Area 
-            type="monotone" 
-            dataKey="price" 
-            stroke="#10b981" 
-            fillOpacity={1}
-            fill="url(#colorPrice)"
-            strokeWidth={2}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+      <ClientOnly fallback={<div className="w-full h-[300px] bg-white/5 animate-pulse rounded-lg" />}>
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={MOCK_PRICE_DATA}>
+            <defs>
+              <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+            <XAxis dataKey="time" stroke="#666" style={{ fontSize: '10px' }} />
+            <YAxis stroke="#666" style={{ fontSize: '10px' }} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#000',
+                border: '1px solid #333',
+                borderRadius: '8px',
+              }}
+            />
+            <Area 
+              type="monotone" 
+              dataKey="price" 
+              stroke="#10b981" 
+              fillOpacity={1}
+              fill="url(#colorPrice)"
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </ClientOnly>
     </Card>
   );
 }
