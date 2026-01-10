@@ -421,7 +421,11 @@ export default function VaultDetailPage({ params }: VaultDetailPageProps) {
 
           {/* Right Column */}
           <div className="space-y-6">
-            <SwapPanel vaultId={id} />
+            <SwapPanel 
+              vaultId={id}
+              vaultSymbol={vault.symbol}
+              vaultPrice={displayPrice}
+            />
             <VaultDetails vaultId={id} />
           </div>
         </div>

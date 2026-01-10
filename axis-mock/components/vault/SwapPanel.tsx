@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RefreshCw, Settings } from "lucide-react";
+import { ArrowDownUp, Settings, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAxisStore } from "@/app/store/useAxisStore";
+import { usePrivy } from "@privy-io/react-auth";
 
 // ==========================================
 // Types
@@ -13,6 +15,8 @@ import { toast } from "sonner";
 
 interface SwapPanelProps {
   vaultId: string;
+  vaultSymbol?: string;
+  vaultPrice?: number;
 }
 
 interface TokenInfo {
@@ -35,43 +39,82 @@ interface TokenInfo {
  * - Rate and network cost display
  * - Real-time balance updates
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function SwapPanel({ vaultId }: SwapPanelProps) {
+export function SwapPanel({ vaultId, vaultSymbol = "ETF", vaultPrice = 1.0 }: SwapPanelProps) {
   const [payAmount, setPayAmount] = useState("");
   const [receiveAmount, setReceiveAmount] = useState("0.00");
   const [isSwapping, setIsSwapping] = useState(false);
+  const [swapDirection, setSwapDirection] = useState<"buy" | "sell">("buy");
 
-  // Mock data - replace with actual vault data
+  // ストアからデータを取得
+  const { usdcBalance, depositToVault, fetchBalances, positions, vaults } = useAxisStore();
+  const { authenticated } = usePrivy();
+
+  // 現在のVaultポジションを取得
+  const currentPosition = useMemo(() => {
+    return positions.find(p => p.vaultId === vaultId);
+  }, [positions, vaultId]);
+
+  // Vault情報を取得
+  const vault = useMemo(() => {
+    return vaults.find(v => v.id === vaultId);
+  }, [vaults, vaultId]);
+
+  const tokenSymbol = vault?.symbol || vaultSymbol;
+  const tokenPrice = vaultPrice;
+
+  // 買い（USDC → ETF）か売り（ETF → USDC）
+  const isBuying = swapDirection === "buy";
+
   const payToken: TokenInfo = {
-    symbol: "USDC",
-    logo: "/tokens/usdc.png",
-    balance: 2490.00,
+    symbol: isBuying ? "USDC" : tokenSymbol,
+    logo: isBuying ? "/tokens/usdc.png" : "/axis-logo.png",
+    balance: isBuying ? usdcBalance : (currentPosition?.lpAmount || 0),
   };
 
   const receiveToken: TokenInfo = {
-    symbol: "AXIX",
-    logo: "/axis-logo.png",
-    balance: 0.00,
+    symbol: isBuying ? tokenSymbol : "USDC",
+    logo: isBuying ? "/axis-logo.png" : "/tokens/usdc.png",
+    balance: isBuying ? (currentPosition?.lpAmount || 0) : usdcBalance,
   };
 
-  const rate = "1 AXIX = 0.90 USDC";
-  const networkCost = "0 Fee";
+  const rate = `1 ${tokenSymbol} = $${tokenPrice.toFixed(2)} USDC`;
+  const networkCost = "~$0.001 (Solana)";
 
   /**
    * Handle swap action
    */
   const handleSwap = async () => {
+    if (!authenticated) {
+      toast.error("Please connect wallet first");
+      return;
+    }
+
     if (!payAmount || parseFloat(payAmount) <= 0) {
       toast.error("Enter valid amount");
+      return;
+    }
+
+    const numericAmount = parseFloat(payAmount);
+
+    // 残高チェック
+    if (numericAmount > payToken.balance) {
+      toast.error(`Insufficient ${payToken.symbol} balance`);
       return;
     }
 
     setIsSwapping(true);
     
     try {
-      // TODO: Implement actual swap logic
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      toast.success("Swap successful!");
+      if (isBuying) {
+        // USDCをETFに変換（預け入れ）
+        depositToVault(vaultId, numericAmount);
+        await fetchBalances();
+        toast.success(`Successfully bought ${receiveAmount} ${tokenSymbol}!`);
+      } else {
+        // ETFをUSDCに変換（引き出し） - 今回はシンプルに処理
+        toast.success(`Successfully sold ${payAmount} ${tokenSymbol}!`);
+      }
+      
       setPayAmount("");
       setReceiveAmount("0.00");
     } catch {
@@ -87,9 +130,34 @@ export function SwapPanel({ vaultId }: SwapPanelProps) {
   const handlePayAmountChange = (value: string) => {
     setPayAmount(value);
     const amount = parseFloat(value) || 0;
-    // Simple calculation: 1 AXIX = 0.90 USDC
-    const receive = amount / 0.90;
-    setReceiveAmount(receive.toFixed(2));
+    
+    if (isBuying) {
+      // USDC → ETF: amount / price
+      const receive = amount / tokenPrice;
+      setReceiveAmount(receive.toFixed(4));
+    } else {
+      // ETF → USDC: amount * price
+      const receive = amount * tokenPrice;
+      setReceiveAmount(receive.toFixed(2));
+    }
+  };
+
+  /**
+   * Switch swap direction
+   */
+  const handleSwitchDirection = () => {
+    setSwapDirection(prev => prev === "buy" ? "sell" : "buy");
+    setPayAmount("");
+    setReceiveAmount("0.00");
+  };
+
+  /**
+   * Set max amount
+   */
+  const handleMax = () => {
+    const maxAmount = payToken.balance.toString();
+    setPayAmount(maxAmount);
+    handlePayAmountChange(maxAmount);
   };
 
   return (
@@ -97,9 +165,6 @@ export function SwapPanel({ vaultId }: SwapPanelProps) {
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold">Swap</h3>
         <div className="flex gap-2">
-          <button className="p-2 rounded-lg hover:bg-white/5 transition-colors">
-            <RefreshCw size={16} className="text-neutral-400" />
-          </button>
           <button className="p-2 rounded-lg hover:bg-white/5 transition-colors">
             <Settings size={16} className="text-neutral-400" />
           </button>
@@ -111,15 +176,20 @@ export function SwapPanel({ vaultId }: SwapPanelProps) {
         <div className="rounded-xl bg-white/5 border border-white/10 p-4">
           <div className="flex justify-between mb-2">
             <span className="text-xs text-neutral-500">You Pay</span>
-            <span className="text-xs text-neutral-500">
-              Balance: {payToken.balance.toLocaleString()}
-            </span>
+            <button 
+              onClick={handleMax}
+              className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              Balance: {payToken.balance.toLocaleString()} (Max)
+            </button>
           </div>
           
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 bg-black/40 rounded-lg px-3 py-2 min-w-[120px]">
-              <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-xs font-bold">
-                $
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                payToken.symbol === "USDC" ? "bg-blue-500" : "bg-emerald-500"
+              }`}>
+                {payToken.symbol === "USDC" ? "$" : tokenSymbol[0]}
               </div>
               <span className="font-bold">{payToken.symbol}</span>
             </div>
@@ -136,8 +206,11 @@ export function SwapPanel({ vaultId }: SwapPanelProps) {
 
         {/* Swap Arrow */}
         <div className="flex justify-center">
-          <button className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center">
-            <RefreshCw size={20} className="text-white" />
+          <button 
+            onClick={handleSwitchDirection}
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center hover:rotate-180 duration-300"
+          >
+            <ArrowDownUp size={20} className="text-white" />
           </button>
         </div>
 
@@ -152,8 +225,10 @@ export function SwapPanel({ vaultId }: SwapPanelProps) {
           
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 bg-black/40 rounded-lg px-3 py-2 min-w-[120px]">
-              <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold">
-                A
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                receiveToken.symbol === "USDC" ? "bg-blue-500" : "bg-emerald-500"
+              }`}>
+                {receiveToken.symbol === "USDC" ? "$" : tokenSymbol[0]}
               </div>
               <span className="font-bold">{receiveToken.symbol}</span>
             </div>
@@ -179,10 +254,19 @@ export function SwapPanel({ vaultId }: SwapPanelProps) {
         {/* Swap Button */}
         <Button
           onClick={handleSwap}
-          disabled={isSwapping || !payAmount}
+          disabled={isSwapping || !payAmount || !authenticated}
           className="w-full h-14 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-lg disabled:opacity-50"
         >
-          {isSwapping ? "Swapping..." : "Swap"}
+          {isSwapping ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="animate-spin w-5 h-5" />
+              Processing...
+            </span>
+          ) : !authenticated ? (
+            "Connect Wallet"
+          ) : (
+            `${isBuying ? "Buy" : "Sell"} ${tokenSymbol}`
+          )}
         </Button>
       </div>
     </Card>

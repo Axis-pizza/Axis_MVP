@@ -55,10 +55,9 @@ export function WalletSelector() {
       const solanaAddress = getSolanaAddress(user);
       
       if (solanaAddress) {
-        // ウォレットタイプを判定
-        const walletType = user.wallet?.walletClientType || "Privy";
-        syncStoreWallet(walletType);
-        console.log('Wallet synced:', { solanaAddress, walletType });
+        // ウォレットアドレスをストアに同期（アドレス自体を渡す）
+        syncStoreWallet(solanaAddress);
+        console.log('Wallet synced:', { solanaAddress });
       } else {
         // ソーシャルログインの場合、埋め込みウォレットが作成されるまで待つ
         console.log('No Solana address yet, embedded wallet may be creating...');
