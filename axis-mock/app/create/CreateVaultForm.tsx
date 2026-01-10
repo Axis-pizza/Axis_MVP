@@ -577,7 +577,7 @@ export default function CreateWizard() {
       }
   
       toast.success("Vault Created Successfully!");
-      router.push(`/vaults/${data.id}`);
+      router.push(`/vault/${data.id}`);
   
     } catch (err: any) {
       console.error("Deploy Error:", err);

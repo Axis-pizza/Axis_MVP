@@ -51,14 +51,19 @@ export function WalletSelector() {
    */
   useEffect(() => {
     if (authenticated && user) {
-      // ウォレット情報を取得
+      // ウォレット情報を取得 - Solanaウォレットを優先
       const walletAccounts = user.linkedAccounts?.filter((account: any) => account.type === 'wallet') || [];
-      const walletAddress = user.wallet?.address || (walletAccounts.length > 0 ? (walletAccounts[0] as any).address : undefined);
+      // Solanaウォレット（Phantom, Solflare等）を優先して取得
+      const solanaWallet = walletAccounts.find((account: any) => 
+        account.walletClientType === 'phantom' || 
+        account.walletClientType === 'solflare' ||
+        account.chainType === 'solana'
+      );
+      const walletAddress = (solanaWallet as any)?.address || user?.wallet?.address || (walletAccounts.length > 0 ? (walletAccounts[0] as any).address : undefined);
       
       if (walletAddress) {
-        // ウォレットタイプを判定（デフォルトはPrivy）
-        const walletType = user.wallet?.walletClientType || "Privy";
-        syncStoreWallet(walletType);
+        // ウォレットアドレスをストアに同期
+        syncStoreWallet(walletAddress);
       }
     }
   }, [authenticated, user, syncStoreWallet]);

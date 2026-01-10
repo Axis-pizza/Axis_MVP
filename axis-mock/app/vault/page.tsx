@@ -213,32 +213,42 @@ function VaultDetailContent() {
           <div>
             <h3 className="mb-4 text-lg font-bold text-white">Top Holdings</h3>
             <div className="space-y-3">
-              {vault.composition?.slice(0, 5).map((item: any, i: number) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage
-                        src={item.token.logoURI}
-                        alt={item.token.symbol}
-                        className="object-cover"
-                      />
-                      <AvatarFallback className="bg-neutral-800 text-xs text-neutral-500">
-                        {item.token.symbol[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="text-sm font-bold text-white">{item.token.name}</div>
-                      <div className="text-xs text-neutral-500">{item.token.symbol}</div>
+              {vault.composition?.slice(0, 5).map((item: any, i: number) => {
+                // 安全にトークン情報にアクセス
+                const tokenSymbol = item?.token?.symbol || item?.symbol || 'Unknown';
+                const tokenName = item?.token?.name || item?.name || tokenSymbol;
+                const tokenLogoURI = item?.token?.logoURI || item?.logoURI || null;
+                const tokenWeight = item?.weight || 0;
+                
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        {tokenLogoURI && (
+                          <AvatarImage
+                            src={tokenLogoURI}
+                            alt={tokenSymbol}
+                            className="object-cover"
+                          />
+                        )}
+                        <AvatarFallback className="bg-neutral-800 text-xs text-neutral-500">
+                          {tokenSymbol[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="text-sm font-bold text-white">{tokenName}</div>
+                        <div className="text-xs text-neutral-500">{tokenSymbol}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono text-sm text-white">{tokenWeight}%</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-mono text-sm text-white">{item.weight}%</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

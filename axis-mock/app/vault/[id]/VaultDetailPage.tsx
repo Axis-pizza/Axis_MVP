@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SwapPanel } from "@/components/vault/SwapPanel";
+import { useAxisStore, Vault } from "@/app/store/useAxisStore";
 import {
   TrendingUp,
   Clock,
@@ -15,6 +16,8 @@ import {
   Activity,
   Copy,
   ExternalLink,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import {
   LineChart,
@@ -32,6 +35,8 @@ import { toast } from "sonner";
 // ==========================================
 // Constants
 // ==========================================
+
+const API_URL = process.env.NEXT_PUBLIC_AXIS_API_BASE_URL || "https://axis-api.yusukekikuta-05.workers.dev";
 
 const MOCK_PRICE_DATA = Array.from({ length: 60 }, (_, i) => ({
   time: `${i}d`,
@@ -247,26 +252,107 @@ export default function VaultDetailPage({ params }: VaultDetailPageProps) {
   const { id } = use(params);
   const router = useRouter();
   const [vault, setVault] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { vaults, fetchVaults } = useAxisStore();
 
   useEffect(() => {
-    // TODO: Fetch actual vault data
-    setVault({
-      id,
-      name: "Axis Index",
-      symbol: "AXIX",
-      creator: "Axis Team",
-      strategy: "Quarterly Rebalancing",
-      price: 0.90,
-      priceChange: 11.2,
-      tvl: 4200000,
-      apy: 18.2,
-      holders: 1240,
-      volume24h: 850000,
-    });
-  }, [id]);
+    const loadVault = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // 1. ストアからまず探す
+        let foundVault = vaults.find(v => v.id === id);
+
+        // 2. ストアになければAPIから取得
+        if (!foundVault) {
+          // vaultsが空ならfetch
+          if (vaults.length === 0) {
+            await fetchVaults();
+            foundVault = useAxisStore.getState().vaults.find(v => v.id === id);
+          }
+
+          // まだ見つからなければ個別にAPI呼び出し
+          if (!foundVault) {
+            const res = await fetch(`${API_URL}/vaults/${id}`);
+            if (res.ok) {
+              foundVault = await res.json();
+            }
+          }
+        }
+
+        if (foundVault) {
+          // 追加のデフォルト値を設定
+          setVault({
+            ...foundVault,
+            price: foundVault.tvl ? (foundVault.tvl / 1000) : 1.0,
+            priceChange: foundVault.apy || 0,
+            holders: 0,
+            volume24h: 0,
+            strategy: foundVault.strategy_type || "Rebalancing",
+          });
+        } else {
+          // モックデータにフォールバック
+          setVault({
+            id,
+            name: "Axis Index",
+            symbol: "AXIX",
+            creator: "Axis Team",
+            strategy: "Quarterly Rebalancing",
+            price: 0.90,
+            priceChange: 11.2,
+            tvl: 4200000,
+            apy: 18.2,
+            holders: 1240,
+            volume24h: 850000,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load vault:", err);
+        setError("Failed to load vault data");
+        // モックデータにフォールバック
+        setVault({
+          id,
+          name: "Axis Index",
+          symbol: "AXIX",
+          creator: "Axis Team",
+          strategy: "Quarterly Rebalancing",
+          price: 0.90,
+          priceChange: 11.2,
+          tvl: 4200000,
+          apy: 18.2,
+          holders: 1240,
+          volume24h: 850000,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadVault();
+  }, [id, vaults, fetchVaults]);
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="animate-spin text-emerald-500 w-8 h-8" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   if (!vault) {
-    return <div>Loading...</div>;
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+          <AlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-neutral-400">Vault not found</p>
+          <Button onClick={() => router.push("/")}>Back to Home</Button>
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
@@ -335,7 +421,11 @@ export default function VaultDetailPage({ params }: VaultDetailPageProps) {
 
           {/* Right Column */}
           <div className="space-y-6">
-            <SwapPanel vaultId={id} />
+            <SwapPanel 
+              vaultId={id} 
+              vaultSymbol={vault.symbol}
+              vaultPrice={vault.price || 1.0}
+            />
             <VaultDetails vaultId={id} />
           </div>
         </div>
