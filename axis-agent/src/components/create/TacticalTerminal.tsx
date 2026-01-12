@@ -3,7 +3,7 @@
  * Professional strategy builder with clean iconography
  */
 
-import { useState, type ReactNode } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Loader2, 
@@ -16,25 +16,27 @@ import {
   Droplets,
   Hexagon,
   Link,
-  FlaskConical,
-  Swords,
   Check,
+  Plus,
   type LucideIcon
 } from 'lucide-react';
 import { useWallet } from '../../hooks/useWallet';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { PizzaChart } from '../common/PizzaChart';
+import { ToppingSearchModal } from './ToppingSearchModal';
+import type { TokenInfo } from '../../types';
 
 // Pizza toppings (strategy ingredients) with icon components
-interface Topping {
+export interface Topping {
   id: string;
   label: string;
   Icon: LucideIcon;
   color: string;
   description: string;
+  image?: string;
 }
 
-const TOPPINGS: Topping[] = [
+export const TOPPINGS: Topping[] = [
   { id: 'sol', label: 'SOL Base', Icon: CircleDot, color: '#9945FF', description: 'Solana ecosystem core' },
   { id: 'defi', label: 'DeFi Sauce', Icon: Layers, color: '#FF6B35', description: 'Yield protocols' },
   { id: 'meme', label: 'Meme Pepperoni', Icon: Flame, color: '#FF4500', description: 'High-risk meme plays' },
@@ -44,22 +46,42 @@ const TOPPINGS: Topping[] = [
 ];
 
 interface TacticalTerminalProps {
-  onAnalyze: (directive: string, tags: string[]) => void;
+  onAnalyze: (directive: string, tags: string[], allToppings: Topping[]) => void;
   isLoading?: boolean;
+  customToppings: Topping[];
+  setCustomToppings: (toppings: Topping[]) => void;
 }
 
-export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps) => {
+export const TacticalTerminal = ({ 
+  onAnalyze, 
+  isLoading, 
+  customToppings, 
+  setCustomToppings 
+}: TacticalTerminalProps) => {
   const { isConnected, shortAddress } = useWallet();
   const { setVisible } = useWalletModal();
   const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
   const [pizzaReady, setPizzaReady] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Combine default and custom toppings
+  const allToppings = [...TOPPINGS, ...customToppings];
 
   // Preview pizza composition
-  const previewSlices = selectedToppings.map((id) => ({
-    symbol: TOPPINGS.find(t => t.id === id)?.emoji || '?',
-    weight: Math.floor(100 / selectedToppings.length),
-    color: TOPPINGS.find(t => t.id === id)?.color,
-  }));
+  const previewSlices = selectedToppings.map((id) => {
+    const topping = allToppings.find(t => t.id === id);
+    return {
+      symbol: topping?.label.split(' ')[0] || '?',
+      weight: Math.floor(100 / selectedToppings.length),
+      color: topping?.color,
+    };
+  });
+
+  // Stable deterministic values for animations
+  const floatingAnimations = useMemo(() => [...Array(5)].map((_, i) => ({
+    x: (i * 85) % 350 + 20,
+    duration: 15 + (i * 3) % 10
+  })), []);
 
   const toggleTopping = (id: string) => {
     setSelectedToppings(prev => {
@@ -71,31 +93,54 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
     });
   };
 
+  const handleAddCustomTopping = (token: TokenInfo) => {
+    const newTopping: Topping = {
+      id: token.address,
+      label: token.symbol,
+      Icon: CircleDot, // Fallback icon
+      image: token.logoURI,
+      color: '#ffffff', // Default white for custom tokens
+      description: token.name
+    };
+
+    setCustomToppings([...customToppings, newTopping]);
+    toggleTopping(newTopping.id);
+  };
+
   const handleOrder = () => {
     if (!isConnected) {
       setVisible(true);
       return;
     }
     
+    // For custom tokens, we might want to pass the IDs differently, 
+    // but the backend AI should handle symbol names in directive well enough.
     const directive = selectedToppings
-      .map(id => TOPPINGS.find(t => t.id === id)?.label)
+      .map(id => allToppings.find(t => t.id === id)?.label)
       .join(' + ');
     
     if (selectedToppings.length >= 2) {
-      onAnalyze(directive, selectedToppings);
+      onAnalyze(directive, selectedToppings, allToppings);
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col px-4 py-8 relative overflow-hidden">
+      <ToppingSearchModal 
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSelect={handleAddCustomTopping}
+        selectedIds={selectedToppings}
+      />
+
       {/* Floating Pizza Decorations */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {[...Array(5)].map((_, i) => (
+        {floatingAnimations.map((anim, i) => (
           <motion.div
             key={i}
-            className="absolute text-4xl"
+            className="absolute text-orange-500/10"
             initial={{ 
-              x: Math.random() * 400, 
+              x: anim.x, 
               y: -50,
               rotate: 0,
               opacity: 0.3 
@@ -105,14 +150,14 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
               rotate: 360,
             }}
             transition={{ 
-              duration: 15 + Math.random() * 10,
+              duration: anim.duration,
               repeat: Infinity,
               delay: i * 3,
               ease: 'linear'
             }}
             style={{ left: `${i * 20}%` }}
           >
-            🍕
+            <Pizza size={48} />
           </motion.div>
         ))}
       </div>
@@ -124,11 +169,11 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
         className="text-center mb-6 relative z-10"
       >
         <motion.div 
-          className="inline-block mb-4"
+          className="inline-block mb-4 text-orange-500"
           animate={{ rotate: [0, -5, 5, 0] }}
           transition={{ duration: 2, repeat: Infinity }}
         >
-          <span className="text-6xl">🍕</span>
+          <Pizza className="w-16 h-16" />
         </motion.div>
         
         <h1 className="text-4xl font-black mb-2">
@@ -155,7 +200,8 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
             onClick={() => setVisible(true)}
             className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-orange-500/20 border border-orange-500/40 rounded-full hover:bg-orange-500/30 transition-colors"
           >
-            <span className="text-xs text-orange-400">🔗 Connect Wallet</span>
+            <Link className="w-3 h-3 text-orange-400" />
+            <span className="text-xs text-orange-400">Connect Wallet</span>
           </motion.button>
         )}
       </motion.div>
@@ -178,11 +224,11 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
               />
               {/* Ninja hand coming from corner */}
               <motion.div
-                className="absolute -bottom-2 -right-2 text-3xl"
+                className="absolute -bottom-2 -right-2 text-3xl text-orange-500"
                 animate={{ rotate: [-10, 10, -10] }}
                 transition={{ duration: 0.5, repeat: Infinity }}
               >
-                🥷
+                <Sparkles size={24} />
               </motion.div>
             </div>
           </motion.div>
@@ -208,7 +254,7 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
 
         {/* Toppings Grid */}
         <div className="grid grid-cols-2 gap-3 mb-6">
-          {TOPPINGS.map((topping, i) => {
+          {allToppings.map((topping, i) => {
             const isSelected = selectedToppings.includes(topping.id);
             return (
               <motion.button
@@ -235,10 +281,14 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
                 
                 <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xl">{topping.emoji}</span>
-                    <span className="font-medium text-sm">{topping.label}</span>
+                    {topping.image ? (
+                      <img src={topping.image} alt={topping.label} className="w-6 h-6 rounded-full" />
+                    ) : (
+                      <topping.Icon className={`w-6 h-6 ${isSelected ? 'text-orange-500' : 'text-white/60'}`} />
+                    )}
+                    <span className="font-medium text-sm truncate">{topping.label}</span>
                   </div>
-                  <p className="text-[10px] text-white/40">{topping.description}</p>
+                  <p className="text-[10px] text-white/40 truncate">{topping.description}</p>
                 </div>
 
                 {/* Selection checkmark */}
@@ -248,12 +298,28 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
                     animate={{ scale: 1 }}
                     className="absolute top-2 right-2 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center"
                   >
-                    <span className="text-xs text-black">✓</span>
+                    <Check className="w-3 h-3 text-black" />
                   </motion.div>
                 )}
               </motion.button>
             );
           })}
+          
+          {/* Add Custom Topping Button */}
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: allToppings.length * 0.05 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setIsSearchOpen(true)}
+            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/30 border-dashed transition-all gap-2"
+          >
+            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+              <Plus className="w-5 h-5 text-white/50" />
+            </div>
+            <span className="text-xs text-white/50">Add Ingredient</span>
+          </motion.button>
         </div>
 
         {/* Selected Summary */}
@@ -266,11 +332,16 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
             <div className="flex items-center justify-between">
               <span className="text-xs text-white/50">Your Order</span>
               <div className="flex gap-1">
-                {selectedToppings.map(id => (
-                  <span key={id} className="text-lg">
-                    {TOPPINGS.find(t => t.id === id)?.emoji}
-                  </span>
-                ))}
+                {selectedToppings.map(id => {
+                  const topping = allToppings.find(t => t.id === id);
+                  if (!topping) return null;
+                  
+                  return topping.image ? (
+                    <img key={id} src={topping.image} alt={topping.label} className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <topping.Icon key={id} className="w-5 h-5 text-orange-400" />
+                  );
+                })}
               </div>
             </div>
           </motion.div>
@@ -295,12 +366,12 @@ export const TacticalTerminal = ({ onAnalyze, isLoading }: TacticalTerminalProps
             </>
           ) : !isConnected ? (
             <>
-              <span>🔗</span>
+              <Link className="w-5 h-5" />
               <span>Connect Wallet First</span>
             </>
           ) : selectedToppings.length < 2 ? (
             <>
-              <span>🍕</span>
+              <Pizza className="w-5 h-5" />
               <span>Select at least 2 toppings</span>
             </>
           ) : (

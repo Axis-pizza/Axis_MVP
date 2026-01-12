@@ -28,7 +28,7 @@ export interface CoinGeckoToken {
  * Fetch top Solana ecosystem tokens from CoinGecko
  * Returns tokens sorted by market cap
  */
-export async function fetchSolanaTokens(perPage: number = 100): Promise<TokenInfo[]> {
+export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInfo[]> {
   // Return cache if fresh
   if (tokenCache.length > 0 && Date.now() - cacheTime < CACHE_TTL) {
     return tokenCache;

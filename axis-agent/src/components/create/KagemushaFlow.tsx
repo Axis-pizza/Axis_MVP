@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
-import { TacticalTerminal } from './TacticalTerminal';
+import { TacticalTerminal, type Topping } from './TacticalTerminal';
 import { StrategyCards } from './StrategyCards';
 import { PizzaBuilder } from './PizzaBuilder';
 import { DeploymentBlueprint } from './DeploymentBlueprint';
@@ -42,9 +42,10 @@ export const KagemushaFlow = () => {
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [customTokens, setCustomTokens] = useState<{ symbol: string; weight: number }[]>([]);
   const [pizzaName, setPizzaName] = useState('');
+  const [customToppings, setCustomToppings] = useState<Topping[]>([]);
 
   // Step 1: Generate strategies from directive
-  const handleAnalyze = async (directive: string, tags: string[]) => {
+  const handleAnalyze = async (directive: string, tags: string[], _allToppings: Topping[]) => {
     setIsLoading(true);
     setStep('SIMULATION');
 
@@ -120,7 +121,12 @@ export const KagemushaFlow = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
           >
-            <TacticalTerminal onAnalyze={handleAnalyze} isLoading={isLoading} />
+            <TacticalTerminal 
+              onAnalyze={handleAnalyze} 
+              isLoading={isLoading}
+              customToppings={customToppings}
+              setCustomToppings={setCustomToppings}
+            />
           </motion.div>
         )}
 
