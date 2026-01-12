@@ -3,7 +3,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { Zap, Shield, Waves, Check } from 'lucide-react';
+import { Zap, Shield, Waves, Check, Sparkles } from 'lucide-react';
 import { BacktestChart } from '../common/BacktestChart';
 import type { Strategy } from '../../types';
 
@@ -95,6 +95,16 @@ export const StrategyPreview = ({ strategy, selected, onSelect, expanded = false
             </span>
           ))}
         </div>
+
+        {/* AI Suggestion */}
+        {strategy.aiSuggestion && (
+          <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/5">
+            <div className="flex items-start gap-2">
+              <Sparkles className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-white/70 italic leading-relaxed">"{strategy.aiSuggestion}"</p>
+            </div>
+          </div>
+        )}
 
         {/* Metrics Row */}
         <div className="grid grid-cols-4 gap-2 p-3 bg-black/30 rounded-xl mb-4">

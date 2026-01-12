@@ -46,7 +46,7 @@ export const TOPPINGS: Topping[] = [
 ];
 
 interface TacticalTerminalProps {
-  onAnalyze: (directive: string, tags: string[], allToppings: Topping[]) => void;
+  onAnalyze: (directive: string, tags: string[], allToppings: Topping[], customInput?: string) => void;
   isLoading?: boolean;
   customToppings: Topping[];
   setCustomToppings: (toppings: Topping[]) => void;
@@ -63,6 +63,7 @@ export const TacticalTerminal = ({
   const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
   const [pizzaReady, setPizzaReady] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [customInstructions, setCustomInstructions] = useState('');
 
   // Combine default and custom toppings
   const allToppings = [...TOPPINGS, ...customToppings];
@@ -120,7 +121,7 @@ export const TacticalTerminal = ({
       .join(' + ');
     
     if (selectedToppings.length >= 2) {
-      onAnalyze(directive, selectedToppings, allToppings);
+      onAnalyze(directive, selectedToppings, allToppings, customInstructions);
     }
   };
 
@@ -346,6 +347,20 @@ export const TacticalTerminal = ({
             </div>
           </motion.div>
         )}
+
+        {/* Custom Instructions */}
+        <div className="mb-5">
+           <label className="text-xs text-white/50 mb-2 block">AI Instructions (Optional)</label>
+           <textarea
+             value={customInstructions}
+             onChange={(e) => setCustomInstructions(e.target.value.slice(0, 300))}
+             placeholder="E.g. Focus on high volatility, minimize downside..."
+             className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-orange-500/50 transition-colors h-20 resize-none"
+           />
+           <div className="text-right text-[10px] text-white/30 mt-1">
+             {customInstructions.length}/300
+           </div>
+        </div>
 
         {/* Order Button */}
         <motion.button

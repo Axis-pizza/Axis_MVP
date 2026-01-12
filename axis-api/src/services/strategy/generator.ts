@@ -39,7 +39,7 @@ export class StrategyGenerator {
   /**
    * Generate AI-powered strategy suggestions
    */
-  async generateStrategies(directive: string, tags: string[] = []): Promise<StrategyResult[]> {
+  async generateStrategies(directive: string, tags: string[] = [], customInput?: string): Promise<StrategyResult[]> {
     // Fetch real-time prices
     const symbols = TOKEN_UNIVERSE.map(t => t.symbol);
     const prices = await this.priceService.getPrices(symbols);
@@ -49,7 +49,7 @@ export class StrategyGenerator {
     // Try AI generation first
     if (this.env?.AI) {
       try {
-        const aiStrategies = await this.generateWithAI(directive, tags, prices);
+        const aiStrategies = await this.generateWithAI(directive, tags, prices, customInput);
         if (aiStrategies.length >= 3) {
           return aiStrategies;
         }
@@ -59,13 +59,13 @@ export class StrategyGenerator {
     }
 
     // Fallback to algorithmic generation
-    return this.generateAlgorithmic(directive, tags, prices);
+    return this.generateAlgorithmic(directive, tags, prices, customInput);
   }
 
   /**
    * Generate strategies using Cloudflare AI
    */
-  private async generateWithAI(directive: string, tags: string[], prices: Record<string, any>): Promise<StrategyResult[]> {
+  private async generateWithAI(directive: string, tags: string[], prices: Record<string, any>, customInput?: string): Promise<StrategyResult[]> {
     const priceContext = Object.entries(prices)
       .map(([sym, p]) => `${sym}: $${p.priceFormatted}`)
       .join(', ');
@@ -77,12 +77,14 @@ export class StrategyGenerator {
 Available tokens: ${tokenContext}
 Current prices: ${priceContext}
 User preferences: ${tags.join(', ') || 'none'}
+User notes: ${customInput || 'none'}
 
 Output ONLY a JSON array with exactly this structure:
 [{
   "name": "Strategy Name",
   "type": "AGGRESSIVE" | "BALANCED" | "CONSERVATIVE",
   "description": "Brief strategy thesis",
+  "aiSuggestion": "Short, specific advice for this strategy based on user notes (max 20 words)",
   "tokens": [{"symbol": "SOL", "weight": 40}, ...],
   "expectedApy": 25,
   "riskScore": 7
@@ -91,7 +93,7 @@ Output ONLY a JSON array with exactly this structure:
 Rules:
 - Weights must sum to 100
 - Use 3-5 tokens per strategy
-- Match user's directive intent
+- Match user's directive and notes
 - Be creative with names`;
 
     const response: any = await this.env.AI.run('@cf/meta/llama-3-8b-instruct', {
@@ -117,7 +119,7 @@ Rules:
   /**
    * Generate strategies algorithmically using market data
    */
-  private generateAlgorithmic(directive: string, tags: string[], prices: Record<string, any>): StrategyResult[] {
+  private generateAlgorithmic(directive: string, tags: string[], prices: Record<string, any>, customInput?: string): StrategyResult[] {
     const d = directive.toUpperCase();
     const now = Date.now();
 
@@ -132,6 +134,7 @@ Rules:
       metrics: this.generateMetrics('AGGRESSIVE'),
       backtest: this.generateBacktest('AGGRESSIVE'),
       createdAt: now,
+      aiSuggestion: 'High risk, high potential upside with meme exposure.',
     };
 
     // Strategy 2: Balanced (DeFi + L1)
@@ -145,6 +148,7 @@ Rules:
       metrics: this.generateMetrics('BALANCED'),
       backtest: this.generateBacktest('BALANCED'),
       createdAt: now,
+      aiSuggestion: 'Balanced blend of DeFi protocols and Layer 1s.',
     };
 
     // Strategy 3: Conservative (LST + Stable)
@@ -158,6 +162,7 @@ Rules:
       metrics: this.generateMetrics('CONSERVATIVE'),
       backtest: this.generateBacktest('CONSERVATIVE'),
       createdAt: now,
+      aiSuggestion: 'Focus on capital preservation and steady yield.',
     };
 
     return [aggressive, balanced, conservative];
@@ -320,6 +325,7 @@ Rules:
       },
       backtest: this.generateBacktest(rawStrategy.type),
       createdAt: Date.now(),
+      aiSuggestion: rawStrategy.aiSuggestion || 'AI generated strategy based on your preferences.',
     };
   }
 }

@@ -8,11 +8,11 @@ export const api = {
   /**
    * Generate AI strategies
    */
-  async analyze(directive: string, tags: string[] = []) {
+  async analyze(directive: string, tags: string[] = [], customInput?: string) {
     const res = await fetch(`${API_BASE}/kagemusha/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ directive, tags }),
+      body: JSON.stringify({ directive, tags, customInput }),
     });
     return res.json();
   },

@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, TrendingUp, Users, Crown, ChevronRight, Flame, Loader2, Plus, Zap, Shield, Target } from 'lucide-react';
 import { api } from '../../services/api';
 import { PizzaChart } from '../common/PizzaChart';
+import { StrategyDetailModal } from '../common/StrategyDetailModal';
 
 interface DiscoveredStrategy {
   id: string;
@@ -20,12 +21,9 @@ interface DiscoveredStrategy {
   createdAt: number;
 }
 
-interface DiscoverViewProps {
-  onSelectStrategy?: (strategy: DiscoveredStrategy) => void;
-}
-
-export const DiscoverView = ({ onSelectStrategy }: DiscoverViewProps) => {
+export const DiscoverView = () => {
   const [strategies, setStrategies] = useState<DiscoveredStrategy[]>([]);
+  const [selectedStrategy, setSelectedStrategy] = useState<DiscoveredStrategy | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'trending' | 'new' | 'top'>('all');
@@ -152,7 +150,7 @@ export const DiscoverView = ({ onSelectStrategy }: DiscoverViewProps) => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ delay: i * 0.03 }}
-                  onClick={() => onSelectStrategy?.(strategy)}
+                  onClick={() => setSelectedStrategy(strategy)}
                   className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl hover:border-white/20 hover:bg-white/[0.05] cursor-pointer transition-all group"
                 >
                   <div className="flex items-center gap-4">
@@ -223,6 +221,28 @@ export const DiscoverView = ({ onSelectStrategy }: DiscoverViewProps) => {
           No strategies found matching your search
         </div>
       )}
+
+      {/* Strategy Detail Modal */}
+      <StrategyDetailModal
+        isOpen={!!selectedStrategy}
+        strategy={selectedStrategy ? {
+          id: selectedStrategy.id,
+          address: selectedStrategy.id, // Assuming ID is address/pubkey
+          ownerPubkey: selectedStrategy.ownerPubkey,
+          name: selectedStrategy.name,
+          type: selectedStrategy.type,
+          tokens: selectedStrategy.tokens,
+          description: selectedStrategy.description,
+          tvl: selectedStrategy.tvl,
+          createdAt: selectedStrategy.createdAt,
+          pnl: 0 // Mock for now
+        } : null}
+        onClose={() => setSelectedStrategy(null)}
+        onSuccess={() => {
+          // Ideally refresh strategies
+          setSelectedStrategy(null);
+        }}
+      />
     </div>
   );
 };

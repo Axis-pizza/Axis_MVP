@@ -38,6 +38,7 @@ export interface Strategy {
     volatility: number;
   };
   createdAt: number;
+  aiSuggestion?: string;
 }
 
 export interface Vault {

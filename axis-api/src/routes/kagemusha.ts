@@ -23,14 +23,14 @@ const createJitoService = (env: Bindings) => {
  */
 app.post('/analyze', async (c) => {
   try {
-    const { directive, tags } = await c.req.json();
+    const { directive, tags, customInput } = await c.req.json();
     
     if (!directive) {
       return c.json({ success: false, error: 'Directive is required' }, 400);
     }
 
     const generator = new StrategyGenerator(c.env);
-    const strategies = await generator.generateStrategies(directive, tags || []);
+    const strategies = await generator.generateStrategies(directive, tags || [], customInput);
     
     return c.json({ 
       success: true, 

@@ -126,6 +126,13 @@ export const KagemushaFlow = () => {
   const handleConfirmStrategy = () => {
     if (selectedStrategy) {
       setCustomTokens(selectedStrategy.tokens);
+      if (publicKey) {
+        const addr = publicKey.toBase58();
+        const shortAddr = `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+        setPizzaName(`${shortAddr} Pizza`);
+      } else {
+        setPizzaName('My Alpha Pizza');
+      }
       setStep('CUSTOMIZE');
     }
   };

@@ -407,3 +407,109 @@ export async function sendViaJito(
   }
 }
 
+/**
+ * Withdraw/Redeem funds from a strategy
+ */
+export async function withdraw(
+  connection: Connection,
+  wallet: WalletContextState,
+  strategyPubkey: PublicKey,
+  amountShares: number
+): Promise<string> {
+  if (!wallet.publicKey || !wallet.signTransaction) {
+    throw new Error('Wallet not connected');
+  }
+
+  try {
+    const shares = new BN(amountShares * 1e9); 
+
+    const [positionPda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('position'),
+        strategyPubkey.toBuffer(),
+        wallet.publicKey.toBuffer()
+      ],
+      PROGRAM_ID
+    );
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: strategyPubkey, isSigner: false, isWritable: true },
+        { pubkey: positionPda, isSigner: false, isWritable: true },
+        { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      programId: PROGRAM_ID,
+      data: Buffer.concat([
+        Buffer.from([2]), // Instruction index 2 for Withdraw
+        shares.toArrayLike(Buffer, 'le', 8)
+      ])
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = wallet.publicKey;
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+    const signed = await wallet.signTransaction(transaction);
+    const signature = await connection.sendRawTransaction(signed.serialize());
+    
+    await connection.confirmTransaction(signature, 'confirmed');
+
+    console.log(`✅ Withdrawn shares: ${amountShares}`);
+
+    return signature;
+  } catch (error) {
+    console.error('Failed to withdraw:', error);
+    throw error;
+  }
+}
+
+/**
+ * Rebalance strategy with new weights/tokens
+ * Note: Simpler implementation for MVP, in production this would involve swaps
+ */
+export async function rebalance(
+  connection: Connection,
+  wallet: WalletContextState,
+  strategyPubkey: PublicKey,
+  newTokens: Array<{ symbol: string; weight: number }>
+): Promise<string> {
+  if (!wallet.publicKey || !wallet.signTransaction) {
+    throw new Error('Wallet not connected');
+  }
+
+  try {
+    const targetWeights = newTokens.map(t => t.weight * 100);
+    // Pad to 10 tokens
+    while (targetWeights.length < 10) targetWeights.push(0);
+
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: strategyPubkey, isSigner: false, isWritable: true },
+        { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      ],
+      programId: PROGRAM_ID,
+      data: Buffer.concat([
+        Buffer.from([3]), // Instruction index 3 for Rebalance
+        Buffer.from(new Uint16Array(targetWeights).buffer),
+      ])
+    });
+
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = wallet.publicKey;
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+    const signed = await wallet.signTransaction(transaction);
+    const signature = await connection.sendRawTransaction(signed.serialize());
+    
+    await connection.confirmTransaction(signature, 'confirmed');
+
+    console.log(`✅ Strategy rebalanced: ${strategyPubkey.toString()}`);
+
+    return signature;
+  } catch (error) {
+    console.error('Failed to rebalance:', error);
+    throw error;
+  }
+}
+

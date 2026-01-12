@@ -36,7 +36,7 @@ export const CreateETFFlow = () => {
     }
   }, [directive]);
 
-  const handleAnalyze = async (dir: string, tags: string[], allToppings: Topping[]) => {
+  const handleAnalyze = async (dir: string, tags: string[], allToppings: Topping[], customInput?: string) => {
     setDirective(dir);
     setLoading(true);
     setStep('CUSTOMIZE');
@@ -56,7 +56,7 @@ export const CreateETFFlow = () => {
     setSelectedCustomTokens(customSelected);
     
     try {
-      const res = await api.analyze(dir, tags);
+      const res = await api.analyze(dir, tags, customInput);
       if (res.success && res.strategies) {
         setStrategies(res.strategies);
         // Auto-select first strategy

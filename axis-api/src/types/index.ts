@@ -39,8 +39,9 @@ export interface StrategyResult {
   description: string;
   tokens: TokenAllocation[];
   metrics: StrategyMetrics;
-  backtest: BacktestData;
+  backtest: BacktestData | null;
   createdAt: number;
+  aiSuggestion?: string;
 }
 
 export interface StrategyMetrics {
