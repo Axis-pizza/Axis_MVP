@@ -2,10 +2,10 @@ import { Hono } from 'hono';
 import { Bindings } from '../config/env';
 import * as VaultModel from '../models/vault';
 import { STRICT_LIST } from '../config/constants';
-import { JitoService } from '../services/jito';
+import { JitoBundleService } from '../services/blockchain';
 
 const app = new Hono<{ Bindings: Bindings }>();
-const jitoService = new JitoService();
+const jitoService = new JitoBundleService();
 
 app.get('/vaults', async (c) => {
   try {
@@ -20,7 +20,7 @@ app.get('/vaults', async (c) => {
 // New Endpoint: Prepare for Deployment (Get Jito Tip Account)
 app.get('/vaults/prepare-deployment', async (c) => {
     try {
-        const tipAccount = await jitoService.getTipAccount();
+        const tipAccount = await jitoService.getRandomTipAccount();
         // Return tip account for frontend to include in the transaction
         return c.json({ 
             success: true, 
