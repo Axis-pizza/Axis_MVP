@@ -1,0 +1,29 @@
+# Solana / Anchor
+target/
+.anchor/
+test-ledger/
+
+# Cargo
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local config
+.cargo/config.toml
+
+# Backup files
+*.bak
+
+# Node (for tests)
+node_modules/

@@ -1,0 +1,445 @@
+{
+  "address": "2kdDnjHHLmHex8v5pk8XgB7ddFeiuBW4Yp5Ykx8JmBLd",
+  "metadata": {
+    "name": "kagemusha",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Kagemusha - AI-Powered Strategy Vault Protocol for Solana"
+  },
+  "instructions": [
+    {
+      "name": "deposit",
+      "docs": [
+        "Deposit tokens into a strategy vault.",
+        "Creates or updates the user's position."
+      ],
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "strategy",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strategy"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "relations": [
+            "strategy"
+          ]
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_strategy",
+      "docs": [
+        "Initialize a new strategy vault with the given parameters.",
+        "",
+        "# Arguments",
+        "* `name` - Strategy name (max 32 chars)",
+        "* `strategy_type` - 0: Sniper, 1: Fortress, 2: Wave",
+        "* `target_weights` - Token weights in basis points (must sum to 10000)"
+      ],
+      "discriminator": [
+        208,
+        119,
+        144,
+        145,
+        178,
+        57,
+        105,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "strategy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  114,
+                  97,
+                  116,
+                  101,
+                  103,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "path": "name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "strategy_type",
+          "type": "u8"
+        },
+        {
+          "name": "target_weights",
+          "type": {
+            "vec": "u16"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tactical_rebalance",
+      "docs": [
+        "Execute a tactical rebalance via Jupiter swap.",
+        "Only callable by the strategy owner."
+      ],
+      "discriminator": [
+        111,
+        219,
+        97,
+        115,
+        139,
+        154,
+        231,
+        202
+      ],
+      "accounts": [
+        {
+          "name": "strategy",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "strategy"
+          ]
+        },
+        {
+          "name": "jupiter_program"
+        },
+        {
+          "name": "vault_token_in",
+          "writable": true
+        },
+        {
+          "name": "vault_token_out",
+          "writable": true
+        },
+        {
+          "name": "protocol_fee_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in",
+          "type": "u64"
+        },
+        {
+          "name": "minimum_amount_out",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "StrategyVault",
+      "discriminator": [
+        159,
+        204,
+        238,
+        219,
+        38,
+        201,
+        136,
+        177
+      ]
+    },
+    {
+      "name": "UserPosition",
+      "discriminator": [
+        251,
+        248,
+        209,
+        245,
+        83,
+        234,
+        17,
+        27
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidStrategyType",
+      "msg": "Invalid strategy type. Must be 0 (Sniper), 1 (Fortress), or 2 (Wave)."
+    },
+    {
+      "code": 6001,
+      "name": "InvalidWeightSum",
+      "msg": "Weights must sum to 10000 basis points (100%)."
+    },
+    {
+      "code": 6002,
+      "name": "NameTooLong",
+      "msg": "Strategy name too long. Maximum 32 characters."
+    },
+    {
+      "code": 6003,
+      "name": "Unauthorized",
+      "msg": "Unauthorized. Only the owner can perform this action."
+    },
+    {
+      "code": 6004,
+      "name": "StrategyInactive",
+      "msg": "Strategy is not active."
+    },
+    {
+      "code": 6005,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds for rebalance."
+    },
+    {
+      "code": 6006,
+      "name": "SlippageExceeded",
+      "msg": "Slippage tolerance exceeded."
+    }
+  ],
+  "types": [
+    {
+      "name": "StrategyVault",
+      "docs": [
+        "The core account that stores a user's strategy configuration.",
+        "Each strategy is a PDA derived from the owner's pubkey and strategy name."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "docs": [
+              "The owner (Shogun) who created this strategy"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "docs": [
+              "Human-readable name (max 32 chars)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "strategy_type",
+            "docs": [
+              "Strategy type: 0 = Sniper, 1 = Fortress, 2 = Wave"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "target_weights",
+            "docs": [
+              "Target weights in basis points (10000 = 100%)",
+              "Each element represents the weight for a token in the composition"
+            ],
+            "type": {
+              "array": [
+                "u16",
+                10
+              ]
+            }
+          },
+          {
+            "name": "num_tokens",
+            "docs": [
+              "Number of active tokens in the composition"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "is_active",
+            "docs": [
+              "Whether the strategy is actively rebalancing"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "tvl",
+            "docs": [
+              "Total value locked in the vault (in lamports equivalent)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "fees_collected",
+            "docs": [
+              "Accumulated fees collected"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "last_rebalance",
+            "docs": [
+              "Last rebalance timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserPosition",
+      "docs": [
+        "Tracks individual user deposits into a strategy vault."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "docs": [
+              "The strategy vault this position belongs to"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "docs": [
+              "The user who owns this position"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "lp_shares",
+            "docs": [
+              "Amount of LP tokens representing share ownership"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "deposit_time",
+            "docs": [
+              "Timestamp of initial deposit"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "entry_value",
+            "docs": [
+              "Entry value in USDC (for PnL calculation)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

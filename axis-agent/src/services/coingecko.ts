@@ -22,11 +22,14 @@ export interface CoinGeckoToken {
   market_cap: number;
   market_cap_rank: number;
   price_change_percentage_24h: number;
+  platforms?: {
+    solana?: string;
+  };
 }
 
 /**
  * Fetch top Solana ecosystem tokens from CoinGecko
- * Returns tokens sorted by market cap
+ * Returns tokens sorted by market cap (only those with valid Solana addresses)
  */
 export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInfo[]> {
   // Return cache if fresh
@@ -42,6 +45,7 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
       per_page: String(perPage),
       page: '1',
       sparkline: 'false',
+      include_platform: 'true', // Request platform data
     });
 
     const response = await fetch(`${COINGECKO_API}/coins/markets?${params}`);
@@ -49,12 +53,16 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
     
     const markets: CoinGeckoToken[] = await response.json();
     
+    // Filter to only include tokens with valid Solana addresses
     tokenCache = markets
-      .filter(m => m.id && m.symbol)
+      .filter(m => {
+        // Must have id, symbol, AND a Solana platform address
+        return m.id && m.symbol && m.platforms?.solana;
+      })
       .map(m => ({
         symbol: m.symbol.toUpperCase(),
         name: m.name,
-        address: m.id, // CoinGecko ID as identifier
+        address: m.platforms!.solana!, // Use actual Solana address
         logoURI: m.image,
         price: m.current_price,
         priceFormatted: formatPrice(m.current_price),
@@ -62,7 +70,7 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
       }));
     
     cacheTime = Date.now();
-    console.log(`[CoinGecko] Fetched ${tokenCache.length} Solana tokens`);
+    console.log(`[CoinGecko] Fetched ${tokenCache.length} Solana tokens (filtered from ${markets.length} total)`);
     
     return tokenCache;
   } catch (error) {

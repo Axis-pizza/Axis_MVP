@@ -6,7 +6,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("Kage111111111111111111111111111111111111111");
+declare_id!("2kdDnjHHLmHex8v5pk8XgB7ddFeiuBW4Yp5Ykx8JmBLd");
 
 #[program]
 pub mod kagemusha {

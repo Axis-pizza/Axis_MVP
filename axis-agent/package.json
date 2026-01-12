@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-phantom": "^0.9.28",
     "@solana/wallet-adapter-react": "^0.15.39",
@@ -17,6 +19,7 @@
     "@solana/web3.js": "^1.98.4",
     "@tanstack/react-query": "^5.90.16",
     "@tanstack/react-router": "^1.147.3",
+    "buffer": "^6.0.3",
     "clsx": "^2.1.1",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.562.0",
@@ -42,6 +45,7 @@
     "tailwindcss": "^4.0.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^6.4.1"
+    "vite": "^6.4.1",
+    "vite-plugin-node-polyfills": "^0.24.0"
   }
 }

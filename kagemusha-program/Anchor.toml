@@ -3,13 +3,13 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-kagemusha = "Kage111111111111111111111111111111111111111"
+kagemusha = "2kdDnjHHLmHex8v5pk8XgB7ddFeiuBW4Yp5Ykx8JmBLd"
 
 [programs.devnet]
-kagemusha = "Kage111111111111111111111111111111111111111"
+kagemusha = "2kdDnjHHLmHex8v5pk8XgB7ddFeiuBW4Yp5Ykx8JmBLd"
 
 [programs.mainnet]
-kagemusha = "Kage111111111111111111111111111111111111111"
+kagemusha = "2kdDnjHHLmHex8v5pk8XgB7ddFeiuBW4Yp5Ykx8JmBLd"
 
 [registry]
 url = "https://api.apr.dev"
