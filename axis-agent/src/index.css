@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #FF4500; /* Pizza Orange/Red */
+  --color-brand-secondary: #FFD700; /* Cheese Gold */
+  --color-bg-dark: #0a0a0a;
+  --color-card-dark: #1a1a1a;
+}
+
+body {
+  background-color: var(--color-bg-dark);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+}
