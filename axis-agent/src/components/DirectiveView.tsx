@@ -22,10 +22,13 @@ export const DirectiveView = ({ onAnalyze }: { onAnalyze: () => void }) => {
         <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full text-center mb-12"
+            className="w-full text-center mb-12 flex flex-col items-center"
         >
+             <div className="w-20 h-20 mb-4 rounded-2xl overflow-hidden shadow-2xl shadow-orange-500/20">
+                <img src="/logo.webp" alt="Axis Logo" className="w-full h-full object-cover" />
+             </div>
              <h1 className="text-4xl font-bold tracking-tighter mb-2 bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-amber-200">
-                KAGEMUSHA
+                AXIS
              </h1>
              <p className="text-xs uppercase tracking-[0.3em] text-white/40">Tactical Strategy Engine</p>
         </motion.div>

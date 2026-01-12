@@ -57,7 +57,7 @@ pub fn handler(
     strategy.last_rebalance = Clock::get()?.unix_timestamp;
     strategy.bump = ctx.bumps.strategy;
     
-    msg!("Kagemusha: Strategy '{}' initialized by {}", name, ctx.accounts.owner.key());
+    msg!("Kagemusha: Strategy '{}' initialized by {} (Jito Bundle)", name, ctx.accounts.owner.key());
     
     Ok(())
 }

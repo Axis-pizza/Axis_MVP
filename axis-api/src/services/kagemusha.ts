@@ -27,7 +27,8 @@ const SOLANA_TOP_TOKENS = [
   { symbol: 'IO', name: 'io.net', sector: 'DePIN' },
   { symbol: 'USDC', name: 'USDC', sector: 'Stable' },
   { symbol: 'KMNO', name: 'Kamino', sector: 'DeFi' },
-  { symbol: 'DRIFT', name: 'Drift', sector: 'DeFi' }
+  { symbol: 'DRIFT', name: 'Drift', sector: 'DeFi' },
+  { symbol: 'JitoSOL', name: 'Jito Staked SOL', sector: 'LST' }
 ];
 
 export class KagemushaService {
@@ -52,10 +53,23 @@ export class KagemushaService {
         // Prepare Token Context (Limit to 50 to fit Context Window, prioritize by known symbols + randoms)
         // In a real prod, we would sort by Volume/MCap via another API. 
         // Here we take a mix of top known tokens + random selection from strict list for discovery.
-        const prioritySymbols = new Set(['SOL', 'JUP', 'USDC', 'JTO', 'PYTH', 'WIF', 'BONK', 'RAY', 'RENDER', 'HNT']);
+
+        // Extract potential symbols from directive (uppercase words)
+        const directiveWords = directive.toUpperCase().split(/[^A-Z0-9]+/);
+        const requestedSymbols = new Set(directiveWords.filter(w => w.length >= 2 && w.length <= 6));
+        
+        const prioritySymbols = new Set(['SOL', 'JUP', 'USDC', 'JTO', 'PYTH', 'WIF', 'BONK', 'RAY', 'RENDER', 'HNT', 'JitoSOL']);
+        
+        // Ensure requested symbols are treated as priority if they exist in Jupiter list
         const contextTokens = jupTokens
-             .filter(t => prioritySymbols.has(t.symbol) || Math.random() < 0.2) // Mix priority + random discovery
-             .slice(0, 50)
+             .filter(t => 
+                prioritySymbols.has(t.symbol) || 
+                requestedSymbols.has(t.symbol) || // Explicitly requested
+                requestedSymbols.has(t.name.toUpperCase()) || // Match by name (e.g. "ETHER")
+                (t.symbol === 'WETH' && (requestedSymbols.has('ETH') || requestedSymbols.has('ETHEREUM'))) || // Handle ETH mapping
+                Math.random() < 0.2
+             ) 
+             .slice(0, 60) // Increased context slightly
              .map(t => `${t.symbol} (${t.name})`);
 
         const prompt = Prompts.getKagemushaPrompt(pythPrices, contextTokens, directive, tags);
