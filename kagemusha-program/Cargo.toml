@@ -1,0 +1,23 @@
+[package]
+name = "kagemusha"
+version = "0.1.0"
+edition = "2021"
+description = "Kagemusha - AI-Powered Strategy Vault Protocol for Solana"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+path = "programs/kagemusha/src/lib.rs"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+
+[dependencies]
+anchor-lang = "0.30.1"
+anchor-spl = "0.30.1"
+
+[dev-dependencies]
+solana-program-test = "1.18"
+solana-sdk = "1.18"
