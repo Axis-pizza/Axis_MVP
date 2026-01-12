@@ -9,6 +9,7 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import vaultRoutes from './routes/vault';
 import miscRoutes from './routes/misc';
+import kagemushaRoutes from './routes/kagemusha';
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -33,5 +34,6 @@ app.route('/auth', authRoutes);
 app.route('/', userRoutes);
 app.route('/', vaultRoutes);
 app.route('/', miscRoutes);
+app.route('/kagemusha', kagemushaRoutes);
 
 export default app

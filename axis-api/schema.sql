@@ -50,6 +50,17 @@ CREATE TABLE vaults (
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
+-- 4. AI Strategies (Kagemusha)
+CREATE TABLE strategies (
+  id TEXT PRIMARY KEY,
+  owner_pubkey TEXT NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL, -- SNIPER, FORTRESS, WAVE
+  config TEXT NOT NULL, -- JSON weights
+  is_active INTEGER DEFAULT 1,
+  created_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
 -- 初期データ投入
 -- テスト用の招待コードを作成 (これがないとInviteGateを通過できません)
 INSERT INTO invite_codes (code, creator_id, is_used) VALUES ('AXIS-TEST', 'admin', 0);

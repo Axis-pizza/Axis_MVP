@@ -6,3 +6,10 @@ compatibility_date = "2024-04-01"
 binding = "axis_db"
 database_name = "axis-db"
 database_id = "30e73485-4507-447b-a4a0-6f1b7a10812b"
+
+[ai]
+binding = "AI"
+
+[[vectorize]]
+binding = "VECTOR_INDEX"
+index_name = "axis-vector-index"

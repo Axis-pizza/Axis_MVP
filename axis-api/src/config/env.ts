@@ -8,4 +8,6 @@ export type Bindings = {
   EMAIL: any
   ADMIN_EMAIL: string
   SENDER_EMAIL: string
+  AI: any
+  VECTOR_INDEX: VectorizeIndex
 }
