@@ -1,4 +1,4 @@
-import { Ai } from '@cloudflare/ai';
+import { Prompts } from './prompts';
 
 export interface TacticResult {
   id: string;
@@ -48,7 +48,6 @@ export class KagemushaService {
 
       // 2. AI Generation
       if (this.env.AI) {
-        const ai = new Ai(this.env.AI);
         
         // Prepare Token Context (Limit to 50 to fit Context Window, prioritize by known symbols + randoms)
         // In a real prod, we would sort by Volume/MCap via another API. 
@@ -59,53 +58,10 @@ export class KagemushaService {
              .slice(0, 50)
              .map(t => `${t.symbol} (${t.name})`);
 
-        const prompt = `
-          You are Kagemusha, an elite crypto quantitative analyst AI.
-          
-          MARKET CONTEXT (REAL-TIME):
-          - SOL Price: $${pythPrices.SOL.price} (${pythPrices.SOL.confidence})
-          - JUP Price: $${pythPrices.JUP.price} (${pythPrices.JUP.confidence})
-          
-          AVAILABLE ASSETS (JUPITER STRICT LIST - SUBSET):
-          ${JSON.stringify(contextTokens)}
-          
-          USER DIRECTIVE: "${directive}"
-          TACTICAL TAGS: ${tags.join(', ')}
-          
-          TASK:
-          Generate 3 distinct investment portfolios based on the directive.
-          1. "SNIPER": Aggressive, high beta, potentially meme/momentum heavy.
-          2. "FORTRESS": Defensive, yield-focused, high stablecoin/LSD weight.
-          3. "WAVE": Balanced, trend-following, diversified.
-          
-          CONSTRAINT:
-          - Output strictly valid JSON array. No markdown. No chatter.
-          - "tokens" array must sum to 100 weight.
-          - "backtest" array must have 7 numbers representing simulated equity curve (start at 100).
-          - Use symbols EXACTLY as provided in the Asset List.
-          - "analysis" field must contain a short professional commentary (max 30 words).
-          
-          JSON SCHEMA:
-          [
-            {
-              "id": "generated-string",
-              "name": "Strategy Name",
-              "type": "SNIPER" | "FORTRESS" | "WAVE",
-              "description": "One line summary.",
-              "analysis": "Market Thesis: [Why this works]. Volatility Outlook: [Risk factors].",
-              "tokens": [{"symbol": "SOL", "weight": 50}, ...],
-              "metrics": {
-                 "winRate": "XX%", 
-                 "expectedRoi": "+XX%", 
-                 "riskLevel": "LOW"|"MID"|"HIGH",
-                 "backtest": [100, 105, 110, 108, 115, 120, 130]
-              }
-            }
-          ]
-        `;
+        const prompt = Prompts.getKagemushaPrompt(pythPrices, contextTokens, directive, tags);
 
         try {
-          const response: any = await ai.run('@cf/meta/llama-3-8b-instruct', { 
+          const response: any = await this.env.AI.run('@cf/meta/llama-3-8b-instruct', { 
             messages: [
               { role: 'system', content: 'You are a JSON-only API. specific strict JSON format.' },
               { role: 'user', content: prompt }

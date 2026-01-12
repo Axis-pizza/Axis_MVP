@@ -10,7 +10,7 @@ const app = new Hono<{ Bindings: Bindings }>();
 app.post('/chat', async (c) => {
     try {
         const { history, currentState } = await c.req.json();
-        const result = await AIService.processChat(history, currentState, c.env.GOOGLE_API_KEY);
+        const result = await AIService.processChat(history, currentState, c.env);
         return c.json(result);
     } catch (e: any) {
         console.error("AI Error:", e);
