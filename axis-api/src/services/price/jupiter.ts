@@ -7,6 +7,7 @@ import { TokenInfo, TokenPrice, PriceHistory } from '../../types';
 
 const JUPITER_API_BASE = 'https://api.jup.ag';
 const JUPITER_TOKEN_LIST = 'https://token.jup.ag/strict';
+const COINGECKO_TOKEN_LIST = 'https://tokens.coingecko.com/solana/all.json';
 const BIRDEYE_API = 'https://public-api.birdeye.so';
 
 export class JupiterService {
@@ -25,25 +26,44 @@ export class JupiterService {
     }
 
     try {
-      const response = await fetch(JUPITER_TOKEN_LIST);
-      if (!response.ok) throw new Error('Failed to fetch Jupiter tokens');
-      
-      const tokens: any[] = await response.json();
-      
-      this.tokenCache = tokens.map(t => ({
-        symbol: t.symbol,
-        name: t.name,
-        address: t.address,
-        decimals: t.decimals,
-        logoURI: t.logoURI,
-      }));
+      try {
+        const response = await fetch(JUPITER_TOKEN_LIST);
+        if (!response.ok) throw new Error(`Jupiter returned ${response.status}`);
+        
+        const tokens: any[] = await response.json();
+        
+        this.tokenCache = tokens.map(t => ({
+          symbol: t.symbol,
+          name: t.name,
+          address: t.address,
+          decimals: t.decimals,
+          logoURI: t.logoURI,
+        }));
+        console.log(`[Jupiter] Cached ${this.tokenCache.length} tokens from Jupiter (Strict)`);
+      } catch (jupError) {
+        console.warn(`[Jupiter] Failed to fetch from Jupiter (${jupError}), trying CoinGecko fallback...`);
+        
+        // Fallback to CoinGecko
+        const response = await fetch(COINGECKO_TOKEN_LIST);
+        if (!response.ok) throw new Error(`CoinGecko returned ${response.status}`);
+        
+        const data: any = await response.json();
+        const tokens = data.tokens || []; // CoinGecko wraps in { tokens: [...] }
+        
+        this.tokenCache = tokens.map((t: any) => ({
+          symbol: t.symbol,
+          name: t.name,
+          address: t.address,
+          decimals: t.decimals,
+          logoURI: t.logoURI,
+        }));
+        console.log(`[Jupiter] Cached ${this.tokenCache.length} tokens from CoinGecko`);
+      }
       
       this.cacheTime = Date.now();
-      console.log(`[Jupiter] Cached ${this.tokenCache.length} tokens`);
-      
       return this.tokenCache;
     } catch (error) {
-      console.error('[Jupiter] Token list fetch failed:', error);
+      console.error('[Jupiter] Token list fetch failed (all sources):', error);
       return this.tokenCache.length > 0 ? this.tokenCache : [];
     }
   }

@@ -1,0 +1,1 @@
+export { DiscoverView } from './DiscoverView';

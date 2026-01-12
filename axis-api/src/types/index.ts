@@ -15,7 +15,7 @@ export interface TokenPrice {
   priceFormatted: string;
   confidence: number;
   timestamp: number;
-  source: 'pyth' | 'jupiter' | 'birdeye' | 'fallback';
+  source: 'pyth' | 'jupiter' | 'birdeye' | 'coingecko' | 'fallback';
 }
 
 export interface TokenAllocation {

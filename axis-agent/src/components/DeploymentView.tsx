@@ -176,7 +176,7 @@ export const DeploymentView = () => {
                     {status === 'SIGNING' && "Verifying Signature..."}
                     {status === 'BUNDLING' && <><Zap className="w-5 h-5 animate-pulse text-orange-500" /> Sending Jito Bundle...</>}
                     
-                    {(status === 'DEPLOYING' || status === 'BUNDLING') && (
+                    {status === 'BUNDLING' && (
                         <motion.div 
                             className="absolute bottom-0 left-0 h-1 bg-orange-500"
                             initial={{ width: 0 }}

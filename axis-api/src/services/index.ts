@@ -3,7 +3,7 @@
  */
 
 // Price Services
-export { PriceService, PythPriceService, JupiterService } from './price';
+export { PriceService, PythPriceService, CoinGeckoService } from './price';
 
 // Strategy Services
 export { StrategyGenerator, TOKEN_UNIVERSE } from './strategy';

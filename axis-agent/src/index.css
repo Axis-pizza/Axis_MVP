@@ -1,14 +1,126 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-primary: #FF4500; /* Pizza Orange/Red */
-  --color-brand-secondary: #FFD700; /* Cheese Gold */
-  --color-bg-dark: #0a0a0a;
-  --color-card-dark: #1a1a1a;
+  --color-brand-primary: #FF6B35;
+  --color-brand-secondary: #FFB347;
+  --color-accent: #FF4500;
+  --color-bg-dark: #030303;
+  --color-card-dark: #0a0a0a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   background-color: var(--color-bg-dark);
   color: #fff;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Safe area for mobile */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Gradient text - Pizza Orange */
+.gradient-text {
+  background: linear-gradient(135deg, #FF6B35, #FFB347);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Pizza crust pattern */
+.crust-pattern {
+  background-image: radial-gradient(circle at 50% 50%, #D4A574 0%, #8B4513 100%);
+}
+
+/* Topping colors */
+.topping-pepperoni { background: #FF6B35; }
+.topping-cheese { background: #FFB347; }
+.topping-basil { background: #7CB518; }
+.topping-mushroom { background: #8B4513; }
+
+/* Animation for loading states */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255, 107, 53, 0.5);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Matrix rain effect */
+@keyframes matrix-rain {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+.matrix-char {
+  animation: matrix-rain 3s linear infinite;
+}
+
+/* Floating nav shadow */
+.floating-nav-shadow {
+  box-shadow: 
+    0 -10px 40px -10px rgba(255, 107, 53, 0.15),
+    0 0 60px -30px rgba(255, 179, 71, 0.3);
+}
+
+/* Tactical grid background */
+.tactical-grid {
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
