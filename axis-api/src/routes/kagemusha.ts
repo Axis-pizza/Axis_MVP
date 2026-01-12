@@ -12,7 +12,11 @@ import { JitoBundleService } from '../services/blockchain';
 const app = new Hono<{ Bindings: Bindings }>();
 
 const priceService = new PriceService();
-const jitoService = new JitoBundleService();
+
+// Helper to create Jito service with env RPC URL
+const createJitoService = (env: Bindings) => {
+  return new JitoBundleService('devnet', 'tokyo', env.SOLANA_RPC_URL);
+};
 
 /**
  * POST /analyze - Generate AI-powered strategy suggestions
@@ -112,31 +116,77 @@ app.post('/deploy', async (c) => {
       return c.json({ success: false, error: 'Signed transaction required' }, 400);
     }
 
-    // Send via Jito for MEV protection
+    // Create Jito service with env RPC URL
+    const jitoService = createJitoService(c.env);
+
+    // Send via Jito for MEV protection (or standard RPC for devnet)
     const result = await jitoService.sendBundle([signedTransaction]);
 
-    // Save to database
+    // Save to database with all details
+    const id = strategyId || crypto.randomUUID();
     if (metadata && c.env.axis_db) {
-      const id = strategyId || crypto.randomUUID();
       await c.env.axis_db.prepare(
-        'INSERT INTO strategies (id, owner_pubkey, name, type, config, jito_bundle_id) VALUES (?, ?, ?, ?, ?, ?)'
+        `INSERT INTO strategies (id, owner_pubkey, name, type, config, description, jito_bundle_id, is_public) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         id,
         metadata.creator || 'unknown',
         metadata.name,
         metadata.type,
         JSON.stringify(metadata.composition),
-        result.bundleId
+        metadata.description || '',
+        result.bundleId,
+        metadata.isPublic !== false ? 1 : 0
       ).run();
     }
 
     return c.json({ 
       success: true, 
       bundleId: result.bundleId,
-      strategyId: strategyId || crypto.randomUUID()
+      strategyId: id
     });
   } catch (error: any) {
     console.error('[Kagemusha] Deploy failed:', error);
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+/**
+ * GET /discover - Get all public strategies for discovery
+ */
+app.get('/discover', async (c) => {
+  try {
+    const limit = parseInt(c.req.query('limit') || '50');
+    const offset = parseInt(c.req.query('offset') || '0');
+    
+    const results = await c.env.axis_db.prepare(
+      `SELECT id, owner_pubkey, name, type, config, description, total_deposited, created_at 
+       FROM strategies 
+       WHERE is_public = 1 AND status = 'active'
+       ORDER BY total_deposited DESC, created_at DESC
+       LIMIT ? OFFSET ?`
+    ).bind(limit, offset).all();
+    
+    // Parse config JSON for each strategy
+    const strategies = results.results.map((s: any) => ({
+      id: s.id,
+      ownerPubkey: s.owner_pubkey,
+      name: s.name,
+      type: s.type,
+      tokens: s.config ? JSON.parse(s.config) : [],
+      description: s.description || '',
+      tvl: s.total_deposited || 0,
+      createdAt: s.created_at,
+    }));
+    
+    return c.json({ 
+      success: true, 
+      strategies,
+      total: strategies.length,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    console.error('[Kagemusha] Discover failed:', error);
     return c.json({ success: false, error: error.message }, 500);
   }
 });
@@ -149,10 +199,25 @@ app.get('/strategies/:pubkey', async (c) => {
     const pubkey = c.req.param('pubkey');
     
     const results = await c.env.axis_db.prepare(
-      'SELECT * FROM strategies WHERE owner_pubkey = ? ORDER BY created_at DESC'
+      `SELECT id, owner_pubkey, name, type, config, description, total_deposited, status, created_at
+       FROM strategies 
+       WHERE owner_pubkey = ? 
+       ORDER BY created_at DESC`
     ).bind(pubkey).all();
     
-    return c.json({ success: true, strategies: results.results });
+    const strategies = results.results.map((s: any) => ({
+      id: s.id,
+      ownerPubkey: s.owner_pubkey,
+      name: s.name,
+      type: s.type,
+      tokens: s.config ? JSON.parse(s.config) : [],
+      description: s.description || '',
+      tvl: s.total_deposited || 0,
+      status: s.status,
+      createdAt: s.created_at,
+    }));
+    
+    return c.json({ success: true, strategies });
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500);
   }
@@ -163,6 +228,7 @@ app.get('/strategies/:pubkey', async (c) => {
  */
 app.get('/prepare-deployment', async (c) => {
   try {
+    const jitoService = createJitoService(c.env);
     const tipAccount = await jitoService.getRandomTipAccount();
     
     return c.json({
@@ -177,3 +243,4 @@ app.get('/prepare-deployment', async (c) => {
 });
 
 export default app;
+

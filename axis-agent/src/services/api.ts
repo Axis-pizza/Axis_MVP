@@ -76,4 +76,13 @@ export const api = {
     const res = await fetch(`${API_BASE}/kagemusha/strategies/${pubkey}`);
     return res.json();
   },
+
+  /**
+   * Discover public strategies
+   */
+  async discoverStrategies(limit = 50, offset = 0) {
+    const res = await fetch(`${API_BASE}/kagemusha/discover?limit=${limit}&offset=${offset}`);
+    return res.json();
+  },
 };
+

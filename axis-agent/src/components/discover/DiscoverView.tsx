@@ -1,72 +1,92 @@
 /**
- * Discover View - ETF Rankings & Exploration
+ * Discover View - Public Strategies & Rankings
+ * Shows all user-created strategies from the database
  */
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, TrendingUp, TrendingDown, Users, Crown, ChevronRight, Flame } from 'lucide-react';
+import { Search, TrendingUp, Users, Crown, ChevronRight, Flame, Loader2, Plus, Zap, Shield, Target } from 'lucide-react';
 import { api } from '../../services/api';
-import type { Vault } from '../../types';
+import { PizzaChart } from '../common/PizzaChart';
 
-interface DiscoverViewProps {
-  onSelectVault?: (vault: Vault) => void;
+interface DiscoveredStrategy {
+  id: string;
+  ownerPubkey: string;
+  name: string;
+  type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
+  tokens: { symbol: string; weight: number }[];
+  description: string;
+  tvl: number;
+  createdAt: number;
 }
 
-export const DiscoverView = ({ onSelectVault }: DiscoverViewProps) => {
-  const [vaults, setVaults] = useState<Vault[]>([]);
+interface DiscoverViewProps {
+  onSelectStrategy?: (strategy: DiscoveredStrategy) => void;
+}
+
+export const DiscoverView = ({ onSelectStrategy }: DiscoverViewProps) => {
+  const [strategies, setStrategies] = useState<DiscoveredStrategy[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'trending' | 'new' | 'top'>('all');
 
   useEffect(() => {
-    const fetchVaults = async () => {
+    const fetchStrategies = async () => {
+      setLoading(true);
       try {
-        const res = await api.getVaults();
-        if (Array.isArray(res)) {
-          // Transform and add mock data for demo
-          const enriched: Vault[] = res.map((v: any, i: number) => ({
-            id: v.id,
-            name: v.name || `Strategy ${i + 1}`,
-            symbol: v.symbol || `ETF${i}`,
-            creator: v.creator || 'anonymous',
-            tvl: v.tvl || Math.random() * 1000000,
-            apy: v.management_fee * 10 || Math.random() * 50,
-            performance7d: (Math.random() - 0.3) * 20,
-            performance30d: (Math.random() - 0.2) * 40,
-            composition: v.composition || [],
-            holders: Math.floor(Math.random() * 500) + 10,
-            rank: i + 1,
-          }));
-          setVaults(enriched);
+        const res = await api.discoverStrategies(50);
+        if (res.success && res.strategies) {
+          setStrategies(res.strategies);
+        } else {
+          setStrategies([]);
         }
       } catch (e) {
-        console.error('Failed to fetch vaults:', e);
-        // Demo data
-        setVaults([
-          { id: '1', name: 'DeFi Alpha', symbol: 'DEFI', creator: 'whale.sol', tvl: 850000, apy: 42, performance7d: 12.5, performance30d: 35, composition: [], holders: 234, rank: 1 },
-          { id: '2', name: 'Meme Lords', symbol: 'MEME', creator: 'degen.sol', tvl: 520000, apy: 125, performance7d: -8.2, performance30d: 180, composition: [], holders: 567, rank: 2 },
-          { id: '3', name: 'Blue Chip SOL', symbol: 'BLUE', creator: 'inst.sol', tvl: 1200000, apy: 18, performance7d: 5.2, performance30d: 15, composition: [], holders: 892, rank: 3 },
-        ]);
+        console.error('Failed to fetch strategies:', e);
+        setStrategies([]);
       } finally {
         setLoading(false);
       }
     };
-    fetchVaults();
+    fetchStrategies();
   }, []);
 
-  const filteredVaults = vaults
-    .filter(v => v.name.toLowerCase().includes(search.toLowerCase()))
+  const filteredStrategies = strategies
+    .filter(s => 
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.description?.toLowerCase().includes(search.toLowerCase())
+    )
     .sort((a, b) => {
-      if (filter === 'trending') return (b.performance7d || 0) - (a.performance7d || 0);
-      if (filter === 'new') return (b.id > a.id ? 1 : -1);
+      if (filter === 'new') return b.createdAt - a.createdAt;
       if (filter === 'top') return (b.tvl || 0) - (a.tvl || 0);
       return 0;
     });
 
   const formatTVL = (tvl: number) => {
-    if (tvl >= 1000000) return `$${(tvl / 1000000).toFixed(1)}M`;
-    if (tvl >= 1000) return `$${(tvl / 1000).toFixed(0)}K`;
-    return `$${tvl.toFixed(0)}`;
+    if (tvl >= 1000) return `${(tvl / 1000).toFixed(1)}K SOL`;
+    return `${tvl.toFixed(2)} SOL`;
+  };
+
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp * 1000);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const typeIcons = {
+    AGGRESSIVE: Zap,
+    BALANCED: Target,
+    CONSERVATIVE: Shield,
+  };
+
+  const typeColors = {
+    AGGRESSIVE: 'from-orange-500 to-red-500',
+    BALANCED: 'from-blue-500 to-purple-500',
+    CONSERVATIVE: 'from-emerald-500 to-teal-500',
   };
 
   return (
@@ -74,7 +94,7 @@ export const DiscoverView = ({ onSelectVault }: DiscoverViewProps) => {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-1">Discover</h1>
-        <p className="text-white/50 text-sm">Explore top-performing ETFs on Solana</p>
+        <p className="text-white/50 text-sm">Explore community-created strategy pizzas</p>
       </div>
 
       {/* Search */}
@@ -84,8 +104,8 @@ export const DiscoverView = ({ onSelectVault }: DiscoverViewProps) => {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search ETFs..."
-          className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-emerald-500/50"
+          placeholder="Search strategies..."
+          className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-orange-500/50"
         />
       </div>
 
@@ -93,13 +113,13 @@ export const DiscoverView = ({ onSelectVault }: DiscoverViewProps) => {
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
         {[
           { key: 'all', label: 'All', icon: null },
-          { key: 'trending', label: 'Trending', icon: Flame },
+          { key: 'trending', label: 'Hot', icon: Flame },
           { key: 'top', label: 'Top TVL', icon: Crown },
-          { key: 'new', label: 'New', icon: null },
+          { key: 'new', label: 'New', icon: Plus },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
-            onClick={() => setFilter(key as any)}
+            onClick={() => setFilter(key as typeof filter)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
               filter === key
                 ? 'bg-white text-black'
@@ -112,74 +132,117 @@ export const DiscoverView = ({ onSelectVault }: DiscoverViewProps) => {
         ))}
       </div>
 
-      {/* Vault List */}
+      {/* Strategy List */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-2 border-white/20 border-t-emerald-500 rounded-full animate-spin" />
+        <div className="flex flex-col items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-4" />
+          <p className="text-white/50 text-sm">Loading strategies...</p>
         </div>
+      ) : strategies.length === 0 ? (
+        <EmptyState />
       ) : (
         <div className="space-y-3">
           <AnimatePresence>
-            {filteredVaults.map((vault, i) => (
-              <motion.div
-                key={vault.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ delay: i * 0.05 }}
-                onClick={() => onSelectVault?.(vault)}
-                className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl hover:border-white/20 hover:bg-white/[0.05] cursor-pointer transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  {/* Rank */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                    vault.rank === 1 ? 'bg-yellow-500/20 text-yellow-400' :
-                    vault.rank === 2 ? 'bg-gray-400/20 text-gray-300' :
-                    vault.rank === 3 ? 'bg-orange-600/20 text-orange-400' :
-                    'bg-white/5 text-white/40'
-                  }`}>
-                    {vault.rank}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold truncate">{vault.name}</h3>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-white/10 rounded text-white/50">{vault.symbol}</span>
+            {filteredStrategies.map((strategy, i) => {
+              const TypeIcon = typeIcons[strategy.type] || Target;
+              return (
+                <motion.div
+                  key={strategy.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: i * 0.03 }}
+                  onClick={() => onSelectStrategy?.(strategy)}
+                  className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl hover:border-white/20 hover:bg-white/[0.05] cursor-pointer transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    {/* Pizza Preview */}
+                    <div className="shrink-0">
+                      <PizzaChart slices={strategy.tokens} size={56} showLabels={false} animated={false} />
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-white/40">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        {vault.holders}
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold truncate">{strategy.name}</h3>
+                        <span className={`px-1.5 py-0.5 rounded text-xs bg-gradient-to-r ${typeColors[strategy.type]} text-white flex items-center gap-1`}>
+                          <TypeIcon className="w-3 h-3" />
+                        </span>
+                      </div>
+                      
+                      {strategy.description && (
+                        <p className="text-xs text-white/50 truncate mb-1">{strategy.description}</p>
+                      )}
+                      
+                      <div className="flex items-center gap-3 text-xs text-white/40">
+                        <span className="flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {strategy.ownerPubkey.slice(0, 4)}...{strategy.ownerPubkey.slice(-4)}
+                        </span>
+                        <span>{formatDate(strategy.createdAt)}</span>
+                      </div>
+                    </div>
+
+                    {/* TVL */}
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-1 font-bold text-emerald-400">
+                        <TrendingUp className="w-4 h-4" />
+                        {formatTVL(strategy.tvl)}
+                      </div>
+                      <p className="text-[10px] text-white/40 mt-0.5">TVL</p>
+                    </div>
+
+                    <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors shrink-0" />
+                  </div>
+                  
+                  {/* Token Pills */}
+                  <div className="flex gap-1 mt-3 flex-wrap">
+                    {strategy.tokens.slice(0, 5).map((token) => (
+                      <span 
+                        key={token.symbol}
+                        className="px-2 py-0.5 bg-white/5 rounded text-xs text-white/60"
+                      >
+                        {token.symbol} {token.weight}%
                       </span>
-                      <span>TVL {formatTVL(vault.tvl)}</span>
-                    </div>
+                    ))}
+                    {strategy.tokens.length > 5 && (
+                      <span className="px-2 py-0.5 bg-white/5 rounded text-xs text-white/40">
+                        +{strategy.tokens.length - 5} more
+                      </span>
+                    )}
                   </div>
-
-                  {/* Performance */}
-                  <div className="text-right">
-                    <div className={`flex items-center gap-1 font-bold ${
-                      vault.performance7d >= 0 ? 'text-emerald-400' : 'text-red-400'
-                    }`}>
-                      {vault.performance7d >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                      {vault.performance7d >= 0 ? '+' : ''}{vault.performance7d.toFixed(1)}%
-                    </div>
-                    <p className="text-[10px] text-white/40 mt-0.5">7d</p>
-                  </div>
-
-                  <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors" />
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
 
-      {filteredVaults.length === 0 && !loading && (
+      {filteredStrategies.length === 0 && !loading && strategies.length > 0 && (
         <div className="text-center py-12 text-white/40">
-          No ETFs found matching your search
+          No strategies found matching your search
         </div>
       )}
     </div>
   );
 };
+
+// Empty state when no strategies exist
+const EmptyState = () => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="flex flex-col items-center justify-center py-16 text-center"
+  >
+    <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+      <span className="text-4xl">🍕</span>
+    </div>
+    <h3 className="text-xl font-bold mb-2">No Strategies Yet</h3>
+    <p className="text-white/50 text-sm max-w-xs mb-6">
+      Be the first to create a strategy pizza! Your creation will appear here for the community to discover.
+    </p>
+    <p className="text-xs text-white/30">
+      Create → Discover → Grow 🚀
+    </p>
+  </motion.div>
+);

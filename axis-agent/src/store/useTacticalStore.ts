@@ -36,6 +36,7 @@ interface TacticalStore {
   setTactics: (t: Tactic[]) => void;
   selectTactic: (t: Tactic) => void;
   updatePizza: (tokens: Token[]) => void;
+  addToken: (token: Token) => void;
 }
 
 export const useTacticalStore = create<TacticalStore>((set) => ({
@@ -55,5 +56,8 @@ export const useTacticalStore = create<TacticalStore>((set) => ({
   })),
   setTactics: (tactics) => set({ generatedTactics: tactics }),
   selectTactic: (tactic) => set({ selectedTactic: tactic, pizzaComposition: tactic.tokens }),
-  updatePizza: (tokens) => set({ pizzaComposition: tokens })
+  updatePizza: (tokens) => set({ pizzaComposition: tokens }),
+  addToken: (token) => set((state) => ({
+    pizzaComposition: [...state.pizzaComposition, token]
+  })),
 }));

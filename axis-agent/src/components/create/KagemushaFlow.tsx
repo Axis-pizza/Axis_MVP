@@ -1,18 +1,30 @@
 /**
- * Kagemusha Create Flow - Complete 3-step ETF creation
- * Integrates: TacticalTerminal → StrategyCards → PizzaBuilder → DeploymentBlueprint
+ * Kagemusha Create Flow - Complete strategy creation and management
+ * Steps: DIRECTIVE → SIMULATION → CUSTOMIZE → DEPLOY → DEPOSIT → DASHBOARD
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { TacticalTerminal, type Topping } from './TacticalTerminal';
 import { StrategyCards } from './StrategyCards';
 import { PizzaBuilder } from './PizzaBuilder';
 import { DeploymentBlueprint } from './DeploymentBlueprint';
+import { DepositFlow } from './DepositFlow';
+import { StrategyDashboard } from './StrategyDashboard';
+import { RebalanceFlow } from './RebalanceFlow';
 import { api } from '../../services/api';
+import { getUserStrategies, type OnChainStrategy } from '../../services/kagemusha';
 
-type CreateStep = 'DIRECTIVE' | 'SIMULATION' | 'CUSTOMIZE' | 'DEPLOY';
+type CreateStep = 
+  | 'DIRECTIVE' 
+  | 'SIMULATION' 
+  | 'CUSTOMIZE' 
+  | 'DEPLOY' 
+  | 'DEPOSIT' 
+  | 'DASHBOARD'
+  | 'REBALANCE';
 
 interface Strategy {
   id: string;
@@ -35,17 +47,57 @@ interface Strategy {
   };
 }
 
+interface DeployedStrategy {
+  address: string;
+  name: string;
+  type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
+  tokens: { symbol: string; weight: number }[];
+}
+
 export const KagemushaFlow = () => {
+  const { publicKey } = useWallet();
+  const { connection } = useConnection();
+  
   const [step, setStep] = useState<CreateStep>('DIRECTIVE');
   const [isLoading, setIsLoading] = useState(false);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [customTokens, setCustomTokens] = useState<{ symbol: string; weight: number }[]>([]);
   const [pizzaName, setPizzaName] = useState('');
+  const [pizzaDescription, setPizzaDescription] = useState('');
   const [customToppings, setCustomToppings] = useState<Topping[]>([]);
+  
+  // Deployed strategy info (after deployment)
+  const [deployedStrategy, setDeployedStrategy] = useState<DeployedStrategy | null>(null);
+  
+  // Dashboard data
+  const [userStrategies, setUserStrategies] = useState<OnChainStrategy[]>([]);
+  const [selectedDashboardStrategy, setSelectedDashboardStrategy] = useState<OnChainStrategy | null>(null);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+
+  // Load user strategies when entering dashboard
+  const loadUserStrategies = useCallback(async () => {
+    if (!publicKey) return;
+    
+    setIsDashboardLoading(true);
+    try {
+      const strategies = await getUserStrategies(connection, publicKey);
+      setUserStrategies(strategies);
+    } catch (e) {
+      console.error('Failed to load strategies:', e);
+    } finally {
+      setIsDashboardLoading(false);
+    }
+  }, [connection, publicKey]);
+
+  useEffect(() => {
+    if (step === 'DASHBOARD' && publicKey) {
+      loadUserStrategies();
+    }
+  }, [step, publicKey, loadUserStrategies]);
 
   // Step 1: Generate strategies from directive
-  const handleAnalyze = async (directive: string, tags: string[], _allToppings: Topping[]) => {
+  const handleAnalyze = async (directive: string, tags: string[]) => {
     setIsLoading(true);
     setStep('SIMULATION');
 
@@ -55,7 +107,6 @@ export const KagemushaFlow = () => {
       if (response.success && response.strategies) {
         setStrategies(response.strategies);
       } else {
-        // Fallback if API fails - but show empty state
         console.warn('No strategies returned from API');
         setStrategies([]);
       }
@@ -79,20 +130,83 @@ export const KagemushaFlow = () => {
     }
   };
 
-  // Step 3: Customize and deploy
-  const handleDeploy = (tokens: { symbol: string; weight: number }[], name: string) => {
+  // Step 3: Customize and proceed to deploy
+  const handleDeploy = (tokens: { symbol: string; weight: number }[], name: string, description?: string) => {
     setCustomTokens(tokens);
     setPizzaName(name);
+    setPizzaDescription(description || '');
     setStep('DEPLOY');
   };
 
-  // Reset flow
-  const handleComplete = () => {
+  // After successful deployment, go to deposit
+  const handleDeploySuccess = (strategyAddress: string) => {
+    setDeployedStrategy({
+      address: strategyAddress,
+      name: pizzaName,
+      type: selectedStrategy?.type || 'BALANCED',
+      tokens: customTokens,
+    });
+    setStep('DEPOSIT');
+  };
+
+  // After deposit, go to dashboard
+  const handleDepositComplete = () => {
+    setStep('DASHBOARD');
+  };
+
+  // Dashboard actions
+  const handleCreateNew = () => {
+    resetFlow();
     setStep('DIRECTIVE');
+  };
+
+  const handleSelectDashboardStrategy = (strategy: OnChainStrategy) => {
+    setSelectedDashboardStrategy(strategy);
+  };
+
+  const handleDepositToStrategy = (strategy: OnChainStrategy) => {
+    setDeployedStrategy({
+      address: strategy.address,
+      name: strategy.name,
+      type: strategy.strategyType,
+      tokens: strategy.tokens,
+    });
+    setStep('DEPOSIT');
+  };
+
+  const handleRebalanceStrategy = (strategy: OnChainStrategy) => {
+    setSelectedDashboardStrategy(strategy);
+    setStep('REBALANCE');
+  };
+
+  // Reset flow
+  const resetFlow = () => {
     setStrategies([]);
     setSelectedStrategy(null);
     setCustomTokens([]);
     setPizzaName('');
+    setDeployedStrategy(null);
+    setSelectedDashboardStrategy(null);
+  };
+
+  const handleComplete = () => {
+    resetFlow();
+    setStep('DIRECTIVE');
+  };
+
+  // Calculate progress
+  const getProgress = () => {
+    switch (step) {
+      case 'DIRECTIVE': return '16%';
+      case 'SIMULATION': return '33%';
+      case 'CUSTOMIZE': return '50%';
+      case 'DEPLOY': return '66%';
+      case 'DEPOSIT': return '83%';
+      case 'DASHBOARD': 
+      case 'REBALANCE':
+        return '100%';
+      default: return '0%';
+    }
   };
 
   return (
@@ -101,13 +215,7 @@ export const KagemushaFlow = () => {
       <div className="fixed top-0 left-0 right-0 h-1 bg-white/5 z-50">
         <motion.div
           className="h-full bg-gradient-to-r from-orange-500 to-amber-500"
-          animate={{
-            width:
-              step === 'DIRECTIVE' ? '25%' :
-              step === 'SIMULATION' ? '50%' :
-              step === 'CUSTOMIZE' ? '75%' :
-              '100%',
-          }}
+          animate={{ width: getProgress() }}
           transition={{ duration: 0.3 }}
         />
       </div>
@@ -193,8 +301,88 @@ export const KagemushaFlow = () => {
               strategyName={pizzaName}
               strategyType={selectedStrategy.type}
               tokens={customTokens}
+              description={pizzaDescription}
               onBack={() => setStep('CUSTOMIZE')}
               onComplete={handleComplete}
+              onDeploySuccess={handleDeploySuccess}
+            />
+          </motion.div>
+        )}
+
+        {/* Step 5: Deposit */}
+        {step === 'DEPOSIT' && deployedStrategy && (
+          <motion.div
+            key="deposit"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <DepositFlow
+              strategyAddress={deployedStrategy.address}
+              strategyName={deployedStrategy.name}
+              strategyType={deployedStrategy.type}
+              tokens={deployedStrategy.tokens}
+              onBack={() => setStep('DASHBOARD')}
+              onComplete={handleDepositComplete}
+            />
+          </motion.div>
+        )}
+
+        {/* Step 6: Dashboard */}
+        {step === 'DASHBOARD' && (
+          <motion.div
+            key="dashboard"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            <StrategyDashboard
+              strategies={userStrategies.map(s => ({
+                id: s.address,
+                name: s.name,
+                type: s.strategyType,
+                tokens: s.tokens,
+                tvl: s.tvl,
+                pnl: s.pnl,
+                pnlPercent: s.pnlPercent,
+                isActive: s.isActive,
+                lastRebalance: s.lastRebalance,
+              }))}
+              onSelectStrategy={(strategy) => {
+                const onChain = userStrategies.find(s => s.address === strategy.id);
+                if (onChain) handleSelectDashboardStrategy(onChain);
+              }}
+              onDeposit={(strategy) => {
+                const onChain = userStrategies.find(s => s.address === strategy.id);
+                if (onChain) handleDepositToStrategy(onChain);
+              }}
+              onRebalance={(strategy) => {
+                const onChain = userStrategies.find(s => s.address === strategy.id);
+                if (onChain) handleRebalanceStrategy(onChain);
+              }}
+              onCreateNew={handleCreateNew}
+              isLoading={isDashboardLoading}
+            />
+          </motion.div>
+        )}
+
+        {/* Step 7: Rebalance */}
+        {step === 'REBALANCE' && selectedDashboardStrategy && (
+          <motion.div
+            key="rebalance"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <RebalanceFlow
+              strategyName={selectedDashboardStrategy.name}
+              strategyType={selectedDashboardStrategy.strategyType}
+              currentTokens={selectedDashboardStrategy.tokens}
+              onBack={() => setStep('DASHBOARD')}
+              onComplete={() => {
+                loadUserStrategies();
+                setStep('DASHBOARD');
+              }}
             />
           </motion.div>
         )}

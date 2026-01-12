@@ -18,12 +18,13 @@ interface TokenAllocation {
 interface PizzaBuilderProps {
   initialTokens: TokenAllocation[];
   onBack: () => void;
-  onDeploy: (tokens: TokenAllocation[], name: string) => void;
+  onDeploy: (tokens: TokenAllocation[], name: string, description?: string) => void;
 }
 
 export const PizzaBuilder = ({ initialTokens, onBack, onDeploy }: PizzaBuilderProps) => {
   const [tokens, setTokens] = useState<TokenAllocation[]>(initialTokens);
   const [pizzaName, setPizzaName] = useState('My Alpha Pizza');
+  const [description, setDescription] = useState('');
 
   const adjustWeight = (symbol: string, delta: number) => {
     setTokens(prev => {
@@ -77,7 +78,7 @@ export const PizzaBuilder = ({ initialTokens, onBack, onDeploy }: PizzaBuilderPr
       </div>
 
       {/* Pizza Name Input */}
-      <div className="mb-6">
+      <div className="mb-4">
         <label className="text-xs text-white/50 mb-1 block">Pizza Name</label>
         <input
           type="text"
@@ -86,6 +87,22 @@ export const PizzaBuilder = ({ initialTokens, onBack, onDeploy }: PizzaBuilderPr
           className="w-full p-3 bg-white/5 border border-white/10 rounded-xl font-bold text-lg focus:outline-none focus:border-orange-500/50"
           placeholder="Enter your pizza name..."
         />
+      </div>
+
+      {/* Optional Description */}
+      <div className="mb-6">
+        <label className="text-xs text-white/50 mb-1 block">
+          Description <span className="text-white/30">(optional)</span>
+        </label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-orange-500/50 resize-none"
+          placeholder="Share your strategy thesis... (visible in Discover)"
+          rows={2}
+          maxLength={280}
+        />
+        <div className="text-right text-xs text-white/30 mt-1">{description.length}/280</div>
       </div>
 
       {/* Pizza Chart - Centered */}
@@ -178,7 +195,7 @@ export const PizzaBuilder = ({ initialTokens, onBack, onDeploy }: PizzaBuilderPr
         className="fixed bottom-24 left-4 right-4 max-w-md mx-auto"
       >
         <button
-          onClick={() => onDeploy(tokens, pizzaName)}
+          onClick={() => onDeploy(tokens, pizzaName, description || undefined)}
           disabled={totalWeight !== 100 || !pizzaName.trim()}
           className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl font-bold text-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -189,3 +206,4 @@ export const PizzaBuilder = ({ initialTokens, onBack, onDeploy }: PizzaBuilderPr
     </div>
   );
 };
+
