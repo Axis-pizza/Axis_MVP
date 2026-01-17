@@ -3,6 +3,7 @@ import { Bindings } from '../config/env';
 import * as UserModel from '../models/user';
 import * as InviteModel from '../models/invite';
 import { HTTPException } from 'hono/http-exception';
+import { sendInviteEmail } from '../services/email';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -35,6 +36,11 @@ app.post('/register', async (c) => {
 
     // @ts-ignore
     await UserModel.createRegisteredUser(c.env.axis_db, newId, email, wallet_address, newInviteCode, referrerUser.id, avatar_url, name, bio);
+
+    // Send Invite Email (async, don't block response)
+    c.executionCtx.waitUntil(
+      sendInviteEmail(email, newInviteCode)
+    );
 
     return c.json({ 
       success: true, 
