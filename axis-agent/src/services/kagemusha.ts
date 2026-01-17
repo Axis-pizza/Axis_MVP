@@ -321,7 +321,7 @@ export async function initializeStrategy(
 }
 
 /**
- * Deposit SOL/tokens into an existing strategy
+ * Deposit SOL into an existing strategy using deposit_sol instruction
  */
 export async function deposit(
   connection: Connection,
@@ -334,8 +334,9 @@ export async function deposit(
   }
 
   try {
-    const amountLamports = new BN(amount * 1e9);
+    const amountLamports = new BN(amount * LAMPORTS_PER_SOL);
 
+    // Derive position PDA
     const [positionPda] = PublicKey.findProgramAddressSync(
       [
         Buffer.from('position'),
@@ -345,16 +346,32 @@ export async function deposit(
       PROGRAM_ID
     );
 
+    // Derive vault_sol PDA
+    const [vaultSolPda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('vault_sol'),
+        strategyPubkey.toBuffer()
+      ],
+      PROGRAM_ID
+    );
+
+    // Build Anchor instruction discriminator for deposit_sol
+    // From IDL: [108, 81, 78, 117, 125, 155, 56, 200]
+    const depositSolDiscriminator = Buffer.from([
+      108, 81, 78, 117, 125, 155, 56, 200
+    ]);
+
     const instruction = new TransactionInstruction({
       keys: [
         { pubkey: strategyPubkey, isSigner: false, isWritable: true },
         { pubkey: positionPda, isSigner: false, isWritable: true },
         { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: vaultSolPda, isSigner: false, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       programId: PROGRAM_ID,
       data: Buffer.concat([
-        Buffer.from([1]),
+        depositSolDiscriminator,
         amountLamports.toArrayLike(Buffer, 'le', 8)
       ])
     });
@@ -408,21 +425,22 @@ export async function sendViaJito(
 }
 
 /**
- * Withdraw/Redeem funds from a strategy
+ * Withdraw SOL from a strategy using withdraw_sol instruction
  */
 export async function withdraw(
   connection: Connection,
   wallet: WalletContextState,
   strategyPubkey: PublicKey,
-  amountShares: number
+  amountLamports: number
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.signTransaction) {
     throw new Error('Wallet not connected');
   }
 
   try {
-    const shares = new BN(amountShares * 1e9); 
+    const amount = new BN(amountLamports * LAMPORTS_PER_SOL);
 
+    // Derive position PDA
     const [positionPda] = PublicKey.findProgramAddressSync(
       [
         Buffer.from('position'),
@@ -432,17 +450,33 @@ export async function withdraw(
       PROGRAM_ID
     );
 
+    // Derive vault_sol PDA
+    const [vaultSolPda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('vault_sol'),
+        strategyPubkey.toBuffer()
+      ],
+      PROGRAM_ID
+    );
+
+    // Build Anchor instruction discriminator for withdraw_sol
+    // From IDL: [145, 131, 74, 136, 65, 137, 42, 38]
+    const withdrawSolDiscriminator = Buffer.from([
+      145, 131, 74, 136, 65, 137, 42, 38
+    ]);
+
     const instruction = new TransactionInstruction({
       keys: [
         { pubkey: strategyPubkey, isSigner: false, isWritable: true },
         { pubkey: positionPda, isSigner: false, isWritable: true },
         { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: vaultSolPda, isSigner: false, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       programId: PROGRAM_ID,
       data: Buffer.concat([
-        Buffer.from([2]), // Instruction index 2 for Withdraw
-        shares.toArrayLike(Buffer, 'le', 8)
+        withdrawSolDiscriminator,
+        amount.toArrayLike(Buffer, 'le', 8)
       ])
     });
 
@@ -455,7 +489,7 @@ export async function withdraw(
     
     await connection.confirmTransaction(signature, 'confirmed');
 
-    console.log(`✅ Withdrawn shares: ${amountShares}`);
+    console.log(`✅ Withdrawn: ${amountLamports} SOL`);
 
     return signature;
   } catch (error) {

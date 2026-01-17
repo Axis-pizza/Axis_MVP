@@ -4,9 +4,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ArrowLeft, Loader2, Rocket, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Rocket, CheckCircle2, Loader2 } from 'lucide-react';
 import { TokenSelector } from './TokenSelector';
 import { StrategyPreview } from './StrategyPreview';
+import { BacktestLoadingAnimation } from './BacktestLoadingAnimation';
 import { BacktestChart } from '../common/BacktestChart';
 import { api } from '../../services/api';
 import type { TokenAllocation, Strategy, CreateStep } from '../../types';
@@ -180,9 +181,7 @@ export const CreateETFFlow = () => {
 
               {/* Strategy Cards */}
               {loading ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin" style={{ color: themeColor }} />
-                </div>
+                <BacktestLoadingAnimation />
               ) : (
                 <div className="space-y-4">
                   {strategies.map((strategy) => (

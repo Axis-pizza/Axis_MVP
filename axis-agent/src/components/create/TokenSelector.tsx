@@ -103,7 +103,20 @@ export const TokenSelector = ({ selectedTokens, onUpdate, maxTokens = 5 }: Token
             >
               {/* Token Info */}
               <div className="flex items-center gap-3 flex-1">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center text-xs font-bold">
+                {allocation.token?.logoURI ? (
+                  <img 
+                    src={allocation.token.logoURI} 
+                    alt={allocation.symbol}
+                    className="w-8 h-8 rounded-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <div 
+                  className={`w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center text-xs font-bold ${allocation.token?.logoURI ? 'hidden' : ''}`}
+                >
                   {allocation.symbol.charAt(0)}
                 </div>
                 <div>

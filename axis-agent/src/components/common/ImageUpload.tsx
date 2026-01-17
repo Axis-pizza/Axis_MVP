@@ -111,8 +111,9 @@ export const ImageUpload = ({
       } else {
         throw new Error(result.error || 'Upload failed');
       }
-    } catch (e: any) {
-      setError(e.message || 'Upload failed');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Upload failed';
+      setError(message);
       setPreview(null);
     } finally {
       setUploading(false);

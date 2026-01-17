@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, LogOut, Loader2, TrendingUp, TrendingDown, ArrowDownLeft, Copy, ExternalLink } from 'lucide-react';
+import { Wallet, LogOut, Loader2, TrendingUp, TrendingDown, ArrowDownLeft, Copy, ExternalLink, Edit, User } from 'lucide-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { getUserStrategies, type OnChainStrategy } from '../../services/kagemusha';
 import { RedeemModal } from './RedeemModal';
+import { ProfileEditModal } from './ProfileEditModal';
 import { PizzaChart } from '../common/PizzaChart';
 import { StrategyDetailModal } from '../common/StrategyDetailModal';
+import { api } from '../../services/api';
 
 interface ProfileViewProps {
   isConnected: boolean;
@@ -26,6 +28,14 @@ export const ProfileView = ({ isConnected, shortAddress, balance, publicKey, onD
   // Modals State
   const [redeemStrategy, setRedeemStrategy] = useState<OnChainStrategy | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<OnChainStrategy | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
+  // User Profile State
+  const [userProfile, setUserProfile] = useState<{
+    username?: string;
+    bio?: string;
+    pfpUrl?: string;
+  }>({});
 
   const loadStrategies = useCallback(async () => {
     if (!publicKey) return;
@@ -43,6 +53,16 @@ export const ProfileView = ({ isConnected, shortAddress, balance, publicKey, onD
   useEffect(() => {
     if (isConnected && publicKey) {
       loadStrategies();
+      // Load user profile
+      api.getUser(publicKey.toString()).then(profile => {
+        if (profile && !profile.error) {
+          setUserProfile({
+            username: profile.username,
+            bio: profile.bio,
+            pfpUrl: profile.pfpUrl,
+          });
+        }
+      });
     }
   }, [isConnected, publicKey, loadStrategies]);
 
@@ -103,17 +123,42 @@ export const ProfileView = ({ isConnected, shortAddress, balance, publicKey, onD
         
         <div className="flex items-start justify-between mb-6 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
-              <span className="text-2xl">👺</span>
-            </div>
+            {/* Clickable PFP */}
+            <button 
+              onClick={() => setIsEditModalOpen(true)}
+              className="relative group"
+            >
+              {userProfile.pfpUrl ? (
+                <img 
+                  src={userProfile.pfpUrl} 
+                  alt="Profile" 
+                  className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 group-hover:border-orange-500/50 transition-colors"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
+                  <User className="w-8 h-8 text-white" />
+                </div>
+              )}
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white/10 rounded-full flex items-center justify-center group-hover:bg-orange-500 transition-colors">
+                <Edit className="w-3 h-3" />
+              </div>
+            </button>
             <div>
+              {userProfile.username && (
+                <h3 className="font-bold text-lg mb-0.5">{userProfile.username}</h3>
+              )}
               <p className="text-xs text-white/50 mb-0.5">Total Balance</p>
-              <h2 className="text-3xl font-bold font-mono tracking-tight">
+              <h2 className="text-2xl font-bold font-mono tracking-tight">
                 {balance !== null ? balance.toFixed(2) : '—'} <span className="text-sm text-white/40">SOL</span>
               </h2>
             </div>
           </div>
         </div>
+
+        {/* Bio */}
+        {userProfile.bio && (
+          <p className="text-sm text-white/60 mb-4 line-clamp-2">{userProfile.bio}</p>
+        )}
 
         <div className="flex gap-2">
           <button 
@@ -241,6 +286,21 @@ export const ProfileView = ({ isConnected, shortAddress, balance, publicKey, onD
         onSuccess={() => {
           loadStrategies();
           // Optionally keep modal open or refresh it
+        }}
+      />
+
+      {/* Profile Edit Modal */}
+      <ProfileEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        walletAddress={publicKey?.toString() || ''}
+        currentProfile={userProfile}
+        onSave={(data) => {
+          setUserProfile({
+            username: data.username,
+            bio: data.bio,
+            pfpUrl: data.pfpUrl,
+          });
         }}
       />
     </div>

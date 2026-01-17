@@ -52,7 +52,13 @@ export const api = {
   /**
    * Deploy strategy
    */
-  async deploy(signedTransaction: string, metadata: any) {
+  async deploy(signedTransaction: string, metadata: {
+    name?: string;
+    type?: string;
+    composition?: { symbol: string; weight: number }[];
+    creator?: string;
+    initialInvestment?: number;
+  }) {
     const res = await fetch(`${API_BASE}/kagemusha/deploy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -122,6 +128,18 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  /**
+   * Generate pizza-style artwork for a strategy
+   */
+  async generatePizzaArt(tokens: string[], strategyType: string, walletAddress: string) {
+    const res = await fetch(`${API_BASE}/art/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tokens, strategyType, walletAddress }),
     });
     return res.json();
   },

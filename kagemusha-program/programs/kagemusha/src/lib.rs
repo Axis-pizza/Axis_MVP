@@ -52,4 +52,16 @@ pub mod kagemusha {
     ) -> Result<()> {
         withdraw::handler(ctx, amount)
     }
+
+    /// Deposit native SOL into a strategy vault.
+    /// Anyone with SOL can deposit.
+    pub fn deposit_sol(ctx: Context<DepositSol>, amount: u64) -> Result<()> {
+        deposit_sol::handler(ctx, amount)
+    }
+
+    /// Withdraw native SOL from strategy vault.
+    /// Callable by position owner.
+    pub fn withdraw_sol(ctx: Context<WithdrawSol>, amount: u64) -> Result<()> {
+        withdraw_sol::handler(ctx, amount)
+    }
 }

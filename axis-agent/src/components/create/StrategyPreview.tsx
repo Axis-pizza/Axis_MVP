@@ -109,7 +109,7 @@ export const StrategyPreview = ({ strategy, selected, onSelect, expanded = false
         {/* Metrics Row */}
         <div className="grid grid-cols-4 gap-2 p-3 bg-black/30 rounded-xl mb-4">
           <div className="text-center">
-            <p className="text-[10px] text-white/40">APY</p>
+            <p className="text-[10px] text-white/40">ROI</p>
             <p 
               className={`text-sm font-bold ${!themeColor ? defaultColors.text : ''}`}
               style={themeColor && selected ? { color: themeColor } : undefined}
