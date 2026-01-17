@@ -84,5 +84,46 @@ export const api = {
     const res = await fetch(`${API_BASE}/kagemusha/discover?limit=${limit}&offset=${offset}`);
     return res.json();
   },
+
+  /**
+   * Upload image to R2 storage
+   */
+  async uploadImage(file: Blob, walletAddress: string, type: 'strategy' | 'profile' = 'strategy') {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('wallet_address', walletAddress);
+    formData.append('type', type);
+
+    const res = await fetch(`${API_BASE}/upload/image`, {
+      method: 'POST',
+      body: formData,
+    });
+    return res.json();
+  },
+
+  /**
+   * Get user profile
+   */
+  async getUser(walletAddress: string) {
+    const res = await fetch(`${API_BASE}/user?wallet=${encodeURIComponent(walletAddress)}`);
+    return res.json();
+  },
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(data: { 
+    wallet_address: string; 
+    name?: string; 
+    bio?: string; 
+    avatar_url?: string;
+  }) {
+    const res = await fetch(`${API_BASE}/user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
 };
 

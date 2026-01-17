@@ -17,6 +17,12 @@
         {
             "name": "EMAIL"
         }
+    ],
+    "r2_buckets": [
+        {
+            "binding": "IMAGES",
+            "bucket_name": "axis-images"
+        }
     ]
 	// "compatibility_flags": [
 	//   "nodejs_compat"

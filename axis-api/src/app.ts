@@ -10,13 +10,14 @@ import userRoutes from './routes/user';
 import vaultRoutes from './routes/vault';
 import miscRoutes from './routes/misc';
 import kagemushaRoutes from './routes/kagemusha';
+import uploadRoutes from './routes/upload';
 
 const app = new Hono<{ Bindings: Bindings }>()
 
 app.use('/*', cors({
   origin: '*',
   allowHeaders: ['Content-Type', 'Authorization'],
-  allowMethods: ['POST', 'GET', 'OPTIONS'],
+  allowMethods: ['POST', 'GET', 'OPTIONS', 'DELETE'],
   exposeHeaders: ['Content-Length'],
   maxAge: 600,
 }))
@@ -35,5 +36,6 @@ app.route('/', userRoutes);
 app.route('/', vaultRoutes);
 app.route('/', miscRoutes);
 app.route('/kagemusha', kagemushaRoutes);
+app.route('/upload', uploadRoutes);
 
 export default app

@@ -11,4 +11,5 @@ export type Bindings = {
   SENDER_EMAIL: string
   AI: any
   VECTOR_INDEX: VectorizeIndex
+  IMAGES: R2Bucket  // R2 bucket for image storage
 }
