@@ -39,7 +39,17 @@ pub mod kagemusha {
         ctx: Context<Rebalance>,
         amount_in: u64,
         minimum_amount_out: u64,
+        route_data: Vec<u8>,
     ) -> Result<()> {
-        rebalance::handler(ctx, amount_in, minimum_amount_out)
+        rebalance::handler(ctx, amount_in, minimum_amount_out, route_data)
+    }
+
+    /// Withdraw tokens from strategy vault.
+    /// Callable by position owner.
+    pub fn withdraw(
+        ctx: Context<Withdraw>,
+        amount: u64,
+    ) -> Result<()> {
+        withdraw::handler(ctx, amount)
     }
 }

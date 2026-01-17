@@ -23,8 +23,7 @@ pub struct Deposit<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     
-    /// CHECK: Owner for validation only
-    pub owner: AccountInfo<'info>,
+    pub owner: Signer<'info>,
     
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
