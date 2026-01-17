@@ -8,7 +8,7 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 app.post('/register', async (c) => {
   try {
-    const { email, wallet_address, invite_code_used } = await c.req.json()
+    const { email, wallet_address, invite_code_used, avatar_url, name, bio } = await c.req.json()
 
     if (!email || !wallet_address || !invite_code_used) {
       return c.json({ error: 'Missing fields' }, 400)
@@ -34,7 +34,7 @@ app.post('/register', async (c) => {
     const newInviteCode = `AXIS-${randomSuffix}`
 
     // @ts-ignore
-    await UserModel.createRegisteredUser(c.env.axis_db, newId, email, wallet_address, newInviteCode, referrerUser.id);
+    await UserModel.createRegisteredUser(c.env.axis_db, newId, email, wallet_address, newInviteCode, referrerUser.id, avatar_url, name, bio);
 
     return c.json({ 
       success: true, 

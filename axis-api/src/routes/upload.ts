@@ -85,9 +85,9 @@ app.post('/image', async (c) => {
     });
 
     // Generate public URL
-    // Note: R2 public access needs to be configured in Cloudflare dashboard
-    // For now, return the key and construct URL on frontend
-    const imageUrl = `https://pub-axis-images.r2.dev/${key}`;
+    // Use the API worker as a proxy since the R2 bucket might not be public
+    const url = new URL(c.req.url);
+    const imageUrl = `${url.origin}/upload/image/${key}`;
 
     return c.json({
       success: true,
@@ -100,6 +100,34 @@ app.post('/image', async (c) => {
   } catch (e: any) {
     console.error('[Upload Error]', e);
     return c.json({ success: false, error: e.message || 'Upload failed' }, 500);
+  }
+});
+
+/**
+ * GET /upload/image/:key
+ * Serve image from R2
+ */
+app.get('/image/:key{.+}', async (c) => {
+  try {
+    const key = c.req.param('key');
+    
+    const object = await c.env.IMAGES.get(key);
+
+    if (!object) {
+      return c.json({ success: false, error: 'Image not found' }, 404);
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+
+    return new Response(object.body, {
+      headers,
+    });
+
+  } catch (e: any) {
+    console.error('[Serve Image Error]', e);
+    return c.json({ success: false, error: 'Failed to fetch image' }, 500);
   }
 });
 

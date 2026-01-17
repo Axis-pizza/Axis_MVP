@@ -2,6 +2,7 @@
 DROP TABLE IF EXISTS invite_codes;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS vaults;
+DROP TABLE IF EXISTS strategies;
 
 -- 1. 招待コードテーブル
 -- バックエンドに合わせてテーブル名を 'invites' -> 'invite_codes' に変更
@@ -57,6 +58,11 @@ CREATE TABLE strategies (
   name TEXT NOT NULL,
   type TEXT NOT NULL, -- SNIPER, FORTRESS, WAVE
   config TEXT NOT NULL, -- JSON weights
+  description TEXT,
+  jito_bundle_id TEXT,
+  is_public INTEGER DEFAULT 1,
+  status TEXT DEFAULT 'active',
+  total_deposited REAL DEFAULT 0,
   is_active INTEGER DEFAULT 1,
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );

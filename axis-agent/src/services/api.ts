@@ -143,5 +143,40 @@ export const api = {
     });
     return res.json();
   },
+
+  /**
+   * Register new user
+   */
+  async register(data: { email: string; wallet_address: string; invite_code_used: string; avatar_url?: string; name?: string; bio?: string }) {
+    const res = await fetch(`${API_BASE}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  /**
+   * Get proxy URL for R2 images
+   * Converts direct R2 links to API proxy links if needed
+   */
+  getProxyUrl(url: string | undefined | null) {
+    if (!url) return '';
+    // If it's already a proxy URL or local blob, return as is
+    if (url.includes('/upload/image/') || url.startsWith('blob:')) return url;
+    
+    // If it's an R2 URL, convert to proxy
+    if (url.includes('pub-axis-images.r2.dev')) {
+       const key = url.split('pub-axis-images.r2.dev/')[1];
+       return `${API_BASE}/upload/image/${key}`;
+    }
+    
+    // If it's just a path/key (legacy), assume it needs proxy
+    if (!url.startsWith('http') && (url.includes('/') && url.endsWith('.webp'))) {
+        return `${API_BASE}/upload/image/${url}`;
+    }
+
+    return url;
+  }
 };
 

@@ -10,6 +10,7 @@ import {
   Transaction,
   TransactionInstruction,
   LAMPORTS_PER_SOL,
+  SendTransactionError,
 } from '@solana/web3.js';
 import type { GetProgramAccountsFilter } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
@@ -315,6 +316,10 @@ export async function initializeStrategy(
       strategyPubkey: strategyPda
     };
   } catch (error) {
+    if (error instanceof SendTransactionError) {
+      console.error('Transaction failed:Stragety initialization failed');
+      console.error('Logs:', await error.getLogs(connection));
+    }
     console.error('Failed to initialize strategy:', error);
     throw error;
   }
@@ -389,6 +394,10 @@ export async function deposit(
 
     return signature;
   } catch (error) {
+    if (error instanceof SendTransactionError) {
+      console.error('Transaction failed: Deposit failed');
+      console.error('Logs:', await error.getLogs(connection));
+    }
     console.error('Failed to deposit:', error);
     throw error;
   }
@@ -493,6 +502,10 @@ export async function withdraw(
 
     return signature;
   } catch (error) {
+    if (error instanceof SendTransactionError) {
+      console.error('Transaction failed: Withdraw failed');
+      console.error('Logs:', await error.getLogs(connection));
+    }
     console.error('Failed to withdraw:', error);
     throw error;
   }
@@ -542,6 +555,10 @@ export async function rebalance(
 
     return signature;
   } catch (error) {
+    if (error instanceof SendTransactionError) {
+      console.error('Transaction failed: Rebalance failed');
+      console.error('Logs:', await error.getLogs(connection));
+    }
     console.error('Failed to rebalance:', error);
     throw error;
   }

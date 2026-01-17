@@ -161,14 +161,14 @@ export class JitoBundleService {
         try {
           const tx = VersionedTransaction.deserialize(bytes);
           signature = await this.connection.sendTransaction(tx, {
-            skipPreflight: false,
+            skipPreflight: true, // Skip preflight to avoid "already processed" simulation errors
             maxRetries: 3,
           });
         } catch {
           // Fallback to legacy transaction
           const tx = Transaction.from(bytes);
           signature = await this.connection.sendRawTransaction(bytes, {
-            skipPreflight: false,
+            skipPreflight: true, // Skip preflight to avoid "already processed" simulation errors
             maxRetries: 3,
           });
         }

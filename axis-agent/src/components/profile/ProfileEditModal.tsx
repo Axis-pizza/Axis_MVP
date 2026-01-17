@@ -19,6 +19,7 @@ interface ProfileEditModalProps {
     pfpUrl?: string;
   };
   onSave: (data: { username?: string; bio?: string; pfpUrl?: string }) => void;
+  isRegistration?: boolean;
 }
 
 export const ProfileEditModal = ({
@@ -27,10 +28,16 @@ export const ProfileEditModal = ({
   walletAddress,
   currentProfile,
   onSave,
+  isRegistration = false,
 }: ProfileEditModalProps) => {
   const [username, setUsername] = useState(currentProfile.username || '');
   const [bio, setBio] = useState(currentProfile.bio || '');
   const [pfpUrl, setPfpUrl] = useState(currentProfile.pfpUrl || '');
+  
+  // Registration fields
+  const [email, setEmail] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +47,8 @@ export const ProfileEditModal = ({
       setUsername(currentProfile.username || '');
       setBio(currentProfile.bio || '');
       setPfpUrl(currentProfile.pfpUrl || '');
+      setEmail('');
+      setInviteCode('');
       setError(null);
     }
   }, [isOpen, currentProfile]);
@@ -49,21 +58,41 @@ export const ProfileEditModal = ({
     setError(null);
     
     try {
-      const result = await api.updateProfile({
-        wallet_address: walletAddress,
-        name: username || undefined,
-        bio: bio || undefined,
-        avatar_url: pfpUrl || undefined,
-      });
+      let result;
+      
+      if (isRegistration) {
+        if (!email || !inviteCode) {
+            throw new Error('Email and Invite Code are required');
+        }
+        
+        // Register new user
+        result = await api.register({
+            email,
+            wallet_address: walletAddress,
+            invite_code_used: inviteCode,
+            avatar_url: pfpUrl || undefined,
+            name: username || undefined,
+            bio: bio || undefined
+        });
+
+      } else {
+        // Update existing profile
+        result = await api.updateProfile({
+            wallet_address: walletAddress,
+            name: username || undefined,
+            bio: bio || undefined,
+            avatar_url: pfpUrl || undefined,
+        });
+      }
 
       if (result.success) {
         onSave({ username, bio, pfpUrl });
         onClose();
       } else {
-        throw new Error(result.error || 'Failed to save profile');
+        throw new Error(result.error || (isRegistration ? 'Registration failed' : 'Failed to save profile'));
       }
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Failed to save profile';
+      const message = e instanceof Error ? e.message : 'Operation failed';
       setError(message);
     } finally {
       setSaving(false);
@@ -92,13 +121,13 @@ export const ProfileEditModal = ({
             initial={{ opacity: 0, scale: 0.95, y: 40 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 40 }}
-            className="fixed inset-x-4 top-[15%] bottom-[15%] md:inset-x-auto md:w-[480px] md:left-1/2 md:-translate-x-1/2 bg-[#121212] border border-white/10 rounded-3xl z-[70] overflow-hidden flex flex-col"
+            className="fixed inset-x-4 top-[15%] bottom-[5%] md:inset-x-auto md:w-[480px] md:left-1/2 md:-translate-x-1/2 bg-[#121212] border border-white/10 rounded-3xl z-[70] overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
               <div>
-                <h2 className="text-xl font-bold">Edit Profile</h2>
-                <p className="text-xs text-white/50">Customize your identity</p>
+                <h2 className="text-xl font-bold">{isRegistration ? 'Create Profile' : 'Edit Profile'}</h2>
+                <p className="text-xs text-white/50">{isRegistration ? 'Join the Kagemusha network' : 'Customize your identity'}</p>
               </div>
               <button 
                 onClick={onClose} 
@@ -110,6 +139,33 @@ export const ProfileEditModal = ({
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* Registration Fields */}
+              {isRegistration && (
+                <div className="space-y-4 p-4 bg-orange-500/5 rounded-2xl border border-orange-500/10">
+                   <div>
+                    <label className="text-sm text-orange-400 mb-2 block font-medium">Email (Required)</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="w-full p-4 bg-black/40 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50 transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-orange-400 mb-2 block font-medium">Invite Code (Required)</label>
+                    <input
+                      type="text"
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value)}
+                      placeholder="AXIS-XXXX"
+                      className="w-full p-4 bg-black/40 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50 transition-colors uppercase"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* PFP Upload */}
               <div className="flex flex-col items-center">
                 <p className="text-sm text-white/50 mb-4">Profile Picture</p>
@@ -184,18 +240,18 @@ export const ProfileEditModal = ({
             <div className="p-6 border-t border-white/10 shrink-0">
               <button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || (isRegistration && (!email || !inviteCode))}
                 className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-all"
               >
                 {saving ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Saving...
+                    {isRegistration ? 'Registering...' : 'Saving...'}
                   </>
                 ) : (
                   <>
                     <Save className="w-5 h-5" />
-                    Save Profile
+                    {isRegistration ? 'Complete Registration' : 'Save Profile'}
                   </>
                 )}
               </button>

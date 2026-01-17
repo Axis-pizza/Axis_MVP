@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, LogOut, Loader2, TrendingUp, TrendingDown, ArrowDownLeft, Copy, ExternalLink, Edit, User } from 'lucide-react';
+import { Wallet, LogOut, Loader2, TrendingUp, TrendingDown, ArrowDownLeft, Copy, ExternalLink, Edit, User, Plus } from 'lucide-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
@@ -29,6 +29,7 @@ export const ProfileView = ({ isConnected, shortAddress, balance, publicKey, onD
   const [redeemStrategy, setRedeemStrategy] = useState<OnChainStrategy | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<OnChainStrategy | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
   
   // User Profile State
   const [userProfile, setUserProfile] = useState<{
@@ -56,10 +57,14 @@ export const ProfileView = ({ isConnected, shortAddress, balance, publicKey, onD
       // Load user profile
       api.getUser(publicKey.toString()).then(profile => {
         if (profile && !profile.error) {
+          // Check if it's a new user (empty profile)
+          const isNew = !profile.username && !profile.invite_code;
+          setIsNewUser(isNew);
+          
           setUserProfile({
             username: profile.username,
             bio: profile.bio,
-            pfpUrl: profile.pfpUrl,
+            pfpUrl: api.getProxyUrl(profile.pfpUrl),
           });
         }
       });
@@ -140,12 +145,17 @@ export const ProfileView = ({ isConnected, shortAddress, balance, publicKey, onD
                 </div>
               )}
               <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white/10 rounded-full flex items-center justify-center group-hover:bg-orange-500 transition-colors">
-                <Edit className="w-3 h-3" />
+                {isNewUser ? <Plus className="w-3 h-3" /> : <Edit className="w-3 h-3" />}
               </div>
             </button>
             <div>
               {userProfile.username && (
                 <h3 className="font-bold text-lg mb-0.5">{userProfile.username}</h3>
+              )}
+              {isNewUser && (
+                <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] rounded-full border border-orange-500/30 animate-pulse mb-1 inline-block">
+                  Setup Required
+                </span>
               )}
               <p className="text-xs text-white/50 mb-0.5">Total Balance</p>
               <h2 className="text-2xl font-bold font-mono tracking-tight">
@@ -301,7 +311,9 @@ export const ProfileView = ({ isConnected, shortAddress, balance, publicKey, onD
             bio: data.bio,
             pfpUrl: data.pfpUrl,
           });
+          setIsNewUser(false);
         }}
+        isRegistration={isNewUser}
       />
     </div>
   );
