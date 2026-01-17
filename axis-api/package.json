@@ -12,7 +12,8 @@
     "arctic": "^3.7.0",
     "bs58": "^6.0.0",
     "buffer": "^6.0.3",
-    "hono": "^4.11.3"
+    "hono": "^4.11.3",
+    "mimetext": "^3.0.27"
   },
   "devDependencies": {
     "wrangler": "^4.54.0"

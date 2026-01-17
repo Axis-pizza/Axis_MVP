@@ -15,10 +15,24 @@ app.post('/register', async (c) => {
       return c.json({ error: 'Missing fields' }, 400)
     }
 
-    const referrerUser = await c.env.axis_db.prepare('SELECT id FROM users WHERE invite_code = ?').bind(invite_code_used).first();
+    let referrerId: string | null = null;
+    let isSystemInvite = false;
 
-    if (!referrerUser) {
-      return c.json({ error: 'Invalid invite code' }, 400)
+    // 1. Check if it's a User Referral Code (Permanent)
+    const referrerUser = await c.env.axis_db.prepare('SELECT id FROM users WHERE invite_code = ?').bind(invite_code_used).first();
+    
+    if (referrerUser) {
+      // @ts-ignore
+      referrerId = referrerUser.id;
+    } else {
+      // 2. Check if it's a System/One-time Invite Code
+      const invite = await InviteModel.findInviteByCode(c.env.axis_db, invite_code_used);
+      if (invite) {
+        referrerId = (invite.creator_id === 'system') ? null : invite.creator_id;
+        isSystemInvite = true;
+      } else {
+        return c.json({ error: 'Invalid invite code' }, 400)
+      }
     }
 
     const existing = await c.env.axis_db.prepare('SELECT id, invite_code FROM users WHERE email = ? OR wallet_address = ?')
@@ -35,11 +49,16 @@ app.post('/register', async (c) => {
     const newInviteCode = `AXIS-${randomSuffix}`
 
     // @ts-ignore
-    await UserModel.createRegisteredUser(c.env.axis_db, newId, email, wallet_address, newInviteCode, referrerUser.id, avatar_url, name, bio);
+    await UserModel.createRegisteredUser(c.env.axis_db, newId, email, wallet_address, newInviteCode, invite_code_used, avatar_url, name, bio);
+
+    // If it was a one-time invite, mark it as used
+    if (isSystemInvite) {
+      await InviteModel.markInviteUsed(c.env.axis_db, invite_code_used, newId);
+    }
 
     // Send Invite Email (async, don't block response)
     c.executionCtx.waitUntil(
-      sendInviteEmail(email, newInviteCode)
+      sendInviteEmail(c.env, email, newInviteCode)
     );
 
     return c.json({ 
@@ -56,6 +75,34 @@ app.post('/register', async (c) => {
     return c.json({ error: 'Internal Server Error' }, 500)
   }
 })
+
+app.post('/request-invite', async (c) => {
+  try {
+    const { email } = await c.req.json();
+    
+    if (!email) return c.json({ error: 'Email is required' }, 400);
+
+    // 1. Check if user already exists
+    const existingUser = await UserModel.findUserByEmail(c.env.axis_db, email);
+    if (existingUser) {
+        return c.json({ error: 'User already registered' }, 409);
+    }
+
+    // 2. Generate new invite code (assigned to 'system')
+    const code = await InviteModel.createOneInvite(c.env.axis_db, 'system');
+
+    // 3. Send Email
+    c.executionCtx.waitUntil(
+        sendInviteEmail(c.env, email, code)
+    );
+
+    return c.json({ success: true, message: 'Invite code sent' });
+
+  } catch (e) {
+    console.error('Request Invite Error:', e);
+    return c.json({ error: 'Internal Server Error' }, 500);
+  }
+});
 
 app.get('/user', async (c) => { 
   const wallet = c.req.query('wallet');

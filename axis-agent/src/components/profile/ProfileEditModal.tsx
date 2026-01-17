@@ -37,6 +37,7 @@ export const ProfileEditModal = ({
   // Registration fields
   const [email, setEmail] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [regStep, setRegStep] = useState<'EMAIL' | 'CODE'>('EMAIL'); // EMAIL -> CODE
   
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +50,7 @@ export const ProfileEditModal = ({
       setPfpUrl(currentProfile.pfpUrl || '');
       setEmail('');
       setInviteCode('');
+      setRegStep('EMAIL'); // Reset step
       setError(null);
     }
   }, [isOpen, currentProfile]);
@@ -61,11 +63,25 @@ export const ProfileEditModal = ({
       let result;
       
       if (isRegistration) {
+        // Step 1: Request Invite Code
+        if (regStep === 'EMAIL') {
+           if (!email) throw new Error('Email is required');
+           
+           result = await api.requestInvite(email);
+           if (result.success) {
+             setRegStep('CODE');
+             setSaving(false);
+             return; // Stop here, wait for code input
+           } else {
+             throw new Error(result.error || 'Failed to send invite code');
+           }
+        }
+
+        // Step 2: Complete Registration
         if (!email || !inviteCode) {
             throw new Error('Email and Invite Code are required');
         }
         
-        // Register new user
         result = await api.register({
             email,
             wallet_address: walletAddress,
@@ -151,26 +167,47 @@ export const ProfileEditModal = ({
                       </ul>
                    </div>
 
-                   <div>
+                   {/* Step 1: Email */}
+                   <div className={regStep === 'CODE' ? 'opacity-50 pointer-events-none' : ''}>
                     <label className="text-sm text-white/50 mb-2 block font-medium">Email Address <span className="text-orange-500">*</span></label>
                     <input
                       type="email"
                       value={email}
+                      disabled={regStep === 'CODE'}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="name@example.com"
                       className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50 transition-colors"
                     />
                   </div>
-                  <div>
-                    <label className="text-sm text-white/50 mb-2 block font-medium">Invite Code <span className="text-orange-500">*</span></label>
-                    <input
-                      type="text"
-                      value={inviteCode}
-                      onChange={(e) => setInviteCode(e.target.value)}
-                      placeholder="AXIS-XXXX"
-                      className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50 transition-colors uppercase font-mono tracking-widest"
-                    />
-                  </div>
+                  
+                  {/* Step 2: Invite Code (Only shows after email sent) */}
+                  <AnimatePresence>
+                    {regStep === 'CODE' && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }} 
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="overflow-hidden"
+                      >
+                        <label className="text-sm text-white/50 mb-2 block font-medium">
+                            Invite Code <span className="text-orange-500">*</span>
+                            <span className="ml-2 text-xs text-green-400 font-normal">Sent to email!</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={inviteCode}
+                          onChange={(e) => setInviteCode(e.target.value)}
+                          placeholder="AXIS-XXXX"
+                          className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-orange-500/50 transition-colors uppercase font-mono tracking-widest"
+                        />
+                         <button 
+                            onClick={() => setRegStep('EMAIL')}
+                            className="text-xs text-white/30 hover:text-white mt-2 underline"
+                         >
+                            Change Email
+                         </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               ) : (
                 /* Profile Edit Fields - ONLY visible during editing */
@@ -251,18 +288,24 @@ export const ProfileEditModal = ({
             <div className="p-6 border-t border-white/10 shrink-0">
               <button
                 onClick={handleSave}
-                disabled={saving || (isRegistration && (!email || !inviteCode))}
+                disabled={
+                  saving || 
+                  (isRegistration 
+                    ? (regStep === 'EMAIL' ? !email : !inviteCode)
+                    : false
+                  )
+                }
                 className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-all"
               >
                 {saving ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    {isRegistration ? 'Registering...' : 'Saving...'}
+                    {isRegistration ? (regStep === 'EMAIL' ? 'Sending Code...' : 'Registering...') : 'Saving...'}
                   </>
                 ) : (
                   <>
                     <Save className="w-5 h-5" />
-                    {isRegistration ? 'Complete Registration' : 'Save Profile'}
+                    {isRegistration ? (regStep === 'EMAIL' ? 'Get Access Code' : 'Complete Registration') : 'Save Profile'}
                   </>
                 )}
               </button>

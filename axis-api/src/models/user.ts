@@ -52,10 +52,10 @@ export async function createSocialUser(db: D1Database, id: string, email: string
     ).bind(id, email, wallet, inviteCode).run();
 }
 
-export async function createRegisteredUser(db: D1Database, id: string, email: string, wallet: string, inviteCode: string, referredBy: string, avatarUrl?: string, name?: string, bio?: string): Promise<void> {
+export async function createRegisteredUser(db: D1Database, id: string, email: string, wallet: string, inviteCode: string, inviteCodeUsed: string, avatarUrl?: string, name?: string, bio?: string): Promise<void> {
     await db.prepare(
-        'INSERT INTO users (id, email, wallet_address, invite_code, referred_by, avatar_url, name, bio) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).bind(id, email, wallet, inviteCode, referredBy, avatarUrl || null, name || null, bio || null).run()
+        'INSERT INTO users (id, email, wallet_address, invite_code, invite_code_used, avatar_url, name, bio) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(id, email, wallet, inviteCode, inviteCodeUsed, avatarUrl || null, name || null, bio || null).run()
 }
 
 export async function updateUser(db: D1Database, wallet: string, updates: { name?: string, bio?: string, avatar_url?: string, badges?: string }): Promise<void> {

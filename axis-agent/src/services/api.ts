@@ -144,6 +144,15 @@ export const api = {
     return res.json();
   },
 
+  async requestInvite(email: string) {
+    const res = await fetch(`${API_BASE}/request-invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return res.json();
+  },
+
   /**
    * Register new user
    */

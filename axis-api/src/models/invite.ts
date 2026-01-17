@@ -18,14 +18,14 @@ export async function findInviteByCode(db: D1Database, code: string): Promise<In
     "SELECT * FROM invite_codes WHERE code = ? AND is_used = 0"
   ).bind(code).first();
   
-  if (invite) return invite as Invite;
+  if (invite) return invite as unknown as Invite;
   
   // Fallback: check invites table (legacy)
   invite = await db.prepare(
     "SELECT * FROM invites WHERE code = ? AND used_by_user_id IS NULL"
   ).bind(code).first();
   
-  return invite as Invite | null;
+  return invite as unknown as Invite | null;
 }
 
 export async function findAnyInviteByCode(db: D1Database, code: string): Promise<Invite | null> {
@@ -34,10 +34,10 @@ export async function findAnyInviteByCode(db: D1Database, code: string): Promise
   }
   
   let invite = await db.prepare("SELECT * FROM invite_codes WHERE code = ?").bind(code).first();
-  if (invite) return invite as Invite;
+  if (invite) return invite as unknown as Invite;
   
   invite = await db.prepare("SELECT * FROM invites WHERE code = ?").bind(code).first();
-  return invite as Invite | null;
+  return invite as unknown as Invite | null;
 }
 
 export async function markInviteUsed(db: D1Database, code: string, userId: string): Promise<void> {
@@ -60,6 +60,12 @@ export async function createInvites(db: D1Database, userId: string, count: numbe
     batch.push(stmt.bind(generateInviteCode(), userId));
   }
   await db.batch(batch);
+}
+
+export async function createOneInvite(db: D1Database, creatorId: string): Promise<string> {
+    const code = generateInviteCode();
+    await db.prepare("INSERT INTO invite_codes (code, creator_id) VALUES (?, ?)").bind(code, creatorId).run();
+    return code;
 }
 
 export async function findInvitesByCreator(db: D1Database, creatorId: string): Promise<Invite[]> {
