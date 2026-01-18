@@ -8,18 +8,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Loader2, List, Layers, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
 import { SwipeCard, type StrategyCardData } from './SwipeCard';
-import { StrategyDetailModal } from '../common/StrategyDetailModal';
+import type { Strategy } from '../../types'; // 型定義をインポート
 
 interface SwipeDiscoverViewProps {
   onToggleView: () => void;
+  onStrategySelect: (strategy: Strategy) => void; // IDではなくStrategyオブジェクトを受け取る
 }
 
-export const SwipeDiscoverView = ({ onToggleView }: SwipeDiscoverViewProps) => {
+export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDiscoverViewProps) => {
   const [strategies, setStrategies] = useState<StrategyCardData[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedStrategy, setSelectedStrategy] = useState<StrategyCardData | null>(null);
 
   const fetchStrategies = useCallback(async () => {
     setLoading(true);
@@ -45,7 +45,7 @@ export const SwipeDiscoverView = ({ onToggleView }: SwipeDiscoverViewProps) => {
           name: s.name,
           type: (s.type as StrategyCardData['type']) || 'BALANCED',
           tokens: s.tokens || [],
-          roi: s.roi ?? (Math.random() * 40 - 10), // Mock ROI if not available
+          roi: s.roi ?? (Math.random() * 40 - 10),
           tvl: s.tvl || 0,
           imageUrl: s.imageUrl,
           creatorAddress: s.ownerPubkey || '',
@@ -81,17 +81,49 @@ export const SwipeDiscoverView = ({ onToggleView }: SwipeDiscoverViewProps) => {
     }
   };
 
+  // ★重要: ここでデータを変換して渡す
+  const handleSelectStrategy = () => {
+    const s = filteredStrategies[currentIndex];
+    if (!s) return;
+
+    // StrategyCardData -> Strategy (Global Type) への変換
+    const strategyData: Strategy = {
+      id: s.id,
+      name: s.name,
+      ticker: s.name.slice(0, 4).toUpperCase(), // 簡易的に生成
+      type: s.type,
+      description: s.description || '',
+      tokens: s.tokens,
+      apy: s.roi,
+      tvl: s.tvl,
+      price: 100, // 初期価格（詳細画面で再取得されるので仮の値でOK）
+      owner: s.creatorAddress,
+      // 必須だがここにはないデータは一旦空/デフォルトで埋める
+      metrics: {
+        expectedApy: s.roi,
+        riskScore: 5,
+        winRate: 50,
+        sharpeRatio: 1.0
+      },
+      backtest: {
+        timestamps: [],
+        values: [],
+        sharpeRatio: 0,
+        maxDrawdown: 0,
+        volatility: 0
+      },
+      createdAt: Date.now()
+    };
+
+    onStrategySelect(strategyData);
+  };
+
   const handleSwipeRight = () => {
-    // Open detail modal for the current strategy
-    if (filteredStrategies[currentIndex]) {
-      setSelectedStrategy(filteredStrategies[currentIndex]);
-    }
+    handleSelectStrategy();
   };
 
   const handleTap = () => {
-    if (filteredStrategies[currentIndex]) {
-      setSelectedStrategy(filteredStrategies[currentIndex]);
-    }
+    handleSelectStrategy();
   };
 
   const handleReset = () => {
@@ -101,7 +133,7 @@ export const SwipeDiscoverView = ({ onToggleView }: SwipeDiscoverViewProps) => {
   const isAtEnd = currentIndex >= filteredStrategies.length;
 
   return (
-    <div className="min-h-screen bg-[#030303] text-white px-4 py-6 flex flex-col">
+    <div className="min-h-screen bg-[#0C0A09] text-white px-4 py-6 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -125,7 +157,7 @@ export const SwipeDiscoverView = ({ onToggleView }: SwipeDiscoverViewProps) => {
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
-            setCurrentIndex(0); // Reset on search
+            setCurrentIndex(0);
           }}
           placeholder="Search strategies, tokens..."
           className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-orange-500/50 transition-colors"
@@ -201,37 +233,6 @@ export const SwipeDiscoverView = ({ onToggleView }: SwipeDiscoverViewProps) => {
           </div>
         </div>
       )}
-
-      {/* Hint */}
-      {!loading && filteredStrategies.length > 0 && !isAtEnd && (
-        <div className="text-center pb-4">
-          <p className="text-xs text-white/30">
-            ← Skip | Tap or Swipe Right to View →
-          </p>
-        </div>
-      )}
-
-      {/* Strategy Detail Modal */}
-      <StrategyDetailModal
-        isOpen={!!selectedStrategy}
-        strategy={selectedStrategy ? {
-          id: selectedStrategy.id,
-          address: selectedStrategy.id,
-          ownerPubkey: selectedStrategy.creatorAddress,
-          name: selectedStrategy.name,
-          type: selectedStrategy.type,
-          tokens: selectedStrategy.tokens,
-          description: selectedStrategy.description,
-          tvl: selectedStrategy.tvl,
-          pnl: selectedStrategy.roi
-        } : null}
-        onClose={() => setSelectedStrategy(null)}
-        onSuccess={() => {
-          setSelectedStrategy(null);
-          // Move to next card after successful action
-          handleSwipeLeft();
-        }}
-      />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 /**
  * Pizza Chart - Token allocation as pizza slices
- * The core visual of the pizza metaphor
+ * Refined for "High-End Artisan / Private Banking" aesthetic
  */
 
 import { useMemo } from 'react';
@@ -19,18 +19,17 @@ interface PizzaChartProps {
   animated?: boolean;
 }
 
-// Pizza topping colors (warm, appetizing palette)
+// Artisan / Luxury Palette
+// 落ち着いたゴールド、ブロンズ、深みのある食材の色を使用
 const SLICE_COLORS = [
-  '#FF6B35', // Pepperoni red-orange
-  '#FFB347', // Cheese orange
-  '#E8D44D', // Mozzarella yellow
-  '#7CB518', // Basil green
-  '#F7931E', // Crust golden
-  '#C73E1D', // Tomato red
-  '#8B4513', // Mushroom brown
-  '#FF4500', // Hot pepper
-  '#DAA520', // Olive gold
-  '#228B22', // Pepper green
+  '#D97706', // Bronze (Amber 600)
+  '#B45309', // Deep Bronze (Amber 700)
+  '#9F1239', // Wine / Cured Meat (Rose 700)
+  '#15803D', // Deep Basil (Green 700)
+  '#854D0E', // Old Gold (Yellow 800)
+  '#78350F', // Truffle / Mushroom (Amber 900)
+  '#BE123C', // Raspberry / Rare Meat (Rose 700)
+  '#0F766E', // Deep Teal (Emerald 700)
 ];
 
 export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = true }: PizzaChartProps) => {
@@ -40,10 +39,11 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
     const total = slices.reduce((sum, s) => sum + s.weight, 0);
     const cx = size / 2;
     const cy = size / 2;
-    const radius = size / 2 - 8;
-    const innerRadius = radius * 0.25; // Small hole in center
+    // クラスト（外枠）の分少し内側に
+    const radius = size / 2 - 10;
+    const innerRadius = radius * 0.25; // 中央の穴
 
-    let currentAngle = -90; // Start from top
+    let currentAngle = -90; // 12時の方向から開始
     const pathsArr: { d: string; color: string; symbol: string; weight: number }[] = [];
     const labelsArr: { x: number; y: number; symbol: string; weight: number }[] = [];
 
@@ -53,18 +53,18 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
       const endAngle = currentAngle + sliceAngle;
       const midAngle = startAngle + sliceAngle / 2;
 
-      // Convert to radians
+      // ラジアン変換
       const startRad = (startAngle * Math.PI) / 180;
       const endRad = (endAngle * Math.PI) / 180;
       const midRad = (midAngle * Math.PI) / 180;
 
-      // Outer arc points
+      // 外周の点
       const x1 = cx + radius * Math.cos(startRad);
       const y1 = cy + radius * Math.sin(startRad);
       const x2 = cx + radius * Math.cos(endRad);
       const y2 = cy + radius * Math.sin(endRad);
 
-      // Inner arc points
+      // 内周の点
       const x3 = cx + innerRadius * Math.cos(endRad);
       const y3 = cy + innerRadius * Math.sin(endRad);
       const x4 = cx + innerRadius * Math.cos(startRad);
@@ -72,7 +72,7 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
 
       const largeArc = sliceAngle > 180 ? 1 : 0;
 
-      // Path: outer arc -> line to inner -> inner arc -> line back
+      // Path生成: 外周円弧 -> 内周への直線 -> 内周円弧 -> 外周への直線
       const d = `
         M ${x1} ${y1}
         A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}
@@ -88,8 +88,8 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
         weight: slice.weight,
       });
 
-      // Label position (outside the chart)
-      const labelRadius = radius + 20;
+      // ラベル位置（チャートの外側）
+      const labelRadius = radius + 24;
       labelsArr.push({
         x: cx + labelRadius * Math.cos(midRad),
         y: cy + labelRadius * Math.sin(midRad),
@@ -107,30 +107,53 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
     return (
       <div
         style={{ width: size, height: size }}
-        className="rounded-full border-2 border-dashed border-white/20 flex items-center justify-center"
+        className="rounded-full border border-dashed border-[#D97706]/30 flex items-center justify-center bg-[#0C0A09]"
       >
-        <span className="text-white/30 text-sm">Add toppings</span>
+        <span className="text-[#D97706]/50 text-sm font-serif italic">Select Assets</span>
       </div>
     );
   }
 
   return (
-    <div className="relative" style={{ width: size + 60, height: size + 60 }}>
+    <div className="relative flex items-center justify-center" style={{ width: size + 80, height: size + 80 }}>
       <svg
-        width={size + 60}
-        height={size + 60}
-        viewBox={`-30 -30 ${size + 60} ${size + 60}`}
-        className="drop-shadow-2xl"
+        width={size + 80}
+        height={size + 80}
+        viewBox={`-40 -40 ${size + 80} ${size + 80}`}
+        className="overflow-visible"
       >
-        {/* Pizza crust (outer ring) */}
+        <defs>
+          {/* 高級感を出すためのドロップシャドウフィルター */}
+          <filter id="shadow-slice" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.5" />
+          </filter>
+          {/* ゴールドの光沢グラデーション */}
+          <linearGradient id="crustGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#D97706" />
+            <stop offset="50%" stopColor="#F59E0B" />
+            <stop offset="100%" stopColor="#78350F" />
+          </linearGradient>
+        </defs>
+
+        {/* Pizza crust (Outer Rim) - 金の縁取り */}
         <circle
           cx={size / 2}
           cy={size / 2}
           r={size / 2 - 4}
           fill="none"
-          stroke="#D4A574"
-          strokeWidth="8"
-          className="drop-shadow-md"
+          stroke="url(#crustGradient)"
+          strokeWidth="1"
+          strokeOpacity="0.8"
+          className="drop-shadow-lg"
+        />
+        
+        {/* 背景の皿/ベース */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={size / 2 - 10}
+          fill="#1C1917" // Very dark warm gray
+          opacity="0.5"
         />
 
         {/* Slices */}
@@ -139,61 +162,76 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
             key={path.symbol}
             d={path.d}
             fill={path.color}
-            initial={animated ? { scale: 0, opacity: 0 } : false}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: i * 0.1, type: 'spring', stiffness: 200 }}
-            whileHover={{ scale: 1.05, filter: 'brightness(1.2)' }}
-            className="cursor-pointer drop-shadow-lg"
+            stroke="#0C0A09" // 境界線を背景色にしてスライスを際立たせる
+            strokeWidth="1.5"
+            filter="url(#shadow-slice)"
+            initial={animated ? { scale: 0.8, opacity: 0 } : false}
+            animate={{ scale: 1, opacity: 0.9 }} // わずかに透過させてガラス感を出す
+            transition={{ delay: i * 0.08, type: 'spring', stiffness: 100, damping: 20 }}
+            whileHover={{ 
+              scale: 1.05, 
+              opacity: 1,
+              filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(217, 119, 6, 0.5))',
+              zIndex: 10
+            }}
+            className="cursor-pointer"
             style={{ transformOrigin: `${size / 2}px ${size / 2}px` }}
           />
         ))}
 
-        {/* Center circle (cheese pool) */}
+        {/* Center circle (Hole/Void) */}
         <circle
           cx={size / 2}
           cy={size / 2}
           r={size / 2 * 0.22}
-          fill="#1a1a1a"
-          stroke="#333"
-          strokeWidth="2"
+          fill="#0C0A09"
+          stroke="#D97706"
+          strokeWidth="0.5"
+          strokeOpacity="0.3"
         />
 
         {/* Labels */}
         {showLabels && labels.map((label, i) => (
           <motion.g
             key={label.symbol}
-            initial={animated ? { opacity: 0 } : false}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 + i * 0.05 }}
+            initial={animated ? { opacity: 0, y: 5 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 + i * 0.05 }}
           >
+            {/* 接続線 (Connector Line) */}
+            <line 
+                x1={size/2 + (size/2 - 10) * Math.cos(Math.atan2(label.y - size/2, label.x - size/2))}
+                y1={size/2 + (size/2 - 10) * Math.sin(Math.atan2(label.y - size/2, label.x - size/2))}
+                x2={label.x}
+                y2={label.y}
+                stroke="#D97706"
+                strokeWidth="0.5"
+                strokeOpacity="0.3"
+            />
+            
             <text
               x={label.x}
-              y={label.y}
+              y={label.y - 4}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-[10px] font-bold fill-white"
+              className="text-[11px] font-serif font-bold fill-[#E7E5E4] drop-shadow-md"
+              style={{ fontFamily: '"Times New Roman", serif' }}
             >
               {label.symbol}
             </text>
             <text
               x={label.x}
-              y={label.y + 12}
+              y={label.y + 8}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-[9px] fill-white/50"
+              className="text-[10px] font-serif fill-[#D97706]"
+              style={{ fontFamily: '"Times New Roman", serif' }}
             >
               {label.weight}%
             </text>
           </motion.g>
         ))}
       </svg>
-
-      {/* Center label */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="text-center">
-          <span className="text-lg">🍕</span>
-        </div>
-      </div>
     </div>
   );
 };

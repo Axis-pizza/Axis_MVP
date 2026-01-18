@@ -1,10 +1,9 @@
 /**
- * SwipeCard - Tinder-style swipe card for strategy discovery
- * Smooth gesture support with spring physics
+ * SwipeCard - Premium Strategy Card
+ * High-End "Menu" Aesthetic
  */
 
-import { motion, useMotionValue, useTransform } from 'framer-motion';
-import type { PanInfo } from 'framer-motion';
+import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
 import { ExternalLink, TrendingUp, User } from 'lucide-react';
 import { PizzaChart } from '../common/PizzaChart';
 
@@ -51,7 +50,6 @@ export const SwipeCard = ({
   const rotate = useTransform(x, [-200, 200], [-ROTATION_RANGE, ROTATION_RANGE]);
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
   
-  // Indicator opacity based on swipe direction
   const leftIndicatorOpacity = useTransform(x, [-100, 0], [1, 0]);
   const rightIndicatorOpacity = useTransform(x, [0, 100], [0, 1]);
 
@@ -64,9 +62,9 @@ export const SwipeCard = ({
   };
 
   const typeColors = {
-    AGGRESSIVE: 'from-orange-500 to-red-500',
-    BALANCED: 'from-blue-500 to-purple-500',
-    CONSERVATIVE: 'from-emerald-500 to-teal-500',
+    AGGRESSIVE: 'from-[#9F1239] to-[#881337]',
+    BALANCED: 'from-[#D97706] to-[#B45309]',
+    CONSERVATIVE: 'from-[#15803D] to-[#14532D]',
   };
 
   const formatROI = (roi: number) => {
@@ -107,98 +105,89 @@ export const SwipeCard = ({
         opacity: 0,
         transition: { duration: 0.3 }
       }}
-      transition={{
-        type: 'spring',
-        stiffness: 300,
-        damping: 25,
-      }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
     >
-      <div className="w-full h-full bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <div className="w-full h-full bg-[#1C1917] border border-[#D97706]/20 rounded-2xl overflow-hidden shadow-2xl flex flex-col relative">
+        {/* Glow effect */}
+        <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-[#D97706]/10 to-transparent pointer-events-none" />
+
         {/* Strategy Image / Pizza Chart */}
-        <div className="relative h-48 bg-gradient-to-br from-white/5 to-transparent flex items-center justify-center">
+        <div className="relative h-56 flex items-center justify-center bg-[#0C0A09]">
           {strategy.imageUrl ? (
             <img 
               src={strategy.imageUrl} 
               alt={strategy.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover opacity-80"
             />
           ) : (
-            <PizzaChart slices={strategy.tokens} size={140} showLabels={false} animated={false} />
+            <div className="scale-110">
+              <PizzaChart slices={strategy.tokens} size={160} showLabels={false} animated={false} />
+            </div>
           )}
           
           {/* Swipe Indicators */}
           {isTop && (
             <>
               <motion.div 
-                className="absolute top-4 left-4 px-4 py-2 bg-red-500/90 text-white font-bold rounded-xl"
+                className="absolute top-6 left-6 px-4 py-2 border-2 border-[#9F1239] text-[#9F1239] font-serif font-bold tracking-widest text-lg rounded-lg transform -rotate-12 bg-black/50 backdrop-blur-sm"
                 style={{ opacity: leftIndicatorOpacity }}
               >
-                SKIP
+                PASS
               </motion.div>
               <motion.div 
-                className="absolute top-4 right-4 px-4 py-2 bg-emerald-500/90 text-white font-bold rounded-xl"
+                className="absolute top-6 right-6 px-4 py-2 border-2 border-[#15803D] text-[#15803D] font-serif font-bold tracking-widest text-lg rounded-lg transform rotate-12 bg-black/50 backdrop-blur-sm"
                 style={{ opacity: rightIndicatorOpacity }}
               >
-                VIEW
+                INVEST
               </motion.div>
             </>
           )}
 
-          {/* Type Badge */}
-          <div className={`absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r ${typeColors[strategy.type]} text-white`}>
+          {/* Type Badge - Wax Seal Style */}
+          <div className={`absolute bottom-4 right-4 px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-gradient-to-r ${typeColors[strategy.type]} text-white shadow-lg border border-white/10`}>
             {strategy.type}
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-5 flex flex-col">
+        <div className="flex-1 p-6 flex flex-col relative z-10">
           {/* Header */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold truncate mb-1">{strategy.name}</h2>
-              {strategy.description && (
-                <p className="text-sm text-white/50 line-clamp-2">{strategy.description}</p>
-              )}
-            </div>
+          <div className="mb-5">
+            <h2 className="text-2xl font-serif font-bold text-[#E7E5E4] mb-2 leading-tight">{strategy.name}</h2>
+            {strategy.description && (
+              <p className="text-sm text-[#A8A29E] font-serif italic line-clamp-2">{strategy.description}</p>
+            )}
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="p-3 bg-white/5 rounded-xl">
-              <p className="text-xs text-white/50 mb-1">ROI</p>
-              <p className={`text-lg font-bold ${strategy.roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                <TrendingUp className="w-4 h-4 inline mr-1" />
+          {/* Stats Row */}
+          <div className="grid grid-cols-2 gap-px bg-[#D97706]/20 rounded-lg overflow-hidden border border-[#D97706]/10 mb-5">
+            <div className="bg-[#0C0A09] p-4 text-center">
+              <p className="text-[10px] text-[#78716C] uppercase tracking-widest mb-1">ROI</p>
+              <p className={`text-xl font-serif font-bold ${strategy.roi >= 0 ? 'text-[#D97706]' : 'text-[#9F1239]'}`}>
                 {formatROI(strategy.roi)}
               </p>
             </div>
-            <div className="p-3 bg-white/5 rounded-xl">
-              <p className="text-xs text-white/50 mb-1">TVL</p>
-              <p className="text-lg font-bold">{formatTVL(strategy.tvl)} SOL</p>
+            <div className="bg-[#0C0A09] p-4 text-center">
+              <p className="text-[10px] text-[#78716C] uppercase tracking-widest mb-1">TVL</p>
+              <p className="text-xl font-serif font-bold text-[#E7E5E4]">{formatTVL(strategy.tvl)} <span className="text-xs font-normal text-[#78716C]">SOL</span></p>
             </div>
           </div>
 
           {/* Token Allocation */}
           <div className="mb-4">
-            <p className="text-xs text-white/50 mb-2">Allocation</p>
-            <div className="flex flex-wrap gap-1.5">
+            <p className="text-[10px] text-[#78716C] uppercase tracking-widest mb-3">Composition</p>
+            <div className="flex flex-wrap gap-2">
               {strategy.tokens.slice(0, 5).map((token) => (
                 <div 
                   key={token.symbol}
-                  className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-lg"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0C0A09] border border-[#D97706]/20 rounded-md"
                 >
-                  {token.logoUrl ? (
-                    <img src={token.logoUrl} alt={token.symbol} className="w-4 h-4 rounded-full" />
-                  ) : (
-                    <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[8px] font-bold">
-                      {token.symbol[0]}
-                    </div>
-                  )}
-                  <span className="text-xs font-medium">{token.symbol}</span>
-                  <span className="text-xs text-white/40">{token.weight}%</span>
+                  <span className="text-xs font-serif font-bold text-[#D97706]">{token.symbol}</span>
+                  <span className="text-[10px] text-[#78716C]">{token.weight}%</span>
                 </div>
               ))}
               {strategy.tokens.length > 5 && (
-                <div className="px-2 py-1 bg-white/5 rounded-lg text-xs text-white/40">
+                <div className="px-3 py-1.5 bg-[#0C0A09] border border-[#D97706]/10 rounded-md text-xs text-[#78716C]">
                   +{strategy.tokens.length - 5}
                 </div>
               )}
@@ -206,34 +195,32 @@ export const SwipeCard = ({
           </div>
 
           {/* Footer */}
-          <div className="mt-auto flex items-center justify-between pt-4 border-t border-white/5">
-            {/* Creator */}
-            <div className="flex items-center gap-2">
+          <div className="mt-auto flex items-center justify-between pt-4 border-t border-[#D97706]/10">
+            <div className="flex items-center gap-3">
               {strategy.creatorPfpUrl ? (
                 <img 
                   src={strategy.creatorPfpUrl} 
                   alt="Creator" 
-                  className="w-8 h-8 rounded-full object-cover"
+                  className="w-8 h-8 rounded-full object-cover ring-1 ring-[#D97706]/30"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
+                <div className="w-8 h-8 rounded-full bg-[#292524] flex items-center justify-center ring-1 ring-[#D97706]/30">
+                  <User className="w-4 h-4 text-[#A8A29E]" />
                 </div>
               )}
-              <span className="text-xs text-white/50 font-mono">
+              <span className="text-xs text-[#A8A29E] font-mono">
                 {strategy.creatorAddress.slice(0, 4)}...{strategy.creatorAddress.slice(-4)}
               </span>
             </div>
 
-            {/* Explorer Link */}
             <a 
               href={explorerUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 text-xs text-[#D97706] hover:text-[#F59E0B] transition-colors font-serif italic"
             >
-              Solscan <ExternalLink className="w-3 h-3" />
+              Verify on Solscan <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         </div>
@@ -241,5 +228,3 @@ export const SwipeCard = ({
     </motion.div>
   );
 };
-
-export type { StrategyCardData };
