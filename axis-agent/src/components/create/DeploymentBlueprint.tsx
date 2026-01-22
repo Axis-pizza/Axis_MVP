@@ -1,485 +1,247 @@
-/**
- * Deployment Blueprint - Smart Contract visualization (Step 3)
- * Shows the "blueprint" of the deployed strategy
- */
-
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Zap, CheckCircle2, Loader2, ExternalLink, Copy, ArrowLeft, Lock, Coins } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
-import { Program, AnchorProvider, type Idl } from '@coral-xyz/anchor';
-import { PizzaChart } from '../common/PizzaChart';
-import idl from '../../idl/kagemusha.json';
-
-interface TokenAllocation {
-  symbol: string;
-  weight: number;
-}
+import { FileText, ShieldCheck, Wallet, ArrowRight, Info, X } from 'lucide-react';
 
 interface DeploymentBlueprintProps {
   strategyName: string;
-  strategyType: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
-  tokens: TokenAllocation[];
-  description?: string;
+  strategyType: string;
+  tokens: { symbol: string; weight: number; logoURI?: string }[];
+  description: string;
+  
+  // 詳細設定
+  settings?: {
+    swapFee: number;
+    automationEnabled: boolean;
+    triggerType: string;
+    deviationThreshold: number;
+    timeInterval: number;
+  };
+  info?: {
+    symbol: string;
+    imagePreview?: string;
+  };
+
   onBack: () => void;
   onComplete: () => void;
-  onDeploySuccess?: (strategyAddress: string) => void;
+  // 修正: 金額と通貨を渡せるように変更
+  onDeploySuccess?: (address: string, amount: number, asset: 'SOL' | 'USDC') => void;
 }
 
-type DeployStatus = 'PREVIEW' | 'PREPARING' | 'SIGNING' | 'BUNDLING' | 'CONFIRMING' | 'SUCCESS' | 'ERROR';
-
-export const DeploymentBlueprint = ({
-  strategyName,
-  strategyType,
-  tokens,
-  description,
-  onBack,
+export const DeploymentBlueprint = ({ 
+  strategyName, 
+  strategyType, 
+  tokens, 
+  settings,
+  info,
+  onBack, 
   onComplete,
-  onDeploySuccess,
+  onDeploySuccess 
 }: DeploymentBlueprintProps) => {
-  const { publicKey, signTransaction } = useWallet();
-  const { connection } = useConnection();
-  const [status, setStatus] = useState<DeployStatus>('PREVIEW');
-  const [txSignature, setTxSignature] = useState<string | null>(null);
-  const [jitoBundle, setJitoBundle] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // 初期投資モーダル管理
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositAsset, setDepositAsset] = useState<'SOL' | 'USDC'>('SOL');
 
-  const handleDeploy = async () => {
-    if (!publicKey || !signTransaction) return;
-
-    setStatus('PREPARING');
-    setErrorMessage(null);
-
-    try {
-      // 1. Get Jito Tip Account (for mainnet MEV protection)
-      // NOTE: Jito is mainnet-only, for devnet we skip the tip
-      const tipResponse = await fetch('https://axis-api.yusukekikuta-05.workers.dev/kagemusha/prepare-deployment');
-      
-      if (!tipResponse.ok) {
-         throw new Error(`API Error: ${tipResponse.statusText}`);
-      }
-      
-      const tipData = await tipResponse.json();
-      
-      if (!tipData.success) {
-        throw new Error('Failed to get Jito tip account');
-      }
-      
-      // Check if we're on devnet (skip Jito tip for devnet)
-      const isDevnet = connection.rpcEndpoint.includes('devnet');
-
-      // 2. Setup Anchor Provider & Program
-      const provider = new AnchorProvider(
-        connection,
-        {
-          publicKey: publicKey,
-          signTransaction: signTransaction,
-          signAllTransactions: async (txs) => txs,
-        },
-        { commitment: 'confirmed' }
-      );
-
-      const programId = new PublicKey(idl.address);
-      const program = new Program(idl as Idl, provider);
-
-      // 3. Prepare Arguments
-      // Map Strategy Type to u8
-      const strategyTypeMap = {
-        'AGGRESSIVE': 0, // Sniper
-        'CONSERVATIVE': 1, // Fortress
-        'BALANCED': 2,    // Wave
-      } as const;
-      
-      const mappedType = strategyType in strategyTypeMap ? strategyTypeMap[strategyType] : 2;
-
-      // Calculate Weights (Basis Points)
-      // Ensure specific order if needed, but for now just map current tokens to weights
-      // Need to ensure sum is 10000
-      const weights = tokens.map(t => Math.round(t.weight * 100)); // 20% -> 2000
-      
-      // Fix potential rounding errors to sum exactly 10000
-      const currentSum = weights.reduce((a, b) => a + b, 0);
-      if (currentSum !== 10000) {
-        const diff = 10000 - currentSum;
-        if (weights.length > 0) {
-            weights[0] += diff;
-        }
-      }
-
-      // Pad with 0s to length 10
-      while (weights.length < 10) {
-          weights.push(0);
-      }
-
-      // 4. Create Transactions
-      const transaction = new Transaction();
-
-      // A. Jito Tip (only for mainnet MEV protection)
-      if (!isDevnet) {
-        const tipAccount = new PublicKey(tipData.tipAccount);
-        const tipAmount = Math.max(tipData.minTipLamports, 5000);
-        transaction.add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: tipAccount,
-            lamports: tipAmount,
-          })
-        );
-      }
-
-      // B. Initialize Strategy (Escrow Vault)
-      // Add timestamp suffix to ensure unique PDA (prevents "account already in use" error)
-      const uniqueStrategyName = `${strategyName}-${Date.now().toString(36)}`;
-      
-      // Derive PDA for client side reference, Anchor does this internally but we want the address
-      const [strategyPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('strategy'), publicKey.toBuffer(), Buffer.from(uniqueStrategyName)],
-        programId
-      );
-
-      const initIx = await program.methods
-        .initializeStrategy(
-          uniqueStrategyName,
-          mappedType,
-          weights
-        )
-        .accounts({
-          owner: publicKey,
-          // strategy: strategyPda, // Anchor handles this
-          systemProgram: SystemProgram.programId,
-        })
-        .instruction();
-
-      transaction.add(initIx);
-
-      // 5. Sign Transaction
-      setStatus('SIGNING');
-      const latestBlockhash = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = latestBlockhash.blockhash;
-      transaction.feePayer = publicKey;
-
-      const signedTx = await signTransaction(transaction);
-      const serializedTx = signedTx.serialize().toString('base64');
-
-      // 6. Send to Backend for Bundling
-      setStatus('BUNDLING');
-      const response = await fetch('https://axis-api.yusukekikuta-05.workers.dev/kagemusha/deploy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signedTransaction: serializedTx,
-          strategyId: strategyPda.toString(), 
-          metadata: {
-            name: strategyName,
-            type: strategyType,
-            composition: tokens,
-            description: description || '',
-            creator: publicKey.toString(),
-            isPublic: true,
-          },
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setJitoBundle(data.bundleId);
-        setTxSignature(data.strategyId || strategyPda.toString());
-        
-        setStatus('CONFIRMING');
-        // Wait a bit for propagation
-        await new Promise(r => setTimeout(r, 2000));
-        
-        setStatus('SUCCESS');
-      } else {
-        throw new Error(data.error || 'Deployment failed');
-      }
-    } catch (e: any) {
-      console.error('Deploy error:', e);
-      let msg = e.message || 'Unknown error';
-      if (msg.includes('rate limited') || msg.includes('congested')) {
-          msg = '⚠️ Solana Network Busy (Jito). Please Retry.';
-      }
-      setErrorMessage(msg);
-      setStatus('ERROR');
-    }
+  // 1. Deployボタンクリック -> モーダルオープン
+  const handleInitialDeployClick = () => {
+    setIsDepositModalOpen(true);
   };
 
-  return (
-    <div className="min-h-screen px-4 py-6 pb-32">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        {status === 'PREVIEW' || status === 'ERROR' ? (
-          <button
-            onClick={onBack}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-        ) : null}
-        <div>
-          <h2 className="text-xl font-bold">Smart Contract Blueprint</h2>
-          <p className="text-xs text-white/50">Review Escrow & Strategy</p>
-        </div>
-      </div>
+  // 2. モーダルでConfirm -> 親へ通知して遷移
+  const handleConfirmDeploy = () => {
+    if (!depositAmount) return;
+    setIsDepositModalOpen(false);
 
-      <AnimatePresence mode="wait">
-        {status === 'SUCCESS' ? (
-          <SuccessView
-            strategyName={strategyName}
-            tokens={tokens}
-            txSignature={txSignature}
-            jitoBundle={jitoBundle}
-            onComplete={onComplete}
-            onDeposit={() => onDeploySuccess?.(txSignature || '')}
-          />
-        ) : (
-          <motion.div
-            key="blueprint"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="max-w-md mx-auto space-y-6"
-          >
-            {/* Blueprint Card */}
-            <div className="relative p-6 bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-2xl overflow-hidden">
-              {/* Grid pattern overlay */}
-              <div 
-                className="absolute inset-0 opacity-10"
-                style={{
-                  backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-                  backgroundSize: '20px 20px',
-                }}
-              />
-
-              <div className="relative z-10">
-                {/* Strategy Header */}
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center">
-                    {strategyType === 'AGGRESSIVE' ? (
-                      <Zap className="w-6 h-6 text-orange-400" />
-                    ) : (
-                      <Shield className="w-6 h-6 text-emerald-400" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg">{strategyName}</h3>
-                    <p className="text-xs text-white/40">{strategyType} Strategy</p>
-                  </div>
-                </div>
-
-                {/* Composition Pizza */}
-                <div className="flex justify-center mb-6">
-                  <PizzaChart slices={tokens} size={160} showLabels={true} animated={true} />
-                </div>
-
-                {/* Token List */}
-                <div className="space-y-2 mb-6">
-                  {tokens.map((token) => (
-                    <div key={token.symbol} className="flex items-center justify-between p-2 bg-white/5 rounded-lg">
-                      <span className="font-mono text-sm">{token.symbol}</span>
-                      <span className="text-white/60">{token.weight}%</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Protocol Flow */}
-                <div className="p-3 bg-black/50 rounded-xl border border-white/10">
-                  <p className="text-[10px] text-white/40 mb-2 uppercase tracking-wider">Execution Flow</p>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded">Wallet</span>
-                    <span className="text-white/30">→</span>
-                    <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded">Escrow Vault</span>
-                    <span className="text-white/30">→</span>
-                    <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded">Devnet</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Security Badges */}
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-center gap-2 text-xs text-emerald-400">
-                    <Shield className="w-4 h-4" />
-                    <span>MEV Protected via Jito Bundle</span>
-                </div>
-                <div className="flex items-center justify-center gap-2 text-xs text-blue-400">
-                    <Lock className="w-4 h-4" />
-                    <span>Self-Custodial Escrow Contract</span>
-                </div>
-            </div>
-
-            {/* Deploy Button */}
-            <button
-              onClick={handleDeploy}
-              disabled={status !== 'PREVIEW' && status !== 'ERROR'}
-              className={`w-full py-4 rounded-2xl font-bold text-black flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 disabled:cursor-not-allowed transition-all ${
-                status === 'ERROR' 
-                  ? 'bg-red-500 text-white shadow-red-500/30' 
-                  : 'bg-gradient-to-r from-orange-500 to-amber-500 shadow-orange-500/30'
-              }`}
-            >
-              {status === 'PREVIEW' && (
-                <>
-                  <Zap className="w-5 h-5" />
-                  Initialize Escrow & Deploy
-                </>
-              )}
-              {status === 'PREPARING' && (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Preparing Blueprint...
-                </>
-              )}
-              {status === 'SIGNING' && (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Waiting for Signature...
-                </>
-              )}
-              {status === 'BUNDLING' && (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Bundling via Jito...
-                </>
-              )}
-              {status === 'CONFIRMING' && (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Confirming on Solana...
-                </>
-              )}
-              {status === 'ERROR' && (
-                <>
-                  <Zap className="w-5 h-5" />
-                  Network Busy - Retry
-                </>
-              )}
-            </button>
-            
-            {errorMessage && (
-                <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center text-xs text-red-400 bg-red-500/10 p-3 rounded-xl border border-red-500/20"
-                >
-                    {errorMessage}
-                </motion.div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
-
-// Success View Component
-const SuccessView = ({
-  strategyName,
-  tokens,
-  txSignature,
-  jitoBundle,
-  onComplete,
-  onDeposit,
-}: {
-  strategyName: string;
-  tokens: TokenAllocation[];
-  txSignature: string | null;
-  jitoBundle: string | null;
-  onComplete: () => void;
-  onDeposit?: () => void;
-}) => {
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
-
-  const handleDeposit = () => {
-    if (onDeposit) {
-      onDeposit();
+    if (onDeploySuccess) {
+      // 署名フロー(DepositFlow)に任せるため、プレースホルダーのアドレスと入力金額を渡す
+      const mockNewAddress = "So11111111111111111111111111111111111111112"; 
+      onDeploySuccess(mockNewAddress, parseFloat(depositAmount), depositAsset);
     } else {
       onComplete();
     }
-  }
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center justify-center text-center pt-12"
-    >
-      {/* Success Animation */}
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', delay: 0.2 }}
-        className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-lg shadow-emerald-500/30"
-      >
-        <CheckCircle2 className="w-12 h-12 text-black" />
-      </motion.div>
-
-      <h1 className="text-3xl font-bold mb-2">Escrow Initialized! 🏯</h1>
-      <p className="text-white/50 mb-8">{strategyName} is now live on Solana</p>
-
-      {/* Pizza Preview */}
-      <div className="mb-8">
-        <PizzaChart slices={tokens} size={140} showLabels={false} animated={false} />
+    <div className="max-w-3xl mx-auto animate-in slide-in-from-bottom-8 duration-500">
+      
+      {/* Header */}
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-serif font-bold text-[#E7E5E4] mb-2">Final Blueprint</h2>
+        <p className="text-[#A8A29E]">Review your strategy specifications before on-chain deployment.</p>
       </div>
 
-      {/* Transaction Details */}
-      <div className="w-full max-w-sm p-4 bg-white/5 rounded-2xl border border-white/10 space-y-3 text-left">
-        {txSignature && (
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-white/50">Strategy Address</span>
-            <button
-              onClick={() => copyToClipboard(txSignature)}
-              className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300"
-            >
-              {txSignature.slice(0, 8)}...
-              <Copy className="w-3 h-3" />
-            </button>
-          </div>
-        )}
-        {jitoBundle && (
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-white/50">Jito Bundle</span>
-            <span className="text-xs text-emerald-400">✓ Confirmed</span>
-          </div>
-        )}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-white/50">Network</span>
-          <span className="text-xs text-purple-400">Solana Devnet</span>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-col gap-3 mt-8 w-full max-w-sm">
-        <button
-          onClick={handleDeposit}
-          className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl font-bold text-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 hover:scale-[1.02] transition-transform"
-        >
-          <Coins className="w-5 h-5" />
-          Deposit & Activate
-        </button>
+      {/* Receipt Card */}
+      <div className="bg-[#E7E5E4] text-[#0C0A09] rounded-sm p-8 shadow-2xl relative overflow-hidden mb-8 font-serif">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] opacity-50 mix-blend-multiply pointer-events-none" />
         
-        <div className="flex gap-3">
-            <button
-            onClick={onComplete}
-            className="flex-1 py-3 bg-white/10 rounded-xl font-medium hover:bg-white/20 transition-colors text-sm"
-            >
-            Create Another
-            </button>
-            <a
-            href={`https://explorer.solana.com/address/${txSignature}?cluster=devnet`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 py-3 bg-white/5 text-white/70 rounded-xl font-medium hover:bg-white/10 transition-colors flex items-center justify-center gap-2 text-sm"
-            >
-            Verify on Chain
-            <ExternalLink className="w-4 h-4" />
-            </a>
+        {/* Header Section */}
+        <div className="relative border-b-2 border-[#0C0A09] pb-6 mb-6 flex justify-between items-start">
+          <div className="flex items-center gap-4">
+             {/* Logo */}
+             <div className="w-16 h-16 border-2 border-[#0C0A09] flex items-center justify-center bg-white overflow-hidden">
+               {info?.imagePreview ? (
+                 <img src={info.imagePreview} alt="Logo" className="w-full h-full object-cover" />
+               ) : (
+                 <span className="text-2xl font-bold">{strategyName[0]}</span>
+               )}
+             </div>
+             <div>
+               <h1 className="text-3xl font-bold uppercase tracking-wide">{strategyName}</h1>
+               <div className="flex items-center gap-2 mt-1">
+                 <span className="px-2 py-0.5 border border-[#0C0A09] text-xs font-bold bg-[#0C0A09] text-[#E7E5E4]">{info?.symbol || 'ETF'}</span>
+                 <span className="text-sm font-mono text-[#0C0A09]/70">TYPE: {strategyType}</span>
+               </div>
+             </div>
+          </div>
+          <div className="text-right">
+             <div className="text-xs uppercase tracking-widest mb-1 text-[#0C0A09]/60">Created Via</div>
+             <div className="font-bold text-xl">AXIS PROTOCOL</div>
+          </div>
+        </div>
+
+        {/* Content Grid */}
+        <div className="relative grid md:grid-cols-2 gap-8 mb-8">
+           {/* Left: Composition */}
+           <div>
+             <h4 className="text-xs font-bold uppercase tracking-widest border-b border-[#0C0A09]/20 pb-2 mb-3 flex items-center gap-2">
+               <FileText className="w-3 h-3" /> Composition
+             </h4>
+             <ul className="space-y-2">
+               {tokens.map((t, i) => (
+                 <li key={i} className="flex justify-between items-center text-sm">
+                   <span className="font-bold flex items-center gap-2">
+                     {t.symbol}
+                   </span>
+                   <span className="font-mono">{t.weight}%</span>
+                 </li>
+               ))}
+             </ul>
+           </div>
+
+           {/* Right: Parameters */}
+           <div>
+             <h4 className="text-xs font-bold uppercase tracking-widest border-b border-[#0C0A09]/20 pb-2 mb-3 flex items-center gap-2">
+               <ShieldCheck className="w-3 h-3" /> Parameters
+             </h4>
+             <ul className="space-y-3 text-sm">
+               <li className="flex justify-between">
+                 <span className="text-[#0C0A09]/70">Swap Fee</span>
+                 <span className="font-bold">{settings?.swapFee || 0.3}%</span>
+               </li>
+               <li className="flex justify-between">
+                 <span className="text-[#0C0A09]/70">Auto-Rebalance</span>
+                 <span className="font-bold">{settings?.automationEnabled ? 'Active' : 'Disabled'}</span>
+               </li>
+               {settings?.automationEnabled && (
+                 <li className="flex justify-between">
+                   <span className="text-[#0C0A09]/70">Trigger</span>
+                   <span className="font-bold">
+                     {settings.triggerType === 'DEVIATION' 
+                       ? `> ${settings.deviationThreshold}% Drift` 
+                       : `Every ${settings.timeInterval}h`}
+                   </span>
+                 </li>
+               )}
+             </ul>
+           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="relative pt-6 border-t-2 border-[#0C0A09] flex justify-between items-end">
+           <div className="text-xs max-w-xs text-[#0C0A09]/60">
+             * Smart contract ownership will be transferred to your wallet upon deployment.
+           </div>
+           <div className="font-mono text-2xl font-bold tracking-tighter">
+             SIGNATURE REQUIRED
+           </div>
         </div>
       </div>
-    </motion.div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-4">
+        <button
+          onClick={onBack}
+          className="px-8 py-4 bg-[#1C1917] rounded-xl font-bold text-[#78716C] hover:text-[#E7E5E4] transition-colors"
+        >
+          Modify
+        </button>
+        <button
+          onClick={handleInitialDeployClick}
+          className="flex-1 py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] text-[#0C0A09] font-bold rounded-xl shadow-[0_0_30px_rgba(217,119,6,0.2)] hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+        >
+          <Wallet className="w-5 h-5" />
+          Set Liquidity & Deploy
+        </button>
+      </div>
+
+      {/* --- Initial Deposit Modal --- */}
+      <AnimatePresence>
+        {isDepositModalOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsDepositModalOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[#1C1917] border border-[#D97706]/20 rounded-3xl p-6 z-50 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-serif font-bold text-[#E7E5E4]">Initial Liquidity</h3>
+                <button onClick={() => setIsDepositModalOpen(false)}><X className="w-5 h-5 text-[#78716C]" /></button>
+              </div>
+
+              <div className="p-4 bg-[#D97706]/10 rounded-xl border border-[#D97706]/20 mb-6 flex items-start gap-3">
+                <Info className="w-5 h-5 text-[#D97706] shrink-0 mt-0.5" />
+                <p className="text-xs text-[#D97706]">
+                  This amount will be used to mint the initial LP tokens and deploy the strategy on-chain.
+                </p>
+              </div>
+
+              <div className="space-y-4 mb-8">
+                <div>
+                  <label className="text-xs text-[#78716C] mb-1 block">Amount</label>
+                  <div className="relative">
+                    <input 
+                      type="number" 
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full p-4 bg-[#0C0A09] border border-[#D97706]/20 rounded-xl text-xl font-bold text-[#E7E5E4] focus:outline-none focus:border-[#D97706]"
+                      autoFocus
+                    />
+                    <div className="absolute right-2 top-2 bottom-2 bg-[#1C1917] rounded-lg p-1 flex border border-[#white]/10">
+                      <button 
+                        onClick={() => setDepositAsset('SOL')}
+                        className={`px-3 rounded-md text-xs font-bold transition-colors ${depositAsset === 'SOL' ? 'bg-[#D97706] text-[#0C0A09]' : 'text-[#78716C]'}`}
+                      >
+                        SOL
+                      </button>
+                      <button 
+                        onClick={() => setDepositAsset('USDC')}
+                        className={`px-3 rounded-md text-xs font-bold transition-colors ${depositAsset === 'USDC' ? 'bg-[#D97706] text-[#0C0A09]' : 'text-[#78716C]'}`}
+                      >
+                        USDC
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={handleConfirmDeploy}
+                disabled={!depositAmount || parseFloat(depositAmount) <= 0}
+                className="w-full py-4 bg-[#E7E5E4] text-[#0C0A09] font-bold rounded-xl disabled:opacity-50 hover:scale-[1.01] transition-transform flex items-center justify-center gap-2"
+              >
+                Proceed to Signature <ArrowRight className="w-4 h-4" />
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };

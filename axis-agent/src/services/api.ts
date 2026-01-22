@@ -52,19 +52,36 @@ export const api = {
   /**
    * Deploy strategy
    */
-  async deploy(signedTransaction: string, metadata: {
-    name?: string;
-    type?: string;
-    composition?: { symbol: string; weight: number }[];
-    creator?: string;
-    initialInvestment?: number;
-  }) {
-    const res = await fetch(`${API_BASE}/kagemusha/deploy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ signedTransaction, metadata }),
-    });
-    return res.json();
+  async deploy(txSignature: string, strategyData: any) {
+    console.log("📡 API Calling: /kagemusha/deploy"); // 呼び出し確認
+
+    try {
+      const response = await fetch(`${API_BASE}/kagemusha/deploy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          signature: txSignature,
+          ...strategyData,
+        }),
+      });
+
+      // レスポンスの内容をテキストで取得（JSONパースエラーを防ぐためまずはテキストで）
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        // ★サーバーからのエラーメッセージをコンソールに赤く出す
+        console.error(`🚨 Server Error (${response.status}):`, responseText);
+        throw new Error(`Server Error: ${response.status} - ${responseText}`);
+      }
+
+      // JSONに戻して返す
+      return JSON.parse(responseText);
+    } catch (error) {
+      console.error("API Deploy Error:", error);
+      throw error;
+    }
   },
 
   /**
