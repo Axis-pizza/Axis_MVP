@@ -120,19 +120,39 @@ export const DepositFlow = ({
       const base64Tx = Buffer.from(serializedTx).toString('base64');
 
       const payload = {
+        // 1. 基本情報
         name: String(strategyName).trim(),
+        // 説明文がないと一覧で寂しいので、自動生成して送ります
+        description: `${strategyType} Strategy created by ${publicKey.toBase58().slice(0, 6)}...`, 
         type: strategyType,
+        
+        // 2. データ構造の不一致を解消 (Discoverは "tokens" を探しています)
+        tokens: tokens.map(t => ({
+          symbol: String(t.symbol),
+          weight: Math.floor(Number(t.weight))
+        })),
+        // 念のため、古いバックエンド仕様向けに composition も残しておきます
         composition: tokens.map(t => ({
           symbol: String(t.symbol),
           weight: Math.floor(Number(t.weight))
         })),
+
+        // 3. 作成者情報 (Discoverは "ownerPubkey" を探しています)
+        ownerPubkey: publicKey.toBase58(),
         creator: publicKey.toBase58(),
+
+        // 4. 金額情報 (Discoverは "tvl" を探しています)
+        tvl: Number(parsedAmount),
         initialInvestment: Number(parsedAmount),
-        // ★ここを追加：サーバーへの証拠提出
+
+        // 5. 画像データ (現状アップロード機能がないため、空文字を送ってエラーを防ぎます)
+        image: "", 
+        
+        // 6. 証拠データ
         signedTransaction: base64Tx 
       };
 
-      console.log("🚀 Payload with SignedTx:", JSON.stringify(payload, null, 2));
+      console.log("🚀 Payload aligned for Discover:", JSON.stringify(payload, null, 2));
 
       try {
         await api.deploy(signature, payload);

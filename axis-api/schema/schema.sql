@@ -45,3 +45,18 @@ CREATE TABLE vaults (
   apy REAL DEFAULT 0,          -- デフォルト0でGood
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
+
+DROP TABLE IF EXISTS strategies;
+CREATE TABLE strategies (
+  id TEXT PRIMARY KEY,
+  owner_pubkey TEXT NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT,
+  config TEXT,           -- 構成銘柄 (JSON文字列)
+  description TEXT,
+  jito_bundle_id TEXT,
+  is_public INTEGER DEFAULT 1,
+  status TEXT DEFAULT 'active',
+  total_deposited REAL DEFAULT 0,
+  created_at INTEGER DEFAULT (strftime('%s', 'now'))
+);

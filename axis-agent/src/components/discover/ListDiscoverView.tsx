@@ -5,27 +5,37 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, TrendingUp, Users, Crown, ChevronRight, Flame, Loader2, Plus, Zap, Shield, Target, Layers } from 'lucide-react';
+import { useWallet } from '@solana/wallet-adapter-react'; // ★追加: 自分のウォレット取得用
+import { 
+  Search, TrendingUp, Users, Crown, ChevronRight, Flame, Loader2, Plus, 
+  Zap, Shield, Target, Layers, GitFork 
+} from 'lucide-react';
 import { api } from '../../services/api';
 import { PizzaChart } from '../common/PizzaChart';
 import { StrategyDetailModal } from '../common/StrategyDetailModal';
 
-interface DiscoveredStrategy {
+// Strategy型（必要に応じてtypes.tsからインポートするか、ここで定義）
+export interface Strategy {
   id: string;
-  ownerPubkey: string;
   name: string;
   type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
   tokens: { symbol: string; weight: number }[];
-  description: string;
+  description?: string;
+}
+
+interface DiscoveredStrategy extends Strategy {
+  ownerPubkey: string;
   tvl: number;
   createdAt: number;
 }
 
 interface ListDiscoverViewProps {
   onToggleView: () => void;
+  onStrategySelect: (strategy: Strategy) => void; // ★追加: 選択（Fork）用
 }
 
-export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
+export const ListDiscoverView = ({ onToggleView, onStrategySelect }: ListDiscoverViewProps) => {
+  const { publicKey } = useWallet(); // ★追加
   const [strategies, setStrategies] = useState<DiscoveredStrategy[]>([]);
   const [selectedStrategy, setSelectedStrategy] = useState<DiscoveredStrategy | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,12 +46,59 @@ export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
     const fetchStrategies = async () => {
       setLoading(true);
       try {
-        const res = await api.discoverStrategies(50);
-        if (res.success && res.strategies) {
-          setStrategies(res.strategies);
-        } else {
-          setStrategies([]);
+        // --- 1. データ取得 ---
+        const [publicRes, myRes] = await Promise.all([
+          api.discoverStrategies(50).catch(() => ({ strategies: [] })), // エラーでも止まらないように
+          publicKey ? api.getUserStrategies(publicKey.toBase58()).catch(() => ({ strategies: [] })) : Promise.resolve({ strategies: [] })
+        ]);
+
+        let rawList: any[] = [];
+
+        // パブリックリストの結合
+        if (publicRes && Array.isArray(publicRes.strategies)) {
+          rawList = [...rawList, ...publicRes.strategies];
         }
+
+        // 自分リストの結合
+        const myRawStrategies = (myRes.strategies || myRes || []);
+        if (Array.isArray(myRawStrategies)) {
+          rawList = [...rawList, ...myRawStrategies];
+        }
+
+        // --- 2. 安全な変換（マッピング）処理 ---
+        // ここでデータのキー名の揺らぎ（tokens vs compositionなど）を吸収します
+        const normalizedList: DiscoveredStrategy[] = rawList.map((item: any) => {
+          // トークンリストの正規化
+          // tokensがあれば使う、なければcompositionを使う、それもなければ空配列
+          const rawTokens = item.tokens || item.composition || [];
+          const normalizedTokens = Array.isArray(rawTokens) 
+            ? rawTokens.map((t: any) => ({ symbol: t.symbol, weight: Number(t.weight) }))
+            : [];
+
+          return {
+            id: item.id || item.signature || `temp-${Math.random()}`,
+            name: item.name || 'Untitled Strategy',
+            description: item.description || '',
+            type: item.type || 'BALANCED',
+            
+            // 重要: ここで揺らぎを吸収
+            tokens: normalizedTokens, 
+            ownerPubkey: item.ownerPubkey || item.creator || 'Unknown',
+            tvl: Number(item.tvl || item.initialInvestment || 0),
+            createdAt: item.createdAt ? Number(item.createdAt) : Date.now() / 1000
+          };
+        });
+
+        // --- 3. 重複除去 ---
+        // IDを使って重複を取り除きます
+        const uniqueMap = new Map();
+        normalizedList.forEach(item => {
+          uniqueMap.set(item.id, item);
+        });
+        const finalStrategies = Array.from(uniqueMap.values()) as DiscoveredStrategy[];
+
+        setStrategies(finalStrategies);
+
       } catch (e) {
         console.error('Failed to fetch strategies:', e);
         setStrategies([]);
@@ -49,26 +106,37 @@ export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
         setLoading(false);
       }
     };
+    
     fetchStrategies();
-  }, []);
-
+  }, [publicKey]);
+  
   const filteredStrategies = strategies
     .filter(s => 
       s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.description?.toLowerCase().includes(search.toLowerCase())
+      (s.description && s.description.toLowerCase().includes(search.toLowerCase()))
     )
     .sort((a, b) => {
+      // ★追加: 自分の戦略を常にトップに表示したい場合
+      if (publicKey) {
+        const isMineA = a.ownerPubkey === publicKey.toBase58();
+        const isMineB = b.ownerPubkey === publicKey.toBase58();
+        if (isMineA && !isMineB) return -1;
+        if (!isMineA && isMineB) return 1;
+      }
+
       if (filter === 'new') return b.createdAt - a.createdAt;
       if (filter === 'top') return (b.tvl || 0) - (a.tvl || 0);
       return 0;
     });
 
   const formatTVL = (tvl: number) => {
+    if (!tvl) return '0 SOL';
     if (tvl >= 1000) return `${(tvl / 1000).toFixed(1)}K SOL`;
     return `${tvl.toFixed(2)} SOL`;
   };
 
   const formatDate = (timestamp: number) => {
+    if (!timestamp) return 'Just now';
     const date = new Date(timestamp * 1000);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -91,8 +159,14 @@ export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
     CONSERVATIVE: 'from-emerald-500 to-teal-500',
   };
 
+  // 選択（コピー/Fork）ハンドラ
+  const handleSelect = (e: React.MouseEvent, strategy: DiscoveredStrategy) => {
+    e.stopPropagation(); // 詳細モーダルが開くのを防ぐ
+    onStrategySelect(strategy);
+  };
+
   return (
-    <div className="min-h-screen bg-[#030303] text-white px-4 py-6">
+    <div className="min-h-screen bg-[#030303] text-white px-4 py-6 pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -101,7 +175,7 @@ export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
         </div>
         <button 
           onClick={onToggleView}
-          className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors"
+          className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors text-white/70 hover:text-white"
           title="Switch to Swipe View"
         >
           <Layers className="w-5 h-5" />
@@ -116,12 +190,12 @@ export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search strategies..."
-          className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-orange-500/50"
+          className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-orange-500/50 transition-colors"
         />
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
         {[
           { key: 'all', label: 'All', icon: null },
           { key: 'trending', label: 'Hot', icon: Flame },
@@ -153,18 +227,23 @@ export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
         <EmptyState />
       ) : (
         <div className="space-y-3">
-          <AnimatePresence>
+          <AnimatePresence mode="popLayout">
             {filteredStrategies.map((strategy, i) => {
               const TypeIcon = typeIcons[strategy.type] || Target;
+              // 自分の戦略かどうか判定
+              const isMine = publicKey && strategy.ownerPubkey === publicKey.toBase58();
+
               return (
                 <motion.div
                   key={strategy.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: i * 0.03 }}
+                  transition={{ delay: i * 0.05 }}
                   onClick={() => setSelectedStrategy(strategy)}
-                  className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl hover:border-white/20 hover:bg-white/[0.05] cursor-pointer transition-all group"
+                  className={`relative p-4 bg-white/[0.03] border rounded-2xl cursor-pointer transition-all group overflow-hidden ${
+                    isMine ? 'border-orange-500/30 bg-orange-500/[0.05]' : 'border-white/10 hover:border-white/20 hover:bg-white/[0.05]'
+                  }`}
                 >
                   <div className="flex items-center gap-4">
                     {/* Pizza Preview */}
@@ -175,50 +254,62 @@ export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-bold truncate">{strategy.name}</h3>
-                        <span className={`px-1.5 py-0.5 rounded text-xs bg-gradient-to-r ${typeColors[strategy.type]} text-white flex items-center gap-1`}>
+                        <h3 className="font-bold truncate text-white">{strategy.name}</h3>
+                        <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gradient-to-r ${typeColors[strategy.type]} text-white flex items-center gap-1`}>
                           <TypeIcon className="w-3 h-3" />
                         </span>
+                        {/* 自分の戦略ならバッジを表示 */}
+                        {isMine && <span className="text-[10px] bg-orange-500 text-white px-1.5 rounded font-bold">YOU</span>}
                       </div>
                       
                       {strategy.description && (
-                        <p className="text-xs text-white/50 truncate mb-1">{strategy.description}</p>
+                        <p className="text-xs text-white/50 truncate mb-1.5">{strategy.description}</p>
                       )}
                       
-                      <div className="flex items-center gap-3 text-xs text-white/40">
+                      <div className="flex items-center gap-3 text-xs text-white/40 font-mono">
                         <span className="flex items-center gap-1">
                           <Users className="w-3 h-3" />
-                          {strategy.ownerPubkey.slice(0, 4)}...{strategy.ownerPubkey.slice(-4)}
+                          {strategy.ownerPubkey ? `${strategy.ownerPubkey.slice(0, 4)}...` : 'Unknown'}
                         </span>
                         <span>{formatDate(strategy.createdAt)}</span>
                       </div>
                     </div>
 
-                    {/* TVL */}
-                    <div className="text-right shrink-0">
-                      <div className="flex items-center gap-1 font-bold text-emerald-400">
-                        <TrendingUp className="w-4 h-4" />
-                        {formatTVL(strategy.tvl)}
+                    {/* Actions & Stats */}
+                    <div className="flex items-center gap-3">
+                      {/* TVL */}
+                      <div className="text-right shrink-0">
+                        <div className="flex items-center justify-end gap-1 font-bold text-emerald-400">
+                          <TrendingUp className="w-3.5 h-3.5" />
+                          {formatTVL(strategy.tvl)}
+                        </div>
+                        <p className="text-[10px] text-white/30 mt-0.5">TVL</p>
                       </div>
-                      <p className="text-[10px] text-white/40 mt-0.5">TVL</p>
-                    </div>
 
-                    <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors shrink-0" />
+                      {/* Fork Button */}
+                      <button
+                        onClick={(e) => handleSelect(e, strategy)}
+                        className="p-2.5 rounded-xl bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20 z-10"
+                        title="Fork Strategy"
+                      >
+                        <GitFork className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   
                   {/* Token Pills */}
-                  <div className="flex gap-1 mt-3 flex-wrap">
+                  <div className="flex gap-1.5 mt-3 flex-wrap">
                     {strategy.tokens.slice(0, 5).map((token) => (
                       <span 
                         key={token.symbol}
-                        className="px-2 py-0.5 bg-white/5 rounded text-xs text-white/60"
+                        className="px-2 py-0.5 bg-white/5 border border-white/5 rounded text-[10px] text-white/60 font-mono"
                       >
                         {token.symbol} {token.weight}%
                       </span>
                     ))}
                     {strategy.tokens.length > 5 && (
-                      <span className="px-2 py-0.5 bg-white/5 rounded text-xs text-white/40">
-                        +{strategy.tokens.length - 5} more
+                      <span className="px-2 py-0.5 bg-white/5 rounded text-[10px] text-white/40">
+                        +{strategy.tokens.length - 5}
                       </span>
                     )}
                   </div>
@@ -229,9 +320,10 @@ export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
         </div>
       )}
 
+      {/* Empty Search Result */}
       {filteredStrategies.length === 0 && !loading && strategies.length > 0 && (
         <div className="text-center py-12 text-white/40">
-          No strategies found matching your search
+          No strategies found matching "{search}"
         </div>
       )}
 
@@ -239,22 +331,18 @@ export const ListDiscoverView = ({ onToggleView }: ListDiscoverViewProps) => {
       <StrategyDetailModal
         isOpen={!!selectedStrategy}
         strategy={selectedStrategy ? {
-          id: selectedStrategy.id,
-          address: selectedStrategy.id, // Assuming ID is address/pubkey
-          ownerPubkey: selectedStrategy.ownerPubkey,
-          name: selectedStrategy.name,
-          type: selectedStrategy.type,
-          tokens: selectedStrategy.tokens,
-          description: selectedStrategy.description,
-          tvl: selectedStrategy.tvl,
-          createdAt: selectedStrategy.createdAt,
-          pnl: 0 // Mock for now
+          ...selectedStrategy,
+          address: selectedStrategy.id, 
+          pnl: 0 // Mock pnl
         } : null}
         onClose={() => setSelectedStrategy(null)}
-        onSuccess={() => {
-          // Ideally refresh strategies
-          setSelectedStrategy(null);
+        onSelect={() => {
+          if (selectedStrategy) {
+            onStrategySelect(selectedStrategy);
+            setSelectedStrategy(null);
+          }
         }}
+        showSelectButton={true} 
       />
     </div>
   );
@@ -265,17 +353,17 @@ const EmptyState = () => (
   <motion.div
     initial={{ opacity: 0, scale: 0.95 }}
     animate={{ opacity: 1, scale: 1 }}
-    className="flex flex-col items-center justify-center py-16 text-center"
+    className="flex flex-col items-center justify-center py-20 text-center"
   >
     <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
       <span className="text-4xl">🍕</span>
     </div>
     <h3 className="text-xl font-bold mb-2">No Strategies Yet</h3>
-    <p className="text-white/50 text-sm max-w-xs mb-6">
+    <p className="text-white/50 text-sm max-w-xs mb-8 leading-relaxed">
       Be the first to create a strategy pizza! Your creation will appear here for the community to discover.
     </p>
-    <p className="text-xs text-white/30">
+    <div className="text-xs text-white/30 px-3 py-1 rounded-full border border-white/10">
       Create → Discover → Grow 🚀
-    </p>
+    </div>
   </motion.div>
 );

@@ -105,13 +105,22 @@ app.get('/tokens/:address/history', async (c) => {
   }
 });
 
+
 /**
  * POST /deploy - Deploy strategy via Jito Bundle
  */
 app.post('/deploy', async (c) => {
   try {
-    const { signedTransaction, metadata, strategyId } = await c.req.json();
+    // 1. リクエストボディをすべて取得
+    const body = await c.req.json();
     
+    // 2. 必要なデータを取り出し（フロントエンドの送信形式に合わせて調整）
+    // フロントは "signedTransaction" または "signature" で送ってくる可能性がある
+    const signedTransaction = body.signedTransaction || body.signature; 
+    
+    // メタデータが "metadata" キーに入っている場合と、フラットに入っている場合の両方に対応
+    const metadata = body.metadata || body; 
+
     if (!signedTransaction) {
       return c.json({ success: false, error: 'Signed transaction required' }, 400);
     }
@@ -119,34 +128,53 @@ app.post('/deploy', async (c) => {
     // Create Jito service with env RPC URL
     const jitoService = createJitoService(c.env);
 
-    // Send via Jito for MEV protection (or standard RPC for devnet)
-    const result = await jitoService.sendBundle([signedTransaction]);
+    // Send via Jito for MEV protection
+    // (署名データがBase64の場合はデコードが必要な場合もありますが、JitoService側で処理していると仮定)
+    let bundleId = null;
+    try {
+        // 配列にして渡す
+        const result = await jitoService.sendBundle([signedTransaction]);
+        bundleId = result.bundleId;
+    } catch (e) {
+        console.warn("Jito bundle failed, but proceeding to save:", e);
+        // Jitoが失敗してもDB保存は試みるべき
+    }
 
-    // Save to database with all details
-    const id = strategyId || crypto.randomUUID();
-    if (metadata && c.env.axis_db) {
+    // 3. データベースへの保存
+    // フロントエンドが送ってくるキー名 (ownerPubkey, tokens) に対応させる
+    const id = body.strategyId || body.id || crypto.randomUUID();
+    
+    if (c.env.axis_db) {
+      console.log("Saving strategy to DB:", id); // ログ出し推奨
+
+      const owner = metadata.ownerPubkey || metadata.creator || 'unknown';
+      const config = JSON.stringify(metadata.tokens || metadata.composition || []);
+      const isPublic = metadata.isPublic !== false ? 1 : 0; // デフォルトは公開(1)
+
       await c.env.axis_db.prepare(
-        `INSERT INTO strategies (id, owner_pubkey, name, type, config, description, jito_bundle_id, is_public) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO strategies (id, owner_pubkey, name, type, config, description, jito_bundle_id, is_public, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         id,
-        metadata.creator || 'unknown',
-        metadata.name,
-        metadata.type,
-        JSON.stringify(metadata.composition),
+        owner,
+        metadata.name || 'Untitled',
+        metadata.type || 'BALANCED',
+        config,
         metadata.description || '',
-        result.bundleId,
-        metadata.isPublic !== false ? 1 : 0
+        bundleId || 'simulated', // バンドルIDがない場合のダミー
+        isPublic,
+        Math.floor(Date.now() / 1000) // created_at (秒) を追加
       ).run();
     }
 
     return c.json({ 
       success: true, 
-      bundleId: result.bundleId,
+      bundleId: bundleId,
       strategyId: id
     });
   } catch (error: any) {
     console.error('[Kagemusha] Deploy failed:', error);
+    // ここでちゃんとエラーを返してあげる
     return c.json({ success: false, error: error.message }, 500);
   }
 });

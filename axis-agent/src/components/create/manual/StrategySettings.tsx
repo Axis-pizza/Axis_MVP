@@ -1,7 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, Clock, ArrowLeftRight, Percent, Upload, Image as ImageIcon, X } from 'lucide-react';
-import { api } from '../../../services/api'; // 画像アップロードAPIがある場合
+import { RefreshCw, Clock, ArrowLeftRight, Percent } from 'lucide-react';
 
 interface StrategySettingsProps {
   onBack: () => void;
@@ -9,48 +8,16 @@ interface StrategySettingsProps {
 }
 
 export const StrategySettings = ({ onBack, onNext }: StrategySettingsProps) => {
-  // --- Existing States ---
+  // --- States ---
   const [swapFee, setSwapFee] = useState(0.3);
   const [automationEnabled, setAutomationEnabled] = useState(true);
   const [triggerType, setTriggerType] = useState<'DEVIATION' | 'TIME'>('DEVIATION');
   const [deviationThreshold, setDeviationThreshold] = useState(5);
   const [timeInterval, setTimeInterval] = useState(24);
+  
+  // Identity
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
-
-  // --- New: Image Upload State ---
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Handle Image Selection
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Create local preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-    setImageFile(file);
-
-    // Upload to API (Optional: 即時アップロードする場合)
-    // setIsUploading(true);
-    // try {
-    //   const res = await api.uploadImage(file);
-    //   if (res.success) setImagePreview(res.url);
-    // } catch (e) { ... } finally { setIsUploading(false); }
-  };
-
-  const clearImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setImageFile(null);
-    setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -61,75 +28,36 @@ export const StrategySettings = ({ onBack, onNext }: StrategySettingsProps) => {
 
       <div className="space-y-6">
         
-        {/* --- Branding Section (Name, Ticker, Logo) --- */}
+        {/* --- Branding Section (Name & Ticker Only) --- */}
         <div className="p-6 bg-[#1C1917] rounded-2xl border border-[#D97706]/10">
           <h3 className="text-sm font-bold text-[#78716C] uppercase tracking-wider mb-4">Identity</h3>
           
-          <div className="flex gap-6 items-start">
-            {/* Logo Upload */}
-            <div className="shrink-0">
-               <input 
-                 type="file" 
-                 ref={fileInputRef} 
-                 onChange={handleImageSelect} 
-                 className="hidden" 
-                 accept="image/*"
-               />
-               <div 
-                 onClick={() => fileInputRef.current?.click()}
-                 className={`w-24 h-24 rounded-full border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden relative group ${
-                   imagePreview 
-                     ? 'border-[#D97706] bg-black' 
-                     : 'border-[#D97706]/30 hover:border-[#D97706] hover:bg-[#D97706]/5'
-                 }`}
-               >
-                 {imagePreview ? (
-                   <>
-                     <img src={imagePreview} alt="Logo" className="w-full h-full object-cover" />
-                     {/* Hover Overlay to Remove */}
-                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                       <button onClick={clearImage} className="p-1 bg-red-500/20 text-red-500 rounded-full">
-                         <X className="w-5 h-5" />
-                       </button>
-                     </div>
-                   </>
-                 ) : (
-                   <>
-                     <ImageIcon className="w-6 h-6 text-[#78716C] mb-1 group-hover:text-[#D97706]" />
-                     <span className="text-[10px] text-[#78716C] font-bold">Upload</span>
-                   </>
-                 )}
-               </div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-[#78716C] mb-1 block">Strategy Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Solana Blue Chip Index"
+                className="w-full p-3 bg-[#0C0A09] border border-[#D97706]/20 rounded-xl text-sm focus:outline-none focus:border-[#D97706] text-[#E7E5E4] placeholder-[#57534E]"
+              />
             </div>
-
-            {/* Name & Ticker Inputs */}
-            <div className="flex-1 space-y-4">
-              <div>
-                <label className="text-xs text-[#78716C] mb-1 block">Strategy Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Solana Blue Chip Index"
-                  className="w-full p-3 bg-[#0C0A09] border border-[#D97706]/20 rounded-xl text-sm focus:outline-none focus:border-[#D97706] text-[#E7E5E4] placeholder-[#57534E]"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-[#78716C] mb-1 block">Ticker Symbol</label>
-                <input
-                  type="text"
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                  placeholder="e.g. SBCI"
-                  maxLength={5}
-                  className="w-full p-3 bg-[#0C0A09] border border-[#D97706]/20 rounded-xl text-sm focus:outline-none focus:border-[#D97706] font-mono uppercase text-[#E7E5E4] placeholder-[#57534E]"
-                />
-              </div>
+            <div>
+              <label className="text-xs text-[#78716C] mb-1 block">Ticker Symbol</label>
+              <input
+                type="text"
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                placeholder="e.g. SBCI"
+                maxLength={5}
+                className="w-full p-3 bg-[#0C0A09] border border-[#D97706]/20 rounded-xl text-sm focus:outline-none focus:border-[#D97706] font-mono uppercase text-[#E7E5E4] placeholder-[#57534E]"
+              />
             </div>
           </div>
         </div>
 
-        {/* --- Swap Fee (Existing) --- */}
+        {/* --- Swap Fee --- */}
         <div className="p-5 bg-[#1C1917] rounded-2xl border border-[#D97706]/10">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold flex items-center gap-2 text-[#E7E5E4]">
@@ -140,7 +68,7 @@ export const StrategySettings = ({ onBack, onNext }: StrategySettingsProps) => {
           <input
             type="range"
             min="0.01"
-            max="2.0"  // ★修正: 5.0 -> 2.0 (これでも高い方ですが許容範囲)
+            max="2.0"
             step="0.01"
             value={swapFee}
             onChange={(e) => setSwapFee(parseFloat(e.target.value))}
@@ -153,7 +81,7 @@ export const StrategySettings = ({ onBack, onNext }: StrategySettingsProps) => {
           </div>
         </div>
 
-        {/* --- Automation & Rebalancing (Existing) --- */}
+        {/* --- Automation & Rebalancing --- */}
         <div className="p-5 bg-[#1C1917] rounded-2xl border border-[#D97706]/10">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -265,7 +193,7 @@ export const StrategySettings = ({ onBack, onNext }: StrategySettingsProps) => {
         <button
           onClick={() => onNext(
             { swapFee, automationEnabled, triggerType, deviationThreshold, timeInterval }, 
-            { name, symbol, imageFile, imagePreview } // imageFileとPreviewを渡す
+            { name, symbol, image: "" } // 画像は空文字で渡す
           )}
           disabled={!name || !symbol}
           className="flex-1 py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] text-[#0C0A09] font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.98] transition-all"
