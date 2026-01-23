@@ -439,6 +439,134 @@ app.post('/strategies/:id/watchlist', async (c) => {
   }
 });
 
+// ---------------------------------------------------------
+// 🧠 Helper: XP加算ロジック (紹介報酬 10% 自動付与)
+// ---------------------------------------------------------
+async function addXP(
+  db: D1Database, 
+  pubkey: string, 
+  amount: number, 
+  actionType: string, 
+  description: string,
+  relatedId: string | null = null
+) {
+  // 1. 本人に付与
+  await db.prepare(
+    `INSERT INTO xp_ledger (user_pubkey, amount, action_type, description, related_id) 
+     VALUES (?, ?, ?, ?, ?)`
+  ).bind(pubkey, amount, actionType, description, relatedId).run();
+
+  // ユーザーの合計XPを更新
+  await db.prepare(
+    `UPDATE users SET total_xp = total_xp + ? WHERE pubkey = ?`
+  ).bind(amount, pubkey).run();
+
+  // 2. 紹介者ボーナス (再帰防止のため REFERRAL_BONUS 自体は対象外)
+  if (actionType !== 'REFERRAL_BONUS') {
+    const user = await db.prepare(
+      "SELECT referrer_id FROM users WHERE pubkey = ?"
+    ).bind(pubkey).first();
+
+    if (user && user.referrer_id) {
+      const bonus = amount * 0.1; // 10%
+      if (bonus >= 0.1) { // 小さすぎる端数は無視
+        console.log(`🎁 Referral Bonus: ${user.referrer_id} gets ${bonus} XP`);
+        // 再帰呼び出し (紹介者の紹介者には連鎖させない仕様にするならここで止める)
+        await addXP(
+          db, 
+          user.referrer_id as string, 
+          bonus, 
+          'REFERRAL_BONUS', 
+          `Bonus from ${pubkey.slice(0,4)}...`, 
+          pubkey
+        );
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------
+// 👤 Routes
+// ---------------------------------------------------------
+
+// ユーザー取得 & 自動登録 & 招待紐付け
+app.get('/users/:pubkey', async (c) => {
+  const pubkey = c.req.param('pubkey');
+  const refCode = c.req.query('ref'); // クエリパラメータ ?ref=xxx
+
+  try {
+    let user = await c.env.axis_db.prepare("SELECT * FROM users WHERE pubkey = ?").bind(pubkey).first();
+
+    // 新規登録
+    if (!user) {
+      console.log(`🆕 New User: ${pubkey}`);
+      let referrerId = null;
+
+      // 招待コードの有効性チェック
+      if (refCode && refCode !== pubkey) {
+        const parent = await c.env.axis_db.prepare("SELECT pubkey FROM users WHERE pubkey = ?").bind(refCode).first();
+        if (parent) {
+          referrerId = refCode;
+          console.log(`🔗 Linked to: ${referrerId}`);
+        }
+      }
+
+      await c.env.axis_db.prepare(
+        "INSERT INTO users (pubkey, total_xp, referrer_id) VALUES (?, 0, ?)"
+      ).bind(pubkey, referrerId).run();
+
+      // 初期ボーナス (招待された人は +100 XP スタートなど)
+      if (referrerId) {
+        await addXP(c.env.axis_db, pubkey, 100, 'REFERRAL_SIGNUP_BONUS', 'Welcome Bonus');
+      }
+
+      user = await c.env.axis_db.prepare("SELECT * FROM users WHERE pubkey = ?").bind(pubkey).first();
+    }
+    return c.json({ success: true, user });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message });
+  }
+});
+
+// デイリーチェックイン (テスト用)
+app.post('/users/:pubkey/checkin', async (c) => {
+  const pubkey = c.req.param('pubkey');
+  try {
+    // 24時間以内のチェックインを確認
+    const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
+    const existing = await c.env.axis_db.prepare(
+      "SELECT id FROM xp_ledger WHERE user_pubkey = ? AND action_type = 'DAILY_CHECKIN' AND created_at > ?"
+    ).bind(pubkey, oneDayAgo).first();
+
+    if (existing) return c.json({ success: false, message: 'Come back tomorrow!' });
+
+    // 10 XP付与 (紹介者には自動で +1 XP)
+    await addXP(c.env.axis_db, pubkey, 10, 'DAILY_CHECKIN', 'Daily Login');
+    
+    // 最新情報を返す
+    const updated = await c.env.axis_db.prepare("SELECT * FROM users WHERE pubkey = ?").bind(pubkey).first();
+    return c.json({ success: true, user: updated });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message });
+  }
+});
+
+// リーダーボード取得 (TOP 50)
+app.get('/leaderboard', async (c) => {
+  try {
+    const { results } = await c.env.axis_db.prepare(
+      `SELECT pubkey, username, total_xp, rank_tier 
+       FROM users 
+       ORDER BY total_xp DESC 
+       LIMIT 50`
+    ).all();
+    
+    return c.json({ success: true, leaderboard: results });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message });
+  }
+});
+
 /**
  * GET /strategies/:id/watchlist
  * Check status

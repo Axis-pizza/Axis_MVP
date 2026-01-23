@@ -36,7 +36,7 @@ app.route('/auth', authRoutes);
 app.route('/', userRoutes);
 app.route('/', vaultRoutes);
 app.route('/', miscRoutes);
-app.route('/kagemusha', kagemushaRoutes);
+app.route('/', kagemushaRoutes);
 app.route('/upload', uploadRoutes);
 
 
