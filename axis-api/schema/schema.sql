@@ -1,5 +1,5 @@
 -- Users Table (認証・プロファイル・招待機能対応版)
-DROP TABLE IF EXISTS users;
+
 CREATE TABLE users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE,         -- Walletログイン用にNULL許可に変更
@@ -16,7 +16,7 @@ CREATE TABLE users (
 );
 
 -- Invites Table (変更なし: そのままでOK)
-DROP TABLE IF EXISTS invites;
+
 CREATE TABLE invites (
   code TEXT PRIMARY KEY,       
   creator_id TEXT NOT NULL,    
@@ -29,7 +29,7 @@ INSERT OR IGNORE INTO invites (code, creator_id) VALUES ('AXIS-ALPHA', 'admin-id
 INSERT OR IGNORE INTO invites (code, creator_id) VALUES ('AXIS-BETA', 'admin-id');
 
 -- Vaults Table (変更なし: 完璧です)
-DROP TABLE IF EXISTS vaults;
+
 CREATE TABLE vaults (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE vaults (
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
-DROP TABLE IF EXISTS strategies;
+
 CREATE TABLE strategies (
   id TEXT PRIMARY KEY,
   owner_pubkey TEXT NOT NULL,
@@ -59,4 +59,22 @@ CREATE TABLE strategies (
   status TEXT DEFAULT 'active',
   total_deposited REAL DEFAULT 0,
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE TABLE strategy_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  strategy_id TEXT NOT NULL,       -- 戦略ID
+  nav REAL NOT NULL,               -- 純資産価値 (Net Asset Value) - 基準価格
+  tvl REAL,                        -- その時点のTVL
+  timestamp INTEGER NOT NULL       -- 記録日時 (Unix Time)
+);
+
+-- 高速化のためのインデックス
+CREATE INDEX idx_snapshots_strategy_time ON strategy_snapshots(strategy_id, timestamp);
+
+CREATE TABLE IF NOT EXISTS watchlist (
+  user_pubkey TEXT NOT NULL,
+  strategy_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (user_pubkey, strategy_id)
 );

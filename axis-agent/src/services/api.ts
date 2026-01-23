@@ -17,10 +17,28 @@ export const api = {
     return res.json();
   },
 
+  // Watchlistの切り替え
+  async toggleWatchlist(id: string, userPubkey: string) {
+    const res = await fetch(`${API_BASE}/kagemusha/strategies/${id}/watchlist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userPubkey })
+    });
+    return res.json();
+  },
+
+  // Watchlistの状態確認
+  async checkWatchlist(id: string, userPubkey: string) {
+    const res = await fetch(`${API_BASE}/kagemusha/strategies/${id}/watchlist?user=${userPubkey}`);
+    return res.json();
+  },
+
   /**
    * Get token list with prices
    */
   async getTokens() {
+    // 古いコードが残っていないか確認。
+    // バックエンドの /kagemusha/tokens を叩くようにする
     const res = await fetch(`${API_BASE}/kagemusha/tokens`);
     return res.json();
   },
@@ -89,6 +107,16 @@ export const api = {
    */
   async getVaults() {
     const res = await fetch(`${API_BASE}/vaults`);
+    return res.json();
+  },
+
+  /**
+   * Get strategy performance chart
+   * period: '1d' | '7d' | '30d'
+   * type: 'line' | 'candle'
+   */
+  async getStrategyChart(id: string, period = '7d', type: 'line' | 'candle' = 'line') {
+    const res = await fetch(`${API_BASE}/kagemusha/strategies/${id}/chart?period=${period}&type=${type}`);
     return res.json();
   },
 

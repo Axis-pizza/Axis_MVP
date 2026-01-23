@@ -1,10 +1,11 @@
+// src/components/discover/SwipeDiscoverView.tsx
+
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCw, Layers, Loader2, Sparkles } from 'lucide-react';
 import { SwipeCard } from './SwipeCard';
 import { api } from '../../services/api';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { fetchSolanaTokens } from '../../services/coingecko';
 
 interface TokenData {
   price: number;
@@ -28,39 +29,21 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
   const [userMap, setUserMap] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    const loadAllData = async () => {
+    const loadData = async () => {
       setLoading(true);
-      try {
-        console.log("🚀 Starting Data Load...");
+      console.log("🚀 Loading Data...");
 
-        const [publicRes, myRes, coingeckoTokens] = await Promise.all([
-          api.discoverStrategies(50).catch(e => { console.warn("Discover Error:", e); return { strategies: [] }; }),
-          publicKey ? api.getUserStrategies(publicKey.toBase58()).catch(e => { console.warn("MyStrat Error:", e); return { strategies: [] }; }) : Promise.resolve({ strategies: [] }),
-          fetchSolanaTokens().catch(e => { console.warn("CoinGecko Error:", e); return []; })
+      try {
+        // 1. まず戦略リストだけを取得 (ここが失敗すると何も出ないので最優先)
+        // Publicな戦略と、自分の戦略を並列取得
+        const [publicRes, myRes] = await Promise.all([
+          api.discoverStrategies(50).catch(e => { console.error("Strategy API Error:", e); return { strategies: [] }; }),
+          publicKey ? api.getUserStrategies(publicKey.toBase58()).catch(() => ({ strategies: [] })) : Promise.resolve({ strategies: [] })
         ]);
 
-        // 1. Token Map作成 (CoinGeckoベース)
-        const tMap: Record<string, TokenData> = {};
-        coingeckoTokens.forEach((t) => {
-           tMap[t.symbol.toUpperCase()] = {
-             price: t.price || 0,
-             change24h: t.change24h || 0,
-             logoURI: t.logoURI,
-             address: t.address
-           };
-        });
+        console.log("✅ Strategies Loaded:", publicRes?.strategies?.length || 0);
 
-        // フォールバック: CoinGeckoにない場合の主要トークン
-        if (!tMap['SOL']?.logoURI) {
-            tMap['SOL'] = { ...tMap['SOL'], price: tMap['SOL']?.price || 150, logoURI: 'https://assets.coingecko.com/coins/images/4128/large/solana.png?1547769862' };
-        }
-        if (!tMap['USDC']?.logoURI) {
-            tMap['USDC'] = { ...tMap['USDC'], price: tMap['USDC']?.price || 1, logoURI: 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png?1547042389' };
-        }
-
-        setTokenMap(tMap);
-
-        // 2. 戦略リスト結合
+        // 戦略リストの結合と重複除去
         let rawList: any[] = [];
         try {
           const local = JSON.parse(localStorage.getItem('my_local_strategies') || '[]');
@@ -74,38 +57,64 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
         const publicStrats = publicRes.strategies || [];
         rawList = [...rawList, ...myApiStrats, ...publicStrats];
 
-        // 重複除去
         const uniqueMap = new Map();
         rawList.forEach(item => {
           const key = item.id || item.signature || Math.random().toString();
           if (!uniqueMap.has(key)) uniqueMap.set(key, item);
         });
         const uniqueStrategies = Array.from(uniqueMap.values());
+        
+        // ★重要: ここで一度戦略をセットしてしまう (トークン取得を待たない)
         setStrategies(uniqueStrategies);
+        setLoading(false); // カードを表示開始
 
-        // 3. プロフィール取得 (ProfileViewと同じロジックで取得)
+        // 2. 裏でトークン情報を取得 (バックエンド経由)
+        api.getTokens()
+          .then((tokensRes) => {
+            console.log("✅ Tokens Loaded:", tokensRes?.tokens?.length || 0);
+            const tMap: Record<string, TokenData> = {};
+            const tokenList = tokensRes.tokens || [];
+            
+            tokenList.forEach((t: any) => {
+               tMap[t.symbol.toUpperCase()] = {
+                 price: t.price || 0,
+                 change24h: t.change24h || 0,
+                 logoURI: t.logoURI,
+                 address: t.address
+               };
+            });
+            
+            // フォールバック
+            if (!tMap['SOL']) tMap['SOL'] = { price: 150, change24h: 0, logoURI: 'https://assets.coingecko.com/coins/images/4128/large/solana.png' };
+            if (!tMap['USDC']) tMap['USDC'] = { price: 1, change24h: 0, logoURI: 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png' };
+            
+            setTokenMap(tMap);
+          })
+          .catch(e => {
+            console.warn("⚠️ Token fetch failed, using fallback prices.", e);
+            // 失敗しても戦略リストは消えない
+          });
+
+        // 3. 裏でプロフィール画像を取得
         const creators = new Set(uniqueStrategies.map((s: any) => s.ownerPubkey || s.creator).filter(Boolean));
         const profiles: Record<string, any> = {};
         
-        await Promise.all(Array.from(creators).map(async (pubkey: any) => {
-          try {
-            const user = await api.getUser(pubkey);
-            // エラーがなく、データが存在する場合のみ保存
-            if (user && !user.error) {
-                profiles[pubkey] = user;
-            }
-          } catch (e) { /* ignore */ }
-        }));
-        setUserMap(profiles);
+        // 少しずつ取得
+        for (const pubkey of Array.from(creators)) {
+           api.getUser(pubkey).then(user => {
+             if (user && user.avatar_url) {
+                setUserMap(prev => ({ ...prev, [pubkey as string]: user }));
+             }
+           }).catch(() => {});
+        }
 
       } catch (e) {
-        console.error("Discover load error:", e);
-      } finally {
+        console.error("Critical Error:", e);
         setLoading(false);
       }
     };
 
-    loadAllData();
+    loadData();
   }, [publicKey]);
 
   const calculateRealtimeROI = (tokens: any[]) => {
@@ -143,8 +152,6 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
       const owner = s.ownerPubkey || s.creator;
       const userProfile = userMap[owner];
 
-      // ★修正: ProfileViewと同様のPFP取得ロジックを適用
-      // DBのカラム名が avatar_url か pfpUrl かの揺らぎを吸収し、Proxyを通す
       let finalPfpUrl = null;
       if (userProfile) {
           const rawUrl = userProfile.pfpUrl || userProfile.avatar_url;
@@ -162,7 +169,7 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
         roi: calculateRealtimeROI(tokens), 
         tvl: Number(s.tvl || s.initialInvestment || 0),
         creatorAddress: owner || 'Unknown',
-        creatorPfpUrl: finalPfpUrl, // Proxy適用済みのURL
+        creatorPfpUrl: finalPfpUrl,
         description: s.description || userProfile?.bio || '',
         createdAt: s.createdAt || (Date.now() / 1000)
       };
@@ -179,9 +186,19 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
     return (
       <div className="flex flex-col items-center justify-center h-screen text-white/50 bg-[#030303]">
         <Loader2 className="w-10 h-10 animate-spin text-[#D97706] mb-4" />
-        <p className="text-sm font-mono animate-pulse">Fetching Market Data...</p>
+        <p className="text-sm font-mono animate-pulse">Loading Index Data...</p>
       </div>
     );
+  }
+
+  // データがなくても空っぽの画面を表示（エラー回避）
+  if (enrichedStrategies.length === 0) {
+      return (
+        <div className="relative w-full h-[100dvh] bg-[#030303] flex flex-col items-center justify-center p-4">
+            <h3 className="text-xl font-bold text-white mb-2">No Strategies Found</h3>
+            <p className="text-white/50 text-sm">Create one to get started.</p>
+        </div>
+      );
   }
 
   if (currentIndex >= enrichedStrategies.length) {
