@@ -73,7 +73,7 @@ export const FloatingNav = ({ currentView, onNavigate }: FloatingNavProps) => {
         {/* Profile */}
         <NavButton
           icon={User}
-          label="Profile"
+          label="Leaderboard"
           active={currentView === 'PROFILE'}
           onClick={() => onNavigate('PROFILE')}
         />

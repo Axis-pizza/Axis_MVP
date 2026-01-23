@@ -13,3 +13,6 @@ binding = "AI"
 [[vectorize]]
 binding = "VECTOR_INDEX"
 index_name = "axis-vector-index"
+
+[triggers]
+crons = ["0 * * * *"]

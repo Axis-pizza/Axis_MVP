@@ -1,17 +1,13 @@
-/**
- * SwipeCard - Tinder-style swipe card for strategy discovery
- * Smooth gesture support with spring physics
- */
-
-import { motion, useMotionValue, useTransform } from 'framer-motion';
-import type { PanInfo } from 'framer-motion';
-import { ExternalLink, TrendingUp, User } from 'lucide-react';
-import { PizzaChart } from '../common/PizzaChart';
+import { useState, useEffect } from 'react';
+import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
+import { TrendingUp, TrendingDown, Clock, Copy, ExternalLink } from 'lucide-react';
 
 interface Token {
   symbol: string;
   weight: number;
-  logoUrl?: string;
+  address?: string; 
+  logoURI?: string | null;
+  currentPrice?: number;
 }
 
 interface StrategyCardData {
@@ -19,12 +15,13 @@ interface StrategyCardData {
   name: string;
   type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
   tokens: Token[];
-  roi: number; // ROI percentage
+  roi: number;     
   tvl: number;
-  imageUrl?: string;
   creatorAddress: string;
-  creatorPfpUrl?: string;
+  creatorPfpUrl?: string | null; 
   description?: string;
+  createdAt: number;
+  rebalanceType?: string;
 }
 
 interface SwipeCardProps {
@@ -39,6 +36,60 @@ interface SwipeCardProps {
 const SWIPE_THRESHOLD = 100;
 const ROTATION_RANGE = 15;
 
+// --- TokenIcon: 修正版 ---
+// src があってもなくても、まずは表示を試みるロジック
+const TokenIcon = ({ symbol, src, className }: { symbol: string, src?: string | null, className?: string }) => {
+  // 初期値: 親から渡されたsrc、なければJupiter CDN
+  const initialSrc = src || `https://jup.ag/tokens/${symbol}.svg`;
+  const [imgSrc, setImgSrc] = useState<string>(initialSrc);
+  const [errorCount, setErrorCount] = useState(0);
+
+  // srcプロパティが変わったらリセット
+  useEffect(() => {
+    setImgSrc(src || `https://jup.ag/tokens/${symbol}.svg`);
+    setErrorCount(0);
+  }, [src, symbol]);
+
+  const handleError = () => {
+    if (errorCount === 0) {
+      // 1回目失敗: Jupiter CDN (もし初期値がJupiterじゃなかった場合や、念のため再試行)
+      setImgSrc(`https://jup.ag/tokens/${symbol}.svg`);
+      setErrorCount(1);
+    } else if (errorCount === 1) {
+      // 2回目失敗: GitHub Token List
+      setImgSrc(`https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${symbol}/logo.png`);
+      setErrorCount(2);
+    } else {
+      // 3回目失敗: UI Avatars (最終手段)
+      setImgSrc(`https://ui-avatars.com/api/?name=${symbol}&background=random&color=fff&size=128`);
+    }
+  };
+
+  return (
+    <img 
+      src={imgSrc}
+      alt={symbol}
+      className={className}
+      onError={handleError}
+    />
+  );
+};
+
+// ... (helpers)
+const timeAgo = (timestamp: number) => {
+  if (!timestamp) return 'Recently';
+  const seconds = Math.floor(Date.now() / 1000) - timestamp;
+  const days = Math.floor(seconds / 86400);
+  if (days > 0) return `${days}d ago`;
+  const hours = Math.floor(seconds / 3600);
+  if (hours > 0) return `${hours}h ago`;
+  return 'Just now';
+};
+
+const formatCurrency = (val: number) => {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+};
+
 export const SwipeCard = ({ 
   strategy, 
   onSwipeLeft, 
@@ -51,9 +102,8 @@ export const SwipeCard = ({
   const rotate = useTransform(x, [-200, 200], [-ROTATION_RANGE, ROTATION_RANGE]);
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
   
-  // Indicator opacity based on swipe direction
-  const leftIndicatorOpacity = useTransform(x, [-100, 0], [1, 0]);
-  const rightIndicatorOpacity = useTransform(x, [0, 100], [0, 1]);
+  const nopeOpacity = useTransform(x, [-100, -20], [1, 0]);
+  const likeOpacity = useTransform(x, [20, 100], [0, 1]);
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x > SWIPE_THRESHOLD) {
@@ -64,182 +114,176 @@ export const SwipeCard = ({
   };
 
   const typeColors = {
-    AGGRESSIVE: 'from-orange-500 to-red-500',
-    BALANCED: 'from-blue-500 to-purple-500',
-    CONSERVATIVE: 'from-emerald-500 to-teal-500',
+    AGGRESSIVE: 'text-orange-500 bg-orange-500/10 border-orange-500/20',
+    BALANCED: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
+    CONSERVATIVE: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
   };
-
-  const formatROI = (roi: number) => {
-    const sign = roi >= 0 ? '+' : '';
-    return `${sign}${roi.toFixed(1)}%`;
-  };
-
-  const formatTVL = (tvl: number) => {
-    if (tvl >= 1000) return `${(tvl / 1000).toFixed(1)}K`;
-    return tvl.toFixed(2);
-  };
-
-  const explorerUrl = `https://solscan.io/account/${strategy.id}?cluster=devnet`;
 
   return (
     <motion.div
-      className="absolute inset-0 cursor-grab active:cursor-grabbing"
+      className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
       style={{
         x: isTop ? x : 0,
         rotate: isTop ? rotate : 0,
         opacity: isTop ? opacity : 1,
         scale: 1 - index * 0.05,
-        zIndex: 10 - index,
+        zIndex: 100 - index,
+        y: index * 10, 
       }}
       drag={isTop ? 'x' : false}
       dragConstraints={{ left: 0, right: 0 }}
-      dragElastic={0.9}
+      dragElastic={0.7}
       onDragEnd={isTop ? handleDragEnd : undefined}
       onClick={isTop ? onTap : undefined}
       initial={{ scale: 0.95, opacity: 0 }}
-      animate={{ 
-        scale: 1 - index * 0.05, 
-        opacity: 1,
-        y: index * 8,
-      }}
-      exit={{ 
-        x: x.get() > 0 ? 300 : -300, 
-        opacity: 0,
-        transition: { duration: 0.3 }
-      }}
-      transition={{
-        type: 'spring',
-        stiffness: 300,
-        damping: 25,
-      }}
+      animate={{ scale: 1 - index * 0.05, opacity: 1, y: index * 10 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
     >
-      <div className="w-full h-full bg-gradient-to-br from-zinc-900 to-black border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
-        {/* Strategy Image / Pizza Chart */}
-        <div className="relative h-48 bg-gradient-to-br from-white/5 to-transparent flex items-center justify-center">
-          {strategy.imageUrl ? (
-            <img 
-              src={strategy.imageUrl} 
-              alt={strategy.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <PizzaChart slices={strategy.tokens} size={140} showLabels={false} animated={false} />
-          )}
-          
-          {/* Swipe Indicators */}
-          {isTop && (
-            <>
-              <motion.div 
-                className="absolute top-4 left-4 px-4 py-2 bg-red-500/90 text-white font-bold rounded-xl"
-                style={{ opacity: leftIndicatorOpacity }}
-              >
-                SKIP
-              </motion.div>
-              <motion.div 
-                className="absolute top-4 right-4 px-4 py-2 bg-emerald-500/90 text-white font-bold rounded-xl"
-                style={{ opacity: rightIndicatorOpacity }}
-              >
-                VIEW
-              </motion.div>
-            </>
-          )}
+      <div className="w-full h-full bg-[#121212] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col relative select-none">
+        
+        {/* Swipe Indicators */}
+        {isTop && (
+          <>
+            <motion.div 
+              className="absolute top-10 right-10 z-50 border-[6px] border-emerald-500 text-emerald-500 font-black text-4xl px-4 py-2 rounded-xl transform rotate-12 bg-black/40 backdrop-blur-sm pointer-events-none"
+              style={{ opacity: likeOpacity }}
+            >
+              LIKE
+            </motion.div>
+            <motion.div 
+              className="absolute top-10 left-10 z-50 border-[6px] border-red-500 text-red-500 font-black text-4xl px-4 py-2 rounded-xl transform -rotate-12 bg-black/40 backdrop-blur-sm pointer-events-none"
+              style={{ opacity: nopeOpacity }}
+            >
+              PASS
+            </motion.div>
+          </>
+        )}
 
-          {/* Type Badge */}
-          <div className={`absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r ${typeColors[strategy.type]} text-white`}>
-            {strategy.type}
+        {/* --- Header --- */}
+        <div className="p-5 pb-2">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${typeColors[strategy.type]} mb-2`}>
+                {strategy.type}
+              </div>
+              <h2 className="text-2xl font-bold text-white leading-tight line-clamp-1">{strategy.name}</h2>
+            </div>
+            {/* PFP */}
+            <div className="flex flex-col items-center">
+               <div className="w-10 h-10 rounded-full bg-[#292524] p-0.5 border border-white/10 overflow-hidden">
+                 <img 
+                    src={strategy.creatorPfpUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${strategy.creatorAddress}`} 
+                    alt="Creator" 
+                    className="w-full h-full rounded-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/identicon/svg?seed=${strategy.creatorAddress}`;
+                    }}
+                 />
+               </div>
+               <span className="text-[9px] text-white/40 mt-1 font-mono">{strategy.creatorAddress.slice(0,4)}</span>
+            </div>
+          </div>
+          
+          <p className="text-xs text-white/60 line-clamp-2 min-h-[2.5em]">
+            {strategy.description || "No description provided."}
+          </p>
+          
+          <div className="flex items-center gap-3 mt-3">
+             <div className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-lg border border-white/5">
+                <span className="text-[10px] text-white/40 font-mono">
+                  {strategy.id.slice(0, 4)}...{strategy.id.slice(-4)}
+                </span>
+                <Copy className="w-3 h-3 text-white/20" />
+             </div>
+             <div className="flex items-center gap-1 text-[10px] text-white/40">
+                <Clock className="w-3 h-3" />
+                {timeAgo(strategy.createdAt)}
+             </div>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 p-5 flex flex-col">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold truncate mb-1">{strategy.name}</h2>
-              {strategy.description && (
-                <p className="text-sm text-white/50 line-clamp-2">{strategy.description}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="p-3 bg-white/5 rounded-xl">
-              <p className="text-xs text-white/50 mb-1">ROI</p>
-              <p className={`text-lg font-bold ${strategy.roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                <TrendingUp className="w-4 h-4 inline mr-1" />
-                {formatROI(strategy.roi)}
-              </p>
-            </div>
-            <div className="p-3 bg-white/5 rounded-xl">
-              <p className="text-xs text-white/50 mb-1">TVL</p>
-              <p className="text-lg font-bold">{formatTVL(strategy.tvl)} SOL</p>
-            </div>
-          </div>
-
-          {/* Token Allocation */}
-          <div className="mb-4">
-            <p className="text-xs text-white/50 mb-2">Allocation</p>
-            <div className="flex flex-wrap gap-1.5">
-              {strategy.tokens.slice(0, 5).map((token) => (
-                <div 
-                  key={token.symbol}
-                  className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-lg"
-                >
-                  {token.logoUrl ? (
-                    <img src={token.logoUrl} alt={token.symbol} className="w-4 h-4 rounded-full" />
-                  ) : (
-                    <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[8px] font-bold">
-                      {token.symbol[0]}
-                    </div>
-                  )}
-                  <span className="text-xs font-medium">{token.symbol}</span>
-                  <span className="text-xs text-white/40">{token.weight}%</span>
-                </div>
-              ))}
-              {strategy.tokens.length > 5 && (
-                <div className="px-2 py-1 bg-white/5 rounded-lg text-xs text-white/40">
-                  +{strategy.tokens.length - 5}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="mt-auto flex items-center justify-between pt-4 border-t border-white/5">
-            {/* Creator */}
-            <div className="flex items-center gap-2">
-              {strategy.creatorPfpUrl ? (
-                <img 
-                  src={strategy.creatorPfpUrl} 
-                  alt="Creator" 
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-              )}
-              <span className="text-xs text-white/50 font-mono">
-                {strategy.creatorAddress.slice(0, 4)}...{strategy.creatorAddress.slice(-4)}
+        {/* --- Stats --- */}
+        <div className="px-5 py-2 grid grid-cols-2 gap-2">
+           <div className={`col-span-1 p-3 rounded-2xl border ${strategy.roi >= 0 ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'} flex flex-col justify-between h-24`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider opacity-60 flex items-center gap-1">
+                 24h Change
               </span>
-            </div>
+              <div className={`text-3xl font-bold flex items-center gap-1 ${strategy.roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                 {strategy.roi >= 0 ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                 {Math.abs(strategy.roi).toFixed(2)}%
+              </div>
+           </div>
 
-            {/* Explorer Link */}
-            <a 
-              href={explorerUrl}
-              target="_blank"
+           <div className="col-span-1 grid grid-rows-2 gap-2 h-24">
+              <div className="p-2 bg-white/5 border border-white/5 rounded-xl flex flex-col justify-center px-3">
+                 <span className="text-[10px] text-white/40 uppercase font-bold">TVL</span>
+                 <div className="text-lg font-bold text-white">
+                    {strategy.tvl < 0.01 ? '< 0.01' : strategy.tvl.toFixed(2)} <span className="text-xs text-white/50 font-normal">SOL</span>
+                 </div>
+              </div>
+              <div className="p-2 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between px-3">
+                 <span className="text-[10px] text-white/40 uppercase font-bold">Rebalance</span>
+                 <span className="text-xs font-bold text-orange-400">
+                    {strategy.rebalanceType || 'Weekly'}
+                 </span>
+              </div>
+           </div>
+        </div>
+
+        {/* --- Composition List (Updated) --- */}
+        <div className="flex-1 px-5 py-2 overflow-hidden flex flex-col">
+           <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-white/40 uppercase tracking-widest">Composition</span>
+              <span className="text-[10px] text-white/20">{strategy.tokens.length} Assets</span>
+           </div>
+           
+           <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+              {strategy.tokens.map((token, i) => (
+                 <div key={i} className="flex items-center justify-between p-3 bg-white/[0.03] rounded-xl border border-white/5 hover:bg-white/[0.05] transition-colors">
+                    {/* Left: Icon & Symbol & Price */}
+                    <div className="flex items-center gap-3">
+                       <div className="w-9 h-9 rounded-full bg-white/10 overflow-hidden flex-shrink-0 border border-white/5">
+                          <TokenIcon 
+                            symbol={token.symbol} 
+                            src={token.logoURI} 
+                            className="w-full h-full object-cover"
+                          />
+                       </div>
+                       <div>
+                          <div className="font-bold text-sm text-white">{token.symbol}</div>
+                          <div className="text-[11px] text-white/50 font-mono">
+                             {/* ★価格を表示★ */}
+                             {token.currentPrice ? formatCurrency(token.currentPrice) : '$---'}
+                          </div>
+                       </div>
+                    </div>
+                    
+                    {/* Right: Weight & Bar */}
+                    <div className="text-right w-24">
+                       <div className="font-bold text-sm text-white">{token.weight}%</div>
+                       <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
+                          <div className="h-full bg-orange-500 rounded-full" style={{ width: `${token.weight}%` }} />
+                       </div>
+                    </div>
+                 </div>
+              ))}
+           </div>
+        </div>
+
+        {/* --- Footer --- */}
+        <div className="p-3 border-t border-white/5 bg-[#0C0A09] flex justify-center">
+           <a 
+              href={`https://explorer.solana.com/address/${strategy.id}?cluster=devnet`}
+              target="_blank" 
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-xs text-white/50 hover:text-white transition-colors"
-            >
-              Solscan <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
+              className="text-[10px] text-white/20 font-mono hover:text-white/50 flex items-center gap-1 transition-colors"
+           >
+              Contract: {strategy.id.slice(0, 8)}... <ExternalLink className="w-2.5 h-2.5" />
+           </a>
         </div>
+
       </div>
     </motion.div>
   );
 };
-
-export type { StrategyCardData };

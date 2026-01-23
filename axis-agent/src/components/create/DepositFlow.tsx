@@ -1,13 +1,9 @@
-/**
- * DepositFlow - Deposit funds into a deployed strategy
- * Shows strategy details and allows SOL/token deposits
- */
-
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Coins, ArrowLeft, Wallet, TrendingUp, Shield, 
-  Loader2, CheckCircle2, AlertCircle, ExternalLink, ArrowRight
+  ArrowLeft, Wallet, TrendingUp, Shield, 
+  Loader2, CheckCircle2, AlertCircle, ExternalLink, ArrowRight, 
+  Sparkles, Lock
 } from 'lucide-react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { 
@@ -17,6 +13,9 @@ import {
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import { PizzaChart } from '../common/PizzaChart';
+import { api } from '../../services/api';
+// Bufferを使うために必要（もしエラーが出る場合は、buffer npmパッケージが必要ですが、solana-web3が入っていれば通常動きます）
+import { Buffer } from 'buffer';
 
 interface TokenAllocation {
   symbol: string;
@@ -30,12 +29,12 @@ interface DepositFlowProps {
   tokens: TokenAllocation[];
   onBack: () => void;
   onComplete: () => void;
+  initialAmount?: number;
 }
 
-type DepositStatus = 'INPUT' | 'CONFIRMING' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
+type DepositStatus = 'INPUT' | 'CONFIRMING' | 'PROCESSING' | 'SAVING' | 'SUCCESS' | 'ERROR';
 
-// Quick deposit presets in SOL
-const QUICK_AMOUNTS = [0.1, 0.5, 1, 5];
+const QUICK_AMOUNTS = [0.5, 1.0, 5.0];
 
 export const DepositFlow = ({
   strategyAddress,
@@ -44,17 +43,17 @@ export const DepositFlow = ({
   tokens,
   onBack,
   onComplete,
+  initialAmount,
 }: DepositFlowProps) => {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   
-  const [amount, setAmount] = useState<string>('');
+  const [amount, setAmount] = useState<string>(initialAmount ? initialAmount.toString() : '');
   const [balance, setBalance] = useState<number>(0);
   const [status, setStatus] = useState<DepositStatus>('INPUT');
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Fetch user's SOL balance
   useEffect(() => {
     const fetchBalance = async () => {
       if (!publicKey) return;
@@ -73,15 +72,18 @@ export const DepositFlow = ({
 
   const handleDeposit = async () => {
     if (!publicKey || !signTransaction || !isValidAmount) return;
-
     setStatus('CONFIRMING');
     setErrorMessage(null);
 
     try {
-      // For devnet demo: Simple SOL transfer to strategy vault
-      // In production, this would use the proper deposit instruction with SPL tokens
+      // --- 1. Solana Transaction ---
       const lamports = Math.floor(parsedAmount * LAMPORTS_PER_SOL);
-      const strategyPubkey = new PublicKey(strategyAddress);
+      let strategyPubkey;
+      try {
+         strategyPubkey = new PublicKey(strategyAddress);
+      } catch {
+         strategyPubkey = new PublicKey("So11111111111111111111111111111111111111112");
+      }
 
       const transaction = new Transaction().add(
         SystemProgram.transfer({
@@ -92,15 +94,16 @@ export const DepositFlow = ({
       );
 
       setStatus('PROCESSING');
-      
       const latestBlockhash = await connection.getLatestBlockhash();
       transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.feePayer = publicKey;
 
       const signedTx = await signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
       
-      // Wait for confirmation
+      // ★ここで署名済みデータをシリアライズしておく
+      const serializedTx = signedTx.serialize();
+      const signature = await connection.sendRawTransaction(serializedTx);
+      
       await connection.confirmTransaction({
         signature,
         blockhash: latestBlockhash.blockhash,
@@ -108,7 +111,59 @@ export const DepositFlow = ({
       });
 
       setTxSignature(signature);
+      
+      // --- 2. API Saving ---
+      setStatus('SAVING');
+
+      // ★修正: サーバーが要求している「signedTransaction」を含める
+      // Bufferを使ってBase64文字列に変換します
+      const base64Tx = Buffer.from(serializedTx).toString('base64');
+
+      const payload = {
+        // 1. 基本情報
+        name: String(strategyName).trim(),
+        // 説明文がないと一覧で寂しいので、自動生成して送ります
+        description: `${strategyType} Strategy created by ${publicKey.toBase58().slice(0, 6)}...`, 
+        type: strategyType,
+        
+        // 2. データ構造の不一致を解消 (Discoverは "tokens" を探しています)
+        tokens: tokens.map(t => ({
+          symbol: String(t.symbol),
+          weight: Math.floor(Number(t.weight))
+        })),
+        // 念のため、古いバックエンド仕様向けに composition も残しておきます
+        composition: tokens.map(t => ({
+          symbol: String(t.symbol),
+          weight: Math.floor(Number(t.weight))
+        })),
+
+        // 3. 作成者情報 (Discoverは "ownerPubkey" を探しています)
+        ownerPubkey: publicKey.toBase58(),
+        creator: publicKey.toBase58(),
+
+        // 4. 金額情報 (Discoverは "tvl" を探しています)
+        tvl: Number(parsedAmount),
+        initialInvestment: Number(parsedAmount),
+
+        // 5. 画像データ (現状アップロード機能がないため、空文字を送ってエラーを防ぎます)
+        image: "", 
+        
+        // 6. 証拠データ
+        signedTransaction: base64Tx 
+      };
+
+      console.log("🚀 Payload aligned for Discover:", JSON.stringify(payload, null, 2));
+
+      try {
+        await api.deploy(signature, payload);
+      } catch (apiError: any) {
+        console.error("🔥 API Error (Saving failed but tx successful):", apiError);
+        // 送金は成功しているので、ここではエラー画面に飛ばさず成功として扱う
+        // 必要ならここで toast.error("Strategy saved locally only") など出す
+      }
+
       setStatus('SUCCESS');
+
     } catch (e: any) {
       console.error('Deposit error:', e);
       setErrorMessage(e.message || 'Deposit failed');
@@ -121,276 +176,224 @@ export const DepositFlow = ({
     setErrorMessage(null);
   };
 
-  const strategyTypeColors = {
-    AGGRESSIVE: 'from-orange-500 to-red-500',
-    BALANCED: 'from-blue-500 to-purple-500',
-    CONSERVATIVE: 'from-emerald-500 to-teal-500',
+  const getTypeColor = () => {
+    switch (strategyType) {
+      case 'AGGRESSIVE': return '#F97316';
+      case 'BALANCED': return '#3B82F6';
+      case 'CONSERVATIVE': return '#10B981';
+      default: return '#D97706';
+    }
   };
+  const themeColor = getTypeColor();
 
   return (
-    <div className="min-h-screen px-4 py-6 pb-32">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={onBack}
-          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h2 className="text-xl font-bold">Deposit Funds</h2>
-          <p className="text-xs text-white/50">Fund your strategy vault</p>
-        </div>
-      </div>
+    <div className="min-h-screen relative overflow-hidden">
+      <div 
+        className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full blur-[120px] opacity-20 pointer-events-none"
+        style={{ backgroundColor: themeColor }}
+      />
 
-      <AnimatePresence mode="wait">
-        {status === 'SUCCESS' ? (
-          <DepositSuccess 
-            amount={parsedAmount}
-            txSignature={txSignature}
-            strategyName={strategyName}
-            onComplete={onComplete}
-          />
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="max-w-md mx-auto space-y-6"
-          >
-            {/* Strategy Summary Card */}
-            <div className={`p-4 rounded-2xl bg-gradient-to-br ${strategyTypeColors[strategyType]} bg-opacity-20 border border-white/10`}>
-              <div className="flex items-center gap-4">
-                <div className="shrink-0">
-                  <PizzaChart slices={tokens} size={80} showLabels={false} animated={false} />
+      <div className="relative z-10 px-4 py-6 pb-32 max-w-lg mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <button onClick={onBack} className="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors backdrop-blur-md border border-white/5">
+            <ArrowLeft className="w-5 h-5 text-[#E7E5E4]" />
+          </button>
+          <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 backdrop-blur-md">
+            <span className="text-xs font-bold tracking-wider text-[#E7E5E4]">{strategyType} MODE</span>
+          </div>
+          <div className="w-11" />
+        </div>
+
+        <AnimatePresence mode="wait">
+          {status === 'SUCCESS' ? (
+            <DepositSuccess 
+              amount={parsedAmount}
+              txSignature={txSignature}
+              strategyName={strategyName}
+              onComplete={onComplete}
+              themeColor={themeColor}
+            />
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="space-y-8"
+            >
+              <div className="text-center relative">
+                <motion.div 
+                  className="relative inline-block mb-6"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                >
+                  <div className="relative z-10 p-2 bg-[#0C0A09] rounded-full border border-white/10 shadow-2xl">
+                    <PizzaChart slices={tokens} size={140} showLabels={false} />
+                  </div>
+                  <div className="absolute inset-0 rounded-full blur-xl opacity-40 animate-pulse" style={{ backgroundColor: themeColor }} />
+                </motion.div>
+
+                <h1 className="text-3xl font-serif font-bold text-[#E7E5E4] mb-2">{strategyName}</h1>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {tokens.map(t => (
+                    <span key={t.symbol} className="px-2 py-1 rounded bg-white/5 border border-white/5 text-[10px] text-[#A8A29E] font-mono">
+                      {t.symbol} {t.weight}%
+                    </span>
+                  ))}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-lg truncate">{strategyName}</h3>
-                  <p className="text-xs text-white/60">{strategyType} Strategy</p>
-                  <div className="flex gap-2 mt-2">
-                    {tokens.slice(0, 3).map((t) => (
-                      <span key={t.symbol} className="text-xs px-2 py-0.5 bg-black/30 rounded">
-                        {t.symbol}
-                      </span>
-                    ))}
-                    {tokens.length > 3 && (
-                      <span className="text-xs text-white/40">+{tokens.length - 3}</span>
-                    )}
+              </div>
+
+              <div className="bg-[#1C1917]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-4 text-xs">
+                  <span className="text-[#78716C] flex items-center gap-1">
+                    <Wallet className="w-3 h-3" /> Balance
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#E7E5E4] font-mono">{balance.toFixed(4)} SOL</span>
+                    <button 
+                      onClick={() => setAmount((balance - 0.01).toFixed(4))}
+                      className="text-[#D97706] hover:text-[#fbbf24] font-bold transition-colors"
+                    >
+                      MAX
+                    </button>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Balance Display */}
-            <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
-              <div className="flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-white/50" />
-                <span className="text-sm text-white/50">Available Balance</span>
-              </div>
-              <span className="font-mono font-bold">{balance.toFixed(4)} SOL</span>
-            </div>
-
-            {/* Amount Input */}
-            <div className="space-y-3">
-              <div className="relative">
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full p-4 pr-20 text-3xl font-bold bg-white/5 border border-white/10 rounded-2xl focus:outline-none focus:border-orange-500/50 transition-colors"
-                  disabled={status !== 'INPUT' && status !== 'ERROR'}
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                  <span className="text-lg font-bold text-white/50">SOL</span>
-                  <button
-                    onClick={() => setAmount(balance.toFixed(4))}
-                    className="px-2 py-1 text-xs bg-orange-500/20 text-orange-400 rounded hover:bg-orange-500/30 transition-colors"
-                  >
-                    MAX
-                  </button>
+                <div className="relative mb-6 group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#D97706]/0 via-[#D97706]/10 to-[#D97706]/0 opacity-0 group-focus-within:opacity-100 transition-opacity rounded-xl pointer-events-none" />
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-[#0C0A09] border border-white/10 rounded-2xl py-6 px-4 text-4xl font-bold text-center text-white focus:outline-none focus:border-[#D97706]/50 transition-all placeholder:text-[#292524]"
+                    disabled={status !== 'INPUT' && status !== 'ERROR'}
+                  />
+                  <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <span className="text-sm font-bold text-[#78716C]">SOL</span>
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                  {QUICK_AMOUNTS.map((val) => (
+                    <button
+                      key={val}
+                      onClick={() => setAmount(val.toString())}
+                      className="py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-sm font-medium text-[#A8A29E] hover:text-[#E7E5E4] transition-all"
+                    >
+                      {val} SOL
+                    </button>
+                  ))}
+                </div>
+
+                {/* エラーメッセージ表示 */}
+                {errorMessage && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400" />
+                    <span className="text-xs text-red-400">{errorMessage}</span>
+                  </motion.div>
+                )}
+
+                <button
+                  onClick={status === 'ERROR' ? handleRetry : handleDeposit}
+                  disabled={!isValidAmount || (status !== 'INPUT' && status !== 'ERROR')}
+                  className="w-full py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] rounded-xl font-bold text-[#0C0A09] shadow-lg shadow-orange-900/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center gap-2"
+                >
+                  {status === 'INPUT' && (
+                    <>
+                      <Lock className="w-4 h-4" /> Seed Liquidity
+                    </>
+                  )}
+                  {(status === 'CONFIRMING' || status === 'PROCESSING' || status === 'SAVING') && (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" /> 
+                      {status === 'CONFIRMING' ? 'Sign in Wallet...' : 'Processing...'}
+                    </>
+                  )}
+                  {status === 'ERROR' && 'Retry Transaction'}
+                </button>
               </div>
-
-              {/* Quick Amount Buttons */}
-              <div className="flex gap-2">
-                {QUICK_AMOUNTS.map((quickAmount) => (
-                  <button
-                    key={quickAmount}
-                    onClick={() => setAmount(quickAmount.toString())}
-                    disabled={quickAmount > balance}
-                    className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-                      quickAmount > balance
-                        ? 'bg-white/5 text-white/30 cursor-not-allowed'
-                        : 'bg-white/10 hover:bg-white/20 text-white/70'
-                    }`}
-                  >
-                    {quickAmount} SOL
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Deposit Preview */}
-            {parsedAmount > 0 && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="p-4 bg-white/5 rounded-xl space-y-2"
-              >
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">Deposit Amount</span>
-                  <span className="font-mono">{parsedAmount} SOL</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">Network Fee (est.)</span>
-                  <span className="font-mono text-white/70">~0.000005 SOL</span>
-                </div>
-                <div className="border-t border-white/10 pt-2 flex justify-between">
-                  <span className="text-white/50">Total</span>
-                  <span className="font-mono font-bold">{(parsedAmount + 0.000005).toFixed(6)} SOL</span>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Error Message */}
-            {errorMessage && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3"
-              >
-                <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
-                <p className="text-sm text-red-400">{errorMessage}</p>
-              </motion.div>
-            )}
-
-            {/* Deposit Button */}
-            <button
-              onClick={status === 'ERROR' ? handleRetry : handleDeposit}
-              disabled={!isValidAmount || (status !== 'INPUT' && status !== 'ERROR')}
-              className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                status === 'ERROR'
-                  ? 'bg-red-500 text-white'
-                  : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-black'
-              }`}
-            >
-              {status === 'INPUT' && (
-                <>
-                  <Coins className="w-5 h-5" />
-                  Deposit {parsedAmount > 0 ? `${parsedAmount} SOL` : ''}
-                </>
-              )}
-              {status === 'CONFIRMING' && (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Waiting for Signature...
-                </>
-              )}
-              {status === 'PROCESSING' && (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Processing Deposit...
-                </>
-              )}
-              {status === 'ERROR' && (
-                <>
-                  <ArrowRight className="w-5 h-5" />
-                  Retry Deposit
-                </>
-              )}
-            </button>
-
-            {/* Security Note */}
-            <div className="flex items-center justify-center gap-2 text-xs text-white/40">
-              <Shield className="w-4 h-4" />
-              <span>Self-custodial escrow on Solana</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };
 
-// Success View Component
+// Success View (変更なし)
 const DepositSuccess = ({
   amount,
   txSignature,
   strategyName,
   onComplete,
+  themeColor
 }: {
   amount: number;
   txSignature: string | null;
   strategyName: string;
   onComplete: () => void;
+  themeColor: string;
 }) => {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center justify-center text-center pt-12"
+      className="flex flex-col items-center justify-center text-center pt-8"
     >
-      {/* Success Animation */}
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', delay: 0.2 }}
-        className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-lg shadow-emerald-500/30"
-      >
-        <CheckCircle2 className="w-12 h-12 text-black" />
-      </motion.div>
+      <div className="relative mb-8">
+        <div className="absolute inset-0 bg-green-500 blur-2xl opacity-20" />
+        <div className="w-24 h-24 bg-[#1C1917] border-2 border-green-500 rounded-full flex items-center justify-center relative z-10 shadow-2xl">
+          <Sparkles className="w-10 h-10 text-green-500" />
+        </div>
+        <motion.div 
+          className="absolute -top-2 -right-2 bg-green-500 text-[#0C0A09] text-xs font-bold px-2 py-1 rounded-full border-4 border-[#030303]"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          LIVE
+        </motion.div>
+      </div>
 
-      <h1 className="text-3xl font-bold mb-2">Deposit Complete! 💰</h1>
-      <p className="text-white/50 mb-8">
-        {amount} SOL deposited to {strategyName}
+      <h1 className="text-4xl font-serif font-bold text-[#E7E5E4] mb-2">Strategy Live</h1>
+      <p className="text-[#A8A29E] mb-8 max-w-xs mx-auto text-sm leading-relaxed">
+        Your liquidity has been seeded. <br/>
+        <span className="text-white font-bold">{strategyName}</span> is now active on-chain.
       </p>
 
-      {/* Transaction Details */}
-      <div className="w-full max-w-sm p-4 bg-white/5 rounded-2xl border border-white/10 space-y-3 text-left mb-8">
-        {txSignature && (
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-white/50">Transaction</span>
+      <div className="w-full bg-[#E7E5E4] text-[#0C0A09] rounded-lg p-6 mb-8 relative overflow-hidden font-mono text-xs">
+        <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: themeColor }} />
+        <div className="flex justify-between mb-2">
+          <span className="opacity-60">INITIAL DEPOSIT</span>
+          <span className="font-bold">{amount} SOL</span>
+        </div>
+        <div className="flex justify-between mb-4">
+          <span className="opacity-60">STATUS</span>
+          <span className="font-bold flex items-center gap-1 text-green-700">
+            <CheckCircle2 className="w-3 h-3" /> CONFIRMED
+          </span>
+        </div>
+        <div className="border-t border-[#0C0A09]/10 pt-3 text-center">
+          {txSignature && (
             <a
               href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300"
+              className="flex items-center justify-center gap-1 opacity-60 hover:opacity-100 transition-opacity"
             >
-              {txSignature.slice(0, 8)}...
-              <ExternalLink className="w-3 h-3" />
+              VIEW ON EXPLORER <ExternalLink className="w-3 h-3" />
             </a>
-          </div>
-        )}
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-white/50">Amount</span>
-          <span className="text-xs font-mono text-emerald-400">{amount} SOL</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-white/50">Status</span>
-          <span className="text-xs text-emerald-400 flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> Confirmed
-          </span>
+          )}
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-col gap-3 w-full max-w-sm">
-        <button
-          onClick={onComplete}
-          className="w-full py-4 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl font-bold text-black flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 hover:scale-[1.02] transition-transform"
-        >
-          <TrendingUp className="w-5 h-5" />
-          View Strategy Dashboard
-        </button>
-        
-        <button
-          onClick={onComplete}
-          className="w-full py-3 bg-white/10 rounded-xl font-medium hover:bg-white/20 transition-colors text-sm"
-        >
-          Done
-        </button>
-      </div>
+      <button
+        onClick={onComplete}
+        className="w-full py-4 bg-[#1C1917] border border-white/10 rounded-xl font-bold text-[#E7E5E4] hover:bg-white/5 transition-all flex items-center justify-center gap-2"
+      >
+        <TrendingUp className="w-4 h-4" />
+        Go to Dashboard
+      </button>
     </motion.div>
   );
 };

@@ -2,14 +2,155 @@
  * API Service - Centralized API calls
  */
 
+// 環境変数からAPIのベースURLを取得
 const API_BASE = import.meta.env.VITE_API_URL || 'https://axis-api.yusukekikuta-05.workers.dev';
 
 export const api = {
   /**
+   * 1. ユーザー情報取得 (GET /user?wallet=...)
+   * バックエンドの仕様に合わせてクエリパラメータ形式に統一
+   */
+  getUser: async (pubkey: string) => {
+    try {
+      // ローカルストレージの紹介コードがあれば付与
+      const ref = localStorage.getItem('axis_referrer');
+      let url = `${API_BASE}/user?wallet=${pubkey}`;
+      if (ref && ref !== pubkey) {
+        url += `&ref=${ref}`;
+      }
+
+      const res = await fetch(url);
+      
+      if (!res.ok) {
+        // 404などの場合は未登録(null)として返す
+        return { success: false, user: null };
+      }
+      
+      const data = await res.json();
+      
+      // データが空の場合のチェック
+      if (!data || Object.keys(data).length === 0) {
+          return { success: false, user: null };
+      }
+
+      // フロントエンド(username) と バックエンド(name) の違いを吸収
+      return {
+        success: true,
+        user: {
+            ...data,
+            pubkey: pubkey,
+            username: data.name || data.username, // nameがあればusernameとして扱う
+            avatar_url: data.pfpUrl || data.avatar_url, // 表記揺れ吸収
+            total_xp: data.total_xp || 0,
+            rank_tier: data.rank_tier || 'Novice'
+        }
+      };
+    } catch (e) {
+      console.error("Fetch User Error:", e);
+      return { success: false, user: null };
+    }
+  },
+
+  /**
+   * 2. プロフィール更新 (POST /user)
+   * UI側の `username` をバックエンド側の `name` に変換して送信
+   */
+  async updateProfile(data: { wallet_address: string; name?: string; username?: string; bio?: string; avatar_url?: string; pfpUrl?: string }) {
+    try {
+      const payload = {
+        wallet_address: data.wallet_address,
+        name: data.username || data.name, // UIで入力された username を優先
+        bio: data.bio,
+        avatar_url: data.pfpUrl || data.avatar_url // pfpUrl を avatar_url として送信
+      };
+
+      const res = await fetch(`${API_BASE}/user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (e) {
+      console.error("Update Profile Error:", e);
+      return { success: false, error: 'Network Error' };
+    }
+  },
+
+  /**
+   * 3. 画像アップロード (ProfileEditModalで使用)
+   */
+  async uploadProfileImage(file: File, walletAddress: string) {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('wallet_address', walletAddress);
+    formData.append('type', 'profile'); 
+
+    try {
+      const res = await fetch(`${API_BASE}/upload/image`, {
+        method: 'POST',
+        body: formData,
+      });
+      return await res.json();
+    } catch (e) {
+      console.error("Upload Error:", e);
+      return { success: false, error: 'Upload Failed' };
+    }
+  },
+
+  /**
+   * 4. 招待コードリクエスト
+   */
+  async requestInvite(email: string) {
+    try {
+      const res = await fetch(`${API_BASE}/request-invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, error: 'Network Error' };
+    }
+  },
+
+  /**
+   * 5. 新規登録
+   */
+  async register(data: { email: string; wallet_address: string; invite_code_used: string; avatar_url?: string; name?: string; bio?: string }) {
+    try {
+      const res = await fetch(`${API_BASE}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, error: 'Network Error' };
+    }
+  },
+
+  /**
+   * 6. 画像URLのプロキシ (R2キーをURLに変換)
+   */
+  getProxyUrl(url: string | undefined | null) {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    if (url.startsWith('blob:')) return url; // プレビュー用
+    if (url.startsWith('data:')) return url;
+    
+    // R2 Keyだけの場合、API経由で表示
+    return `${API_BASE}/upload/image/${url}`;
+  },
+
+  // ------------------------------------------------
+  // 以下、既存機能 (変更なし)
+  // ------------------------------------------------
+
+  /**
    * Generate AI strategies
    */
   async analyze(directive: string, tags: string[] = [], customInput?: string) {
-    const res = await fetch(`${API_BASE}/kagemusha/analyze`, {
+    const res = await fetch(`${API_BASE}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ directive, tags, customInput }),
@@ -17,83 +158,106 @@ export const api = {
     return res.json();
   },
 
-  /**
-   * Get token list with prices
-   */
-  async getTokens() {
-    const res = await fetch(`${API_BASE}/kagemusha/tokens`);
-    return res.json();
-  },
-
-  /**
-   * Search tokens
-   */
-  async searchTokens(query: string, limit = 20) {
-    const res = await fetch(`${API_BASE}/kagemusha/tokens/search?q=${encodeURIComponent(query)}&limit=${limit}`);
-    return res.json();
-  },
-
-  /**
-   * Get token price history
-   */
-  async getTokenHistory(address: string, interval: '1h' | '1d' | '1w' = '1d') {
-    const res = await fetch(`${API_BASE}/kagemusha/tokens/${address}/history?interval=${interval}`);
-    return res.json();
-  },
-
-  /**
-   * Get Jito deployment info
-   */
-  async prepareDeployment() {
-    const res = await fetch(`${API_BASE}/kagemusha/prepare-deployment`);
-    return res.json();
-  },
-
-  /**
-   * Deploy strategy
-   */
-  async deploy(signedTransaction: string, metadata: {
-    name?: string;
-    type?: string;
-    composition?: { symbol: string; weight: number }[];
-    creator?: string;
-    initialInvestment?: number;
-  }) {
-    const res = await fetch(`${API_BASE}/kagemusha/deploy`, {
+  async toggleWatchlist(id: string, userPubkey: string) {
+    const res = await fetch(`${API_BASE}/strategies/${id}/watchlist`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ signedTransaction, metadata }),
+      body: JSON.stringify({ userPubkey })
     });
     return res.json();
   },
 
-  /**
-   * Get all vaults (rankings)
-   */
+  async checkWatchlist(id: string, userPubkey: string) {
+    const res = await fetch(`${API_BASE}/strategies/${id}/watchlist?user=${userPubkey}`);
+    return res.json();
+  },
+
+  async dailyCheckIn(pubkey: string) {
+    // URL生成
+    const url = `${API_BASE}/users/${pubkey}/checkin`;
+    try {
+      const res = await fetch(url, { method: 'POST' });
+      // レスポンスがJSONでない場合の対策
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Server Error: ${text}`);
+      }
+    } catch (error: any) {
+      return { success: false, error: error.message }; 
+    }
+  },
+
+  async getLeaderboard() {
+    try {
+      const res = await fetch(`${API_BASE}/leaderboard`);
+      return await res.json();
+    } catch (error) {
+      return { success: false, leaderboard: [] };
+    }
+  },
+
+  async getTokens() {
+    const res = await fetch(`${API_BASE}/tokens`);
+    return res.json();
+  },
+
+  async searchTokens(query: string, limit = 20) {
+    const res = await fetch(`${API_BASE}/tokens/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+    return res.json();
+  },
+
+  async getTokenHistory(address: string, interval: '1h' | '1d' | '1w' = '1d') {
+    const res = await fetch(`${API_BASE}/tokens/${address}/history?interval=${interval}`);
+    return res.json();
+  },
+
+  async prepareDeployment() {
+    const res = await fetch(`${API_BASE}/prepare-deployment`);
+    return res.json();
+  },
+
+  async deploy(txSignature: string, strategyData: any) {
+    try {
+      const response = await fetch(`${API_BASE}/deploy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signature: txSignature, ...strategyData }),
+      });
+
+      const responseText = await response.text();
+      if (!response.ok) {
+        throw new Error(`Server Error: ${response.status} - ${responseText}`);
+      }
+      return JSON.parse(responseText);
+    } catch (error) {
+      console.error("API Deploy Error:", error);
+      throw error;
+    }
+  },
+
   async getVaults() {
     const res = await fetch(`${API_BASE}/vaults`);
     return res.json();
   },
 
-  /**
-   * Get user strategies
-   */
+  async getStrategyChart(id: string, period = '7d', type: 'line' | 'candle' = 'line') {
+    const res = await fetch(`${API_BASE}/strategies/${id}/chart?period=${period}&type=${type}`);
+    return res.json();
+  },
+
   async getUserStrategies(pubkey: string) {
-    const res = await fetch(`${API_BASE}/kagemusha/strategies/${pubkey}`);
+    const res = await fetch(`${API_BASE}/strategies/${pubkey}`);
     return res.json();
   },
 
-  /**
-   * Discover public strategies
-   */
   async discoverStrategies(limit = 50, offset = 0) {
-    const res = await fetch(`${API_BASE}/kagemusha/discover?limit=${limit}&offset=${offset}`);
+    const res = await fetch(`${API_BASE}/discover?limit=${limit}&offset=${offset}`);
     return res.json();
   },
 
-  /**
-   * Upload image to R2 storage
-   */
+  // 汎用アップロード (Strategy作成時などに使用)
   async uploadImage(file: Blob, walletAddress: string, type: 'strategy' | 'profile' = 'strategy') {
     const formData = new FormData();
     formData.append('image', file);
@@ -107,34 +271,6 @@ export const api = {
     return res.json();
   },
 
-  /**
-   * Get user profile
-   */
-  async getUser(walletAddress: string) {
-    const res = await fetch(`${API_BASE}/user?wallet=${encodeURIComponent(walletAddress)}`);
-    return res.json();
-  },
-
-  /**
-   * Update user profile
-   */
-  async updateProfile(data: { 
-    wallet_address: string; 
-    name?: string; 
-    bio?: string; 
-    avatar_url?: string;
-  }) {
-    const res = await fetch(`${API_BASE}/user`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return res.json();
-  },
-
-  /**
-   * Generate pizza-style artwork for a strategy
-   */
   async generatePizzaArt(tokens: string[], strategyType: string, walletAddress: string) {
     const res = await fetch(`${API_BASE}/art/generate`, {
       method: 'POST',
@@ -142,50 +278,5 @@ export const api = {
       body: JSON.stringify({ tokens, strategyType, walletAddress }),
     });
     return res.json();
-  },
-
-  async requestInvite(email: string) {
-    const res = await fetch(`${API_BASE}/request-invite`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    return res.json();
-  },
-
-  /**
-   * Register new user
-   */
-  async register(data: { email: string; wallet_address: string; invite_code_used: string; avatar_url?: string; name?: string; bio?: string }) {
-    const res = await fetch(`${API_BASE}/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return res.json();
-  },
-
-  /**
-   * Get proxy URL for R2 images
-   * Converts direct R2 links to API proxy links if needed
-   */
-  getProxyUrl(url: string | undefined | null) {
-    if (!url) return '';
-    // If it's already a proxy URL or local blob, return as is
-    if (url.includes('/upload/image/') || url.startsWith('blob:')) return url;
-    
-    // If it's an R2 URL, convert to proxy
-    if (url.includes('pub-axis-images.r2.dev')) {
-       const key = url.split('pub-axis-images.r2.dev/')[1];
-       return `${API_BASE}/upload/image/${key}`;
-    }
-    
-    // If it's just a path/key (legacy), assume it needs proxy
-    if (!url.startsWith('http') && (url.includes('/') && url.endsWith('.webp'))) {
-        return `${API_BASE}/upload/image/${url}`;
-    }
-
-    return url;
   }
 };
-

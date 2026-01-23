@@ -1,9 +1,10 @@
 /**
  * Strategy Preview Card - Shows AI-generated strategy with backtest
+ * Refined for High-End Artisan Aesthetic
  */
 
 import { motion } from 'framer-motion';
-import { Zap, Shield, Waves, Check, Sparkles } from 'lucide-react';
+import { Zap, Shield, Scale, Check, Sparkles } from 'lucide-react'; // Waves -> Scale (Balance)
 import { BacktestChart } from '../common/BacktestChart';
 import type { Strategy } from '../../types';
 
@@ -17,117 +18,131 @@ interface StrategyPreviewProps {
 
 const typeIcons = {
   AGGRESSIVE: Zap,
-  BALANCED: Waves,
+  BALANCED: Scale, // 天秤（バランス）に変更
   CONSERVATIVE: Shield,
 };
 
+// 高級感のあるカラーパレット（スパイス、チーズ、バジル）
 const typeColors = {
-  AGGRESSIVE: { bg: 'from-orange-500/20 to-red-500/20', border: 'border-orange-500/50', text: 'text-orange-400' },
-  BALANCED: { bg: 'from-blue-500/20 to-purple-500/20', border: 'border-blue-500/50', text: 'text-blue-400' },
-  CONSERVATIVE: { bg: 'from-emerald-500/20 to-teal-500/20', border: 'border-emerald-500/50', text: 'text-emerald-400' },
+  AGGRESSIVE: { 
+    bg: 'from-[#9F1239]/20 to-[#BE123C]/10', // Deep Rose/Chili
+    border: 'border-[#9F1239]/40', 
+    text: 'text-[#FB7185]',
+    icon: '#E11D48'
+  },
+  BALANCED: { 
+    bg: 'from-[#D97706]/20 to-[#B45309]/10', // Gold/Bronze
+    border: 'border-[#D97706]/40', 
+    text: 'text-[#FCD34D]',
+    icon: '#F59E0B'
+  },
+  CONSERVATIVE: { 
+    bg: 'from-[#15803D]/20 to-[#166534]/10', // Deep Basil/Green
+    border: 'border-[#15803D]/40', 
+    text: 'text-[#86EFAC]',
+    icon: '#22C55E'
+  },
 };
 
 export const StrategyPreview = ({ strategy, selected, onSelect, expanded = false, themeColor }: StrategyPreviewProps) => {
-  const Icon = typeIcons[strategy.type];
-  const defaultColors = typeColors[strategy.type];
+  const Icon = typeIcons[strategy.type as keyof typeof typeIcons] || Zap;
+  const defaultColors = typeColors[strategy.type as keyof typeof typeColors] || typeColors.AGGRESSIVE;
 
-  // Dynamic style overrides if themeColor is provided
   const cardStyle = themeColor && selected ? {
     borderColor: themeColor,
-    boxShadow: `0 10px 30px -10px ${themeColor}40`
+    boxShadow: `0 8px 30px -10px ${themeColor}30`,
+    backgroundColor: 'rgba(28, 25, 23, 0.8)' // Warm dark bg
   } : {};
-
-  // For gradient we can't easily use arbitrary string colors without inline styles or generating classes
-  // We'll stick to default classes via Tailwind unless we reconstruct the gradient logic
   
   return (
     <motion.div
-      whileHover={{ scale: 1.02, y: -4 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ scale: 1.01, y: -2 }}
+      whileTap={{ scale: 0.99 }}
       onClick={() => onSelect?.(strategy)}
       className={`
-        relative rounded-2xl cursor-pointer overflow-hidden transition-all
+        relative rounded-xl cursor-pointer overflow-hidden transition-all duration-300
         ${selected 
-          ? `bg-gradient-to-br ${defaultColors.bg} border-2 ${defaultColors.border} shadow-xl` 
-          : 'bg-white/[0.03] border border-white/10 hover:border-white/20'
+          ? `bg-gradient-to-br ${defaultColors.bg} border ${defaultColors.border} shadow-2xl` 
+          : 'bg-[#1C1917]/40 border border-[#D97706]/10 hover:border-[#D97706]/30 hover:bg-[#1C1917]/60'
         }
       `}
       style={cardStyle}
     >
-      {/* Selection indicator */}
+      {/* Selection indicator - Gold Check */}
       {selected && (
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          className="absolute top-3 right-3 w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center z-10"
+          className="absolute top-3 right-3 w-6 h-6 bg-[#D97706] rounded-full flex items-center justify-center z-10 shadow-lg shadow-orange-900/50"
           style={themeColor ? { backgroundColor: themeColor } : undefined}
         >
-          <Check className="w-4 h-4 text-black" />
+          <Check className="w-3.5 h-3.5 text-[#0C0A09]" />
         </motion.div>
       )}
 
       <div className="p-5">
         {/* Header */}
-        <div className="flex items-start gap-3 mb-4">
+        <div className="flex items-start gap-4 mb-5">
           <div 
-            className={`w-12 h-12 rounded-xl bg-gradient-to-br ${defaultColors.bg} flex items-center justify-center ${defaultColors.border} border`}
+            className={`w-10 h-10 rounded-lg bg-gradient-to-br ${defaultColors.bg} flex items-center justify-center border ${defaultColors.border} shadow-inner`}
             style={themeColor && selected ? { borderColor: themeColor } : undefined}
           >
             <Icon 
-              className={`w-6 h-6 ${!themeColor ? defaultColors.text : ''}`} 
-              style={themeColor && selected ? { color: themeColor } : undefined}
+              className="w-5 h-5"
+              style={{ color: themeColor && selected ? themeColor : defaultColors.icon }}
             />
           </div>
-          <div className="flex-1">
-            <h3 className="font-bold text-lg leading-tight">{strategy.name}</h3>
-            <p className="text-xs text-white/40 mt-0.5">{strategy.description}</p>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-serif font-bold text-xl leading-tight text-[#E7E5E4] tracking-wide">
+              {strategy.name}
+            </h3>
+            <p className="text-xs text-[#A8A29E] mt-1 font-serif italic line-clamp-1">
+              {strategy.description}
+            </p>
           </div>
         </div>
 
-        {/* Token Pills */}
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        {/* Token Pills - Elegant Style */}
+        <div className="flex flex-wrap gap-2 mb-5">
           {strategy.tokens.map((t) => (
             <span
               key={t.symbol}
-              className="px-2 py-1 text-xs font-medium bg-white/10 rounded-lg border border-white/10"
+              className="px-3 py-1 text-[10px] font-medium tracking-wider bg-[#0C0A09] rounded-sm border border-[#D97706]/20 text-[#D97706]"
             >
-              {t.symbol} <span className="text-white/50">{t.weight}%</span>
+              {t.symbol} <span className="text-[#78716C] ml-1">{t.weight}%</span>
             </span>
           ))}
         </div>
 
-        {/* AI Suggestion */}
+        {/* AI Suggestion - Menu Description Style */}
         {strategy.aiSuggestion && (
-          <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/5">
-            <div className="flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-white/70 italic leading-relaxed">"{strategy.aiSuggestion}"</p>
-            </div>
+          <div className="mb-5 p-4 bg-[#0C0A09]/50 rounded-lg border border-[#D97706]/10 relative">
+             <Sparkles className="absolute top-3 left-3 w-3 h-3 text-[#D97706]/60" />
+            <p className="text-xs text-[#D6D3D1] italic leading-relaxed pl-5 font-serif">
+              "{strategy.aiSuggestion}"
+            </p>
           </div>
         )}
 
-        {/* Metrics Row */}
-        <div className="grid grid-cols-4 gap-2 p-3 bg-black/30 rounded-xl mb-4">
-          <div className="text-center">
-            <p className="text-[10px] text-white/40">ROI</p>
-            <p 
-              className={`text-sm font-bold ${!themeColor ? defaultColors.text : ''}`}
-              style={themeColor && selected ? { color: themeColor } : undefined}
-            >
+        {/* Metrics Row - Minimalist Table */}
+        <div className="grid grid-cols-4 gap-px bg-[#D97706]/20 rounded-lg overflow-hidden border border-[#D97706]/10">
+          <div className="bg-[#1C1917] p-3 text-center">
+            <p className="text-[9px] text-[#78716C] uppercase tracking-widest mb-0.5">ROI</p>
+            <p className={`text-sm font-bold font-serif ${defaultColors.text}`}>
               +{strategy.metrics.expectedApy}%
             </p>
           </div>
-          <div className="text-center">
-            <p className="text-[10px] text-white/40">Risk</p>
-            <p className="text-sm font-bold">{strategy.metrics.riskScore}/10</p>
+          <div className="bg-[#1C1917] p-3 text-center">
+            <p className="text-[9px] text-[#78716C] uppercase tracking-widest mb-0.5">Risk</p>
+            <p className="text-sm font-serif text-[#E7E5E4]">{strategy.metrics.riskScore}<span className="text-[9px] text-[#57534E]">/10</span></p>
           </div>
-          <div className="text-center">
-            <p className="text-[10px] text-white/40">Win Rate</p>
-            <p className="text-sm font-bold">{strategy.metrics.winRate}%</p>
+          <div className="bg-[#1C1917] p-3 text-center">
+            <p className="text-[9px] text-[#78716C] uppercase tracking-widest mb-0.5">Win</p>
+            <p className="text-sm font-serif text-[#E7E5E4]">{strategy.metrics.winRate}%</p>
           </div>
-          <div className="text-center">
-            <p className="text-[10px] text-white/40">Sharpe</p>
-            <p className="text-sm font-bold">{strategy.metrics.sharpeRatio}</p>
+          <div className="bg-[#1C1917] p-3 text-center">
+            <p className="text-[9px] text-[#78716C] uppercase tracking-widest mb-0.5">Sharpe</p>
+            <p className="text-sm font-serif text-[#E7E5E4]">{strategy.metrics.sharpeRatio}</p>
           </div>
         </div>
 
@@ -137,6 +152,7 @@ export const StrategyPreview = ({ strategy, selected, onSelect, expanded = false
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
+            className="mt-4 pt-4 border-t border-[#D97706]/10"
           >
             <BacktestChart data={strategy.backtest} height={120} showMetrics={false} />
           </motion.div>
