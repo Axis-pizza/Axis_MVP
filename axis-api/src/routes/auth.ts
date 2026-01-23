@@ -1,122 +1,82 @@
 import { Hono } from 'hono';
 import { Bindings } from '../config/env';
-import * as TwitterService from '../services/twitter';
-import * as AuthService from '../services/auth';
 import * as UserModel from '../models/user';
-// ★追加: InviteModelをインポート
 import * as InviteModel from '../models/invite';
+import { sendInviteEmail } from '../services/email';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-app.get('/twitter', TwitterService.createTwitterAuth);
-app.get('/twitter/callback', TwitterService.handleTwitterCallback);
+app.post('/request-invite', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({})); 
+    const { email } = body;
 
-// ★追加: 招待コード確認用エンドポイント
-app.get('/check-invite', async (c) => {
-  const code = c.req.query('code');
-  if (!code) return c.json({ valid: false, message: "Code required" }, 400);
+    // email が undefined/null/空文字 ならエラーを返す
+    if (!email) return c.json({ error: 'Email is required' }, 400);
 
-  const invite = await InviteModel.findInviteByCode(c.env.axis_db, code);
-  
-  if (!invite) {
-    return c.json({ valid: false, message: "Invalid or used code" }, 404);
+    const existingUser = await UserModel.findUserByEmail(c.env.axis_db, email);
+    if (existingUser) {
+        return c.json({ success: true, message: 'Invite code sent (if account available)' });
+    }
+
+    // ★重要: ここで email を渡す！ (これが抜けていた原因です)
+    const code = await InviteModel.createOneInvite(c.env.axis_db, 'system', email);
+
+    if (c.env.EMAIL) {
+      c.executionCtx.waitUntil(sendInviteEmail(c.env, email, code).catch(e => console.error(e)));
+    } else {
+      console.log(`📧 [LOCAL] Email: ${email} | Code: ${code}`);
+    }
+
+    return c.json({ success: true, message: 'Invite code sent' });
+
+  } catch (e: any) {
+    console.error('Request Invite Error:', e);
+    return c.json({ error: e.message || 'Internal Server Error' }, 500);
   }
-  
-  return c.json({ valid: true });
 });
 
-app.post('/social-login', async (c) => {
+app.post('/register', async (c) => {
   try {
-    // ★修正: inviteCode を受け取る
-    const { provider, email, wallet_address, inviteCode } = await c.req.json();
-    
-    if (!provider) return c.json({ error: "Provider required" }, 400);
+    const { email, wallet_address, invite_code_used, avatar_url, name, bio } = await c.req.json();
 
-    let user: UserModel.User | null = null;
-
-    if (provider === 'solana' && wallet_address) {
-      user = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
-    } 
-    else if ((provider === 'google' || provider === 'twitter') && email) {
-      user = await UserModel.findUserByEmail(c.env.axis_db, email);
+    if (!email || !wallet_address || !invite_code_used) {
+      return c.json({ error: 'Missing fields' }, 400);
     }
 
-    if (user) {
-      if (provider === 'solana' && !user.wallet_address && wallet_address) {
-          await UserModel.updateUserWallet(c.env.axis_db, user.id, wallet_address);
-          user.wallet_address = wallet_address;
-      }
-      return c.json({ success: true, isNew: false, user });
+    const invite = await InviteModel.findInviteByCode(c.env.axis_db, invite_code_used);
+    const isDev = invite_code_used === 'AXIS-DEV';
+
+    if (!invite && !isDev) {
+      return c.json({ error: 'Invalid invite code' }, 400);
     }
 
-    // ★追加: 新規ユーザー登録フロー
-    // 招待コードのバリデーション (API側でも再確認)
-    if (inviteCode) {
-        const invite = await InviteModel.findInviteByCode(c.env.axis_db, inviteCode);
-        if (!invite) return c.json({ error: "Invalid invite code" }, 400);
+    const existing = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
+    if (existing) {
+      return c.json({ success: true, user: existing });
     }
 
     const newId = crypto.randomUUID();
-    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const newInviteCode = `AXIS-${randomSuffix}`;
+    // 自分の招待コード発行時も email が必要
+    const newInviteCode = await InviteModel.createOneInvite(c.env.axis_db, newId, email);
 
-    await UserModel.createSocialUser(c.env.axis_db, newId, email || null, wallet_address || null, newInviteCode);
+    await UserModel.createRegisteredUser(
+      c.env.axis_db, newId, email, wallet_address, newInviteCode, invite_code_used, avatar_url, name, bio
+    );
 
-    // ★追加: 招待コード処理: 使用済みにし、ユーザーに使用記録をつける
-    if (inviteCode) {
-        await InviteModel.markInviteUsed(c.env.axis_db, inviteCode, newId);
-        // UserModelにメソッドがない可能性があるため、直接SQLで更新
-        await c.env.axis_db.prepare("UPDATE users SET invite_code_used = ? WHERE id = ?")
-            .bind(inviteCode, newId).run();
+    if (!isDev) {
+      await InviteModel.markInviteUsed(c.env.axis_db, invite_code_used, newId);
     }
 
-    // ★追加: 新規ユーザーに招待枠(10個)を付与
-    await InviteModel.createInvites(c.env.axis_db, newId, 10);
+    if (c.env.EMAIL) {
+      c.executionCtx.waitUntil(sendInviteEmail(c.env, email, newInviteCode));
+    }
 
-    const newUser = {
-      id: newId,
-      email: email || null,
-      wallet_address: wallet_address || null,
-      invite_code: newInviteCode
-    };
+    return c.json({ success: true, user: { pubkey: wallet_address, total_xp: 500 } });
 
-    return c.json({ success: true, isNew: true, user: newUser });
-
-  } catch (e: any) {
-    console.error("Social Auth Error:", e);
-    return c.json({ success: false, error: e.message }, 500);
-  }
-});
-
-app.post('/store-otp', async (c) => {
-  const { email, code } = await c.req.json();
-  const expires = Math.floor(Date.now() / 1000) + 600; 
-  
-  const existing = await UserModel.findUserByEmail(c.env.axis_db, email);
-  
-  if (existing) {
-    await UserModel.updateUserOtp(c.env.axis_db, email, code, expires);
-  } else {
-    const id = crypto.randomUUID();
-    await UserModel.createOtpUser(c.env.axis_db, id, email, code, expires);
-  }
-
-  return c.json({ success: true });
-});
-
-app.post('/verify-otp', async (c) => {
-  try {
-      const { email, code, inviteCode, walletAddress } = await c.req.json();
-      const user = await AuthService.verifyOtpAndProcessInvite(
-          c.env.axis_db, 
-          email, 
-          code, 
-          inviteCode, 
-          walletAddress
-      );
-      return c.json({ success: true, user });
-  } catch (e: any) {
-      return c.json({ success: false, message: e.message }, 400);
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: 'Internal Server Error' }, 500);
   }
 });
 

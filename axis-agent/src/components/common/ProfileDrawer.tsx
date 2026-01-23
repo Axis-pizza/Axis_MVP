@@ -1,21 +1,26 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Copy, Trophy, Wallet, Sparkles, LogOut, CheckCircle } from 'lucide-react';
+import { X, Copy, Trophy, LogOut, CheckCircle, Sparkles, Edit, User, Droplets } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { ProfileEditModal } from './ProfileEditModal';
 
 export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const { showToast } = useToast();
   const { publicKey, disconnect } = useWallet();
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [faucetLoading, setFaucetLoading] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
-  // ユーザーデータ取得
   const fetchUser = async () => {
     if (!publicKey) return;
     const res = await api.getUser(publicKey.toBase58());
-    if (res.success) setUserData(res.user);
+    if (res.success || res.user) {
+       setUserData(res.user || res);
+    }
   };
 
   useEffect(() => {
@@ -25,85 +30,178 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const handleCheckIn = async () => {
     if (!publicKey) return;
     setLoading(true);
-    
     try {
-      console.log("👉 Check-in button clicked");
       const res = await api.dailyCheckIn(publicKey.toBase58());
-      console.log("👈 API Result:", res);
-      
       if (res.success) {
         setUserData(res.user);
-        showToast("XP Claimed Successfully! (+10 XP)", "success");
+        showToast("✅ +10 XP Claimed!", "success");
       } else {
-        // エラー内容を全て表示
-        const errorMsg = res.message || res.error || JSON.stringify(res);
-        console.error("❌ Check-in Failed Logic:", errorMsg);
-        showToast(errorMsg, "error");
+        showToast(res.message || "Check-in failed", "error");
       }
     } catch (e: any) {
-      console.error("❌ System Error:", e);
-      showToast(`System Error: ${e.message}`, "error");
+      showToast(`Error: ${e.message}`, "error");
     }
-    
     setLoading(false);
+  };
+
+  const handleFaucet = async () => {
+    if (!publicKey) return;
+    setFaucetLoading(true);
+    try {
+      const res = await api.requestFaucet(publicKey.toBase58()); 
+      if (res.success) {
+        showToast("💰 1,000 USDC (Devnet) Sent!", "success");
+      } else {
+        window.open("https://faucet.circle.com/", "_blank");
+        showToast("Please use the external faucet", "info");
+      }
+    } catch (e) {
+       window.open("https://faucet.circle.com/", "_blank");
+    } finally {
+      setFaucetLoading(false);
+    }
   };
 
   const handleCopyInvite = () => {
     if (!publicKey) return;
     const link = `${window.location.origin}/?ref=${publicKey.toBase58()}`;
     navigator.clipboard.writeText(link);
-    showToast("Invite Link Copied to Clipboard!", "success");
+    showToast("Invite Link Copied!", "success");
   };
 
   if (!publicKey) return null;
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]" />
-          <motion.div initial={{x:'100%'}} animate={{x:0}} exit={{x:'100%'}} transition={{type:'spring',damping:25}} className="fixed top-0 right-0 bottom-0 w-[85%] max-w-sm bg-[#0C0A09] border-l border-white/10 z-[70] p-6 flex flex-col safe-area-top">
+  return createPortal(
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <motion.div 
+              initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} 
+              onClick={onClose} 
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998]" 
+            />
             
-            {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="font-serif font-bold text-xl text-white">Profile</h2>
-              <button onClick={onClose}><X className="text-[#78716C]" /></button>
-            </div>
+            <motion.div 
+              initial={{x:'100%'}} animate={{x:0}} exit={{x:'100%'}} 
+              transition={{type:'spring', damping:25, stiffness: 200}} 
+              className="fixed top-0 right-0 bottom-0 w-[90%] max-w-sm bg-[#0C0A09] border-l border-white/10 z-[9999] flex flex-col safe-area-top shadow-2xl"
+            >
+              
+              <div className="flex justify-between items-center p-6 pb-2 shrink-0">
+                <h2 className="font-serif font-bold text-xl text-white">My Profile</h2>
+                <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-[#78716C] transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-            {/* XP Card */}
-            <div className="bg-gradient-to-br from-[#1C1917] to-[#292524] rounded-2xl p-6 border border-[#D97706]/20 mb-6 text-center relative overflow-hidden">
-               <Trophy className="absolute -right-4 -bottom-4 w-24 h-24 text-[#D97706]/10 rotate-12" />
-               <p className="text-xs text-[#D97706] uppercase tracking-widest font-bold mb-2">Season 0 (Devnet)</p>
-               <h3 className="text-5xl font-serif font-bold text-white mb-2">{userData?.total_xp?.toLocaleString() || 0}</h3>
-               <p className="text-sm text-[#78716C]">Current XP</p>
-            </div>
+              <div className="flex-1 overflow-y-auto p-6 pt-2 custom-scrollbar">
 
-            {/* Actions */}
-            <div className="space-y-3 mb-8">
-              <button 
-                onClick={handleCheckIn}
-                disabled={loading}
-                className="w-full py-4 bg-[#D97706] text-black font-bold rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
-              >
-                {loading ? <Sparkles className="animate-spin" /> : <CheckCircle />}
-                Daily Check-in (+10 XP)
-              </button>
+                <div className="flex flex-col items-center mb-8">
+                  <div className="relative group cursor-pointer" onClick={() => setIsEditOpen(true)}>
+                    <div className="w-24 h-24 rounded-full border-2 border-[#D97706]/30 p-1">
+                      <div className="w-full h-full rounded-full bg-[#1C1917] overflow-hidden flex items-center justify-center">
+                        {userData?.avatar_url ? (
+                          <img src={api.getProxyUrl(userData.avatar_url)} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-10 h-10 text-white/20" />
+                        )}
+                      </div>
+                    </div>
+                    <div className="absolute bottom-1 right-1 bg-[#D97706] text-black p-1.5 rounded-full border border-black shadow-lg group-hover:scale-110 transition-transform">
+                      <Edit className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
 
-              <button 
-                onClick={handleCopyInvite}
-                className="w-full py-4 bg-[#1C1917] border border-white/10 text-[#E7E5E4] font-bold rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
-              >
-                <Copy /> Copy Invite Link
-              </button>
-            </div>
+                  <h3 className="mt-4 text-xl font-bold text-white">
+                    {userData?.username || `${publicKey.toBase58().slice(0,4)}...${publicKey.toBase58().slice(-4)}`}
+                  </h3>
+                  {userData?.bio ? (
+                    <p className="text-sm text-[#78716C] text-center mt-1 max-w-[200px] leading-relaxed">
+                      {userData.bio}
+                    </p>
+                  ) : (
+                    <button onClick={() => setIsEditOpen(true)} className="text-xs text-[#78716C]/50 mt-1 hover:text-[#D97706] transition-colors">
+                      + Add Bio
+                    </button>
+                  )}
+                </div>
 
-            {/* Footer */}
-            <button onClick={disconnect} className="mt-auto flex items-center gap-2 text-red-500 font-bold text-sm">
-              <LogOut className="w-4 h-4" /> Disconnect Wallet
-            </button>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+                <div className="bg-gradient-to-br from-[#1C1917] to-[#292524] rounded-2xl p-6 border border-[#D97706]/20 mb-6 text-center relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
+                  <Trophy className="absolute -right-4 -bottom-4 w-24 h-24 text-[#D97706]/10 rotate-12 group-hover:rotate-6 transition-transform duration-500" />
+                  
+                  <div className="relative z-10">
+                    <p className="text-[10px] text-[#D97706] uppercase tracking-[0.2em] font-bold mb-2">Season 0 Rank</p>
+                    <h3 className="text-5xl font-serif font-bold text-white mb-1 tracking-tight">
+                      {userData?.total_xp?.toLocaleString() || 0}
+                    </h3>
+                    <div className="flex items-center justify-center gap-2">
+                       <p className="text-sm text-[#78716C]">Current XP</p>
+                       <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-white/50 border border-white/5">
+                         {userData?.rank_tier || 'Novice'}
+                       </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button 
+                    onClick={handleCheckIn}
+                    disabled={loading}
+                    className="w-full py-3.5 bg-[#D97706] hover:bg-[#b45309] text-black font-bold rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-orange-900/20"
+                  >
+                    {loading ? <Sparkles className="animate-spin w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                    <span>Daily Check-in</span>
+                    <span className="bg-black/20 px-1.5 py-0.5 rounded text-xs">+10 XP</span>
+                  </button>
+
+                  <button 
+                    onClick={handleFaucet}
+                    disabled={faucetLoading}
+                    className="w-full py-3.5 bg-[#1C1917] hover:bg-[#292524] border border-blue-500/20 text-blue-400 font-bold rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  >
+                     {faucetLoading ? <Sparkles className="animate-spin w-5 h-5" /> : <Droplets className="w-5 h-5" />}
+                     Get Devnet USDC
+                  </button>
+
+                  <button 
+                    onClick={handleCopyInvite}
+                    className="w-full py-3.5 bg-[#1C1917] hover:bg-[#292524] border border-white/10 text-[#E7E5E4] font-bold rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  >
+                    <Copy className="w-5 h-5" /> Copy Invite Link
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 pt-0 mt-auto shrink-0">
+                <button 
+                  onClick={disconnect} 
+                  className="w-full flex items-center justify-center gap-2 text-red-500/80 hover:text-red-500 font-bold text-sm py-2 hover:bg-red-500/5 rounded-lg transition-colors"
+                >
+                  <LogOut className="w-4 h-4" /> Disconnect Wallet
+                </button>
+              </div>
+
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <ProfileEditModal 
+        isOpen={isEditOpen} 
+        onClose={() => setIsEditOpen(false)}
+        walletAddress={publicKey.toBase58()}
+        // ★修正ポイント: ここを currentProfile に修正
+        currentProfile={{
+          username: userData?.username,
+          bio: userData?.bio,
+          pfpUrl: userData?.avatar_url,
+        }}
+        onSave={fetchUser} // 保存完了時にユーザー情報を再取得
+        isRegistration={!userData?.username && !userData?.invite_code_used}
+      />
+    </>,
+    document.body
   );
 };

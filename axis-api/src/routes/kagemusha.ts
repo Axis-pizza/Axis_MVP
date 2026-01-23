@@ -236,7 +236,7 @@ app.post('/deploy', async (c) => {
       const owner = metadata.ownerPubkey || metadata.creator || 'unknown';
       const config = JSON.stringify(metadata.tokens || metadata.composition || []);
       const isPublic = metadata.isPublic !== false ? 1 : 0; // デフォルトは公開(1)
-
+      await addXP(c.env.axis_db, metadata.ownerPubkey, 500, 'STRATEGY_CREATION', 'Created new strategy');
       await c.env.axis_db.prepare(
         `INSERT INTO strategies (id, owner_pubkey, name, type, config, description, jito_bundle_id, is_public, created_at) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -263,7 +263,9 @@ app.post('/deploy', async (c) => {
     // ここでちゃんとエラーを返してあげる
     return c.json({ success: false, error: error.message }, 500);
   }
+  
 });
+
 app.get('/strategies/:id/chart', async (c) => {
   // パラメータ取得
   const id = c.req.param('id');
