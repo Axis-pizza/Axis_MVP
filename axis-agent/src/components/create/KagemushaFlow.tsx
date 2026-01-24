@@ -130,15 +130,13 @@ export const KagemushaFlow = () => {
     strategyAddress: string, 
     manualData?: ManualData 
   ) => {
-    // データソースの決定
+    // manualData.config から情報を取得するように修正
     const finalTokens = manualData?.tokens || customTokens;
-    const finalName = manualData?.name || pizzaName;
-    const finalType = manualData?.type || selectedStrategy?.type || 'BALANCED';
-
-    if (!finalTokens || finalTokens.length === 0) {
-      console.warn("Warning: Token data is empty in handleDeploySuccess");
-    }
-
+    const finalName = manualData?.config?.name || pizzaName; 
+    
+    // type プロパティは現在 config 内にないため、暫定的に 'BALANCED'
+    const finalType = 'BALANCED'; 
+  
     setDeployedStrategy({
       address: strategyAddress,
       name: finalName,

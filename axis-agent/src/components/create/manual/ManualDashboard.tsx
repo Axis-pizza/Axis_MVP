@@ -11,9 +11,17 @@ import { BacktestChart } from '../../common/BacktestChart';
 
 // --- Types ---
 export interface ManualData {
-  tokens: { symbol: string; weight: number; mint: string }[];
-  config: StrategyConfig;
-}
+    tokens: { symbol: string; weight: number; mint: string }[];
+    config: {
+      name: string;
+      ticker: string;
+      description: string;
+      curatorFee: number;
+      protocolFee: number;
+      rebalanceTrigger: 'THRESHOLD' | 'PERIODIC';
+      rebalanceValue: number;
+    };
+  }
 
 interface StrategyConfig {
   name: string;

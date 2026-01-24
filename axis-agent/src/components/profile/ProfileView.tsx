@@ -67,55 +67,40 @@ export const ProfileView = () => {
   const [myStrategies, setMyStrategies] = useState<any[]>([]);
   const [investedStrategies, setInvestedStrategies] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
-
+  const [myRank, setMyRank] = useState<{ total_xp?: number; rank_tier?: string; username?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
   // PnL (Mock Logic for Demo)
   const [pnlPercent, setPnlPercent] = useState<number>(12.49);
 
   // Fetch Data
   useEffect(() => {
-    if (!publicKey) return;
-    
-    const initData = async () => {
-      setIsLoading(true); // ロード開始
+    const fetchData = async () => {
+      setLoading(true);
       try {
-        // 1. Get Price
-        const price = await api.getSolPrice().catch(() => 200); 
-        setSolPrice(price);
-
-        // 2. Fetch User & Strategies
-        const [userRes, strategiesRes, lbRes] = await Promise.all([
-             api.getUser(publicKey.toBase58()),
-             api.getUserStrategies(publicKey.toBase58()),
-             api.getLeaderboard()
+        const [lbRes, userRes] = await Promise.all([
+          api.getLeaderboard(),
+          publicKey ? api.getUser(publicKey.toBase58()) : Promise.resolve({ user: null })
         ]);
-        
-        if (userRes.success || userRes.username) {
-            const user = userRes.user || userRes;
-            setUserData(user);
-            if (user.pnl_percent !== undefined) setPnlPercent(user.pnl_percent);
-            if (user.total_invested_usd !== undefined) setInvestedAmountUSD(user.total_invested_usd);
+
+        if (lbRes.success) {
+          setLeaderboard(lbRes.leaderboard);
         }
-
-        if (strategiesRes.success) setMyStrategies(strategiesRes.strategies);
-        if (lbRes.success) setLeaderboard(lbRes.leaderboard);
         
-        // Mock Dataの設定 (※ここもAPIから取れるなら修正、一旦モックはコメントアウトするか0にする)
-        // setInvestedStrategies([{ id: '1', name: 'Solana High Yield', amount: 1500 }]);
-        // setActivities([{ type: 'deposit', asset: 'Solana High Yield', amount: '10 SOL', date: '2h ago' }]);
-
-        // Sync (初回のみ)
-        if (userRes.pnl_percent) {
-             // 必要に応じて同期ロジック
+        // 修正箇所: 'success' in userRes を使ってプロパティの存在を確認する
+        if (userRes && 'success' in userRes && userRes.success && userRes.user) {
+          setMyRank(prev => ({
+            ...(prev || {}),
+            ...userRes.user,
+            username: userRes.user.username || 'Anonymous'
+          }));
         }
-
-      } catch (e) { 
-          console.error(e); 
+      } catch (e) {
+        console.error(e);
       } finally {
-          setIsLoading(false); // ロード完了
+        setLoading(false);
       }
     };
-    
-    initData();
+    fetchData();
   }, [publicKey]);
 
   // Balance
