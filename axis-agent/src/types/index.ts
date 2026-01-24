@@ -24,7 +24,7 @@ export interface Strategy {
   name: string;
   ticker?: string; // 追加: 表示用のティッカー
   type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
-  description: string;
+  description?: string;
   tokens: TokenAllocation[];
   metrics?: { // オプショナルに変更（一覧では計算済みデータを使うため）
     expectedApy: number;

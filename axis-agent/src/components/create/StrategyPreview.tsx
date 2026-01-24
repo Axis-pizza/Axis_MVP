@@ -129,20 +129,20 @@ export const StrategyPreview = ({ strategy, selected, onSelect, expanded = false
           <div className="bg-[#1C1917] p-3 text-center">
             <p className="text-[9px] text-[#78716C] uppercase tracking-widest mb-0.5">ROI</p>
             <p className={`text-sm font-bold font-serif ${defaultColors.text}`}>
-              +{strategy.metrics.expectedApy}%
+            +{strategy.metrics?.expectedApy ?? 0}%
             </p>
           </div>
           <div className="bg-[#1C1917] p-3 text-center">
             <p className="text-[9px] text-[#78716C] uppercase tracking-widest mb-0.5">Risk</p>
-            <p className="text-sm font-serif text-[#E7E5E4]">{strategy.metrics.riskScore}<span className="text-[9px] text-[#57534E]">/10</span></p>
+            <p className="text-sm font-serif text-[#E7E5E4]">{strategy.metrics?.riskScore ?? '-'}<span className="text-[9px] text-[#57534E]">/10</span></p>
           </div>
           <div className="bg-[#1C1917] p-3 text-center">
             <p className="text-[9px] text-[#78716C] uppercase tracking-widest mb-0.5">Win</p>
-            <p className="text-sm font-serif text-[#E7E5E4]">{strategy.metrics.winRate}%</p>
+            <p className="text-sm font-serif text-[#E7E5E4]">{strategy.metrics?.winRate ?? '-'}%</p>
           </div>
           <div className="bg-[#1C1917] p-3 text-center">
             <p className="text-[9px] text-[#78716C] uppercase tracking-widest mb-0.5">Sharpe</p>
-            <p className="text-sm font-serif text-[#E7E5E4]">{strategy.metrics.sharpeRatio}</p>
+            <p className="text-sm font-serif text-[#E7E5E4]">{strategy.metrics?.sharpeRatio ?? '-'}</p>
           </div>
         </div>
 

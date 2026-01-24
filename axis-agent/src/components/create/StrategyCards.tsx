@@ -7,27 +7,7 @@ import { motion } from 'framer-motion';
 import { Zap, Shield, Waves, TrendingUp, Check } from 'lucide-react';
 import { PizzaChart } from '../common/PizzaChart';
 import { BacktestChart } from '../common/BacktestChart';
-
-interface Strategy {
-  id: string;
-  name: string;
-  type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
-  description: string;
-  tokens: { symbol: string; weight: number }[];
-  metrics: {
-    expectedApy: number;
-    riskScore: number;
-    winRate: number;
-    sharpeRatio: number;
-  };
-  backtest: {
-    timestamps: number[];
-    values: number[];
-    sharpeRatio: number;
-    maxDrawdown: number;
-    volatility: number;
-  };
-}
+import type { Strategy } from '../../types'; // ★修正: グローバル型をインポート
 
 interface StrategyCardsProps {
   strategies: Strategy[];
@@ -142,22 +122,22 @@ export const StrategyCards = ({ strategies, selectedId, onSelect, onConfirm }: S
                   <div className="flex-1 grid grid-cols-2 gap-2">
                     <MetricBox
                       label="Expected APY"
-                      value={`+${strategy.metrics.expectedApy}%`}
-                      color={strategy.metrics.expectedApy > 50 ? 'text-orange-400' : 'text-emerald-400'}
+                      value={`+${strategy.metrics?.expectedApy ?? 0}%`} // ★修正: オプショナルチェーン
+                      color={(strategy.metrics?.expectedApy ?? 0) > 50 ? 'text-orange-400' : 'text-emerald-400'}
                     />
                     <MetricBox
                       label="Risk Score"
-                      value={`${strategy.metrics.riskScore}/10`}
-                      color={strategy.metrics.riskScore > 6 ? 'text-red-400' : 'text-emerald-400'}
+                      value={`${strategy.metrics?.riskScore ?? '-'}/10`} // ★修正
+                      color={(strategy.metrics?.riskScore ?? 0) > 6 ? 'text-red-400' : 'text-emerald-400'}
                     />
                     <MetricBox
                       label="Win Rate"
-                      value={`${strategy.metrics.winRate}%`}
+                      value={`${strategy.metrics?.winRate ?? '-'}%`} // ★修正
                       color="text-white"
                     />
                     <MetricBox
                       label="Sharpe"
-                      value={strategy.metrics.sharpeRatio.toFixed(2)}
+                      value={strategy.metrics?.sharpeRatio?.toFixed(2) ?? '-'} // ★修正
                       color="text-white"
                     />
                   </div>

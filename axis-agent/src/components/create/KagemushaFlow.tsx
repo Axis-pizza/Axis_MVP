@@ -18,16 +18,10 @@ import { ManualFlow, type ManualData } from './manual/ManualFlow'; // 型をimpo
 import { StrategySettings } from './manual/StrategySettings';
 import { api } from '../../services/api';
 import { getUserStrategies, type OnChainStrategy } from '../../services/kagemusha';
+import type { Strategy } from '../../types/index';
 
 type CreateStep = 'DIRECTIVE' | 'SIMULATION' | 'CUSTOMIZE' | 'SETTINGS' | 'DEPOSIT' | 'DASHBOARD' | 'REBALANCE';
 
-interface Strategy {
-  id: string;
-  name: string;
-  type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
-  description: string;
-  tokens: { symbol: string; weight: number }[];
-}
 
 interface DeployedStrategy {
   address: string;
