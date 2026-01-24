@@ -59,7 +59,7 @@ export default function Home() {
 
         {view === 'PROFILE' && (
           <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-32">
-            <ProfileView isConnected={isConnected} shortAddress={shortAddress} balance={balance} publicKey={publicKey} onDisconnect={disconnect} />
+            <ProfileView />
           </motion.div>
         )}
 

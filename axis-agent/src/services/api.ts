@@ -237,6 +237,20 @@ export const api = {
     }
   },
 
+  async requestFaucet(wallet: string) {
+    try {
+      // エンドポイントは仮定。必要に応じてバックエンドに合わせてください
+      const res = await fetch(`${API_BASE}/faucet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, error: 'Network Error' };
+    }
+  },
+
   async getVaults() {
     const res = await fetch(`${API_BASE}/vaults`);
     return res.json();

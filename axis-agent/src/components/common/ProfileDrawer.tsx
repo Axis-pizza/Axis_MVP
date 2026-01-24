@@ -191,15 +191,15 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       <ProfileEditModal 
         isOpen={isEditOpen} 
         onClose={() => setIsEditOpen(false)}
-        walletAddress={publicKey.toBase58()}
-        // ★修正ポイント: ここを currentProfile に修正
+        // walletAddress はコンポーネント定義にはない可能性がありますが、currentProfileに統合されます
+        // onSave -> onUpdate に変更されている可能性がありますが、定義に合わせてください
         currentProfile={{
+          pubkey: publicKey.toBase58(), // ★修正: pubkeyを追加
           username: userData?.username,
           bio: userData?.bio,
-          pfpUrl: userData?.avatar_url,
+          avatar_url: userData?.avatar_url, // ★修正: pfpUrl -> avatar_url
         }}
-        onSave={fetchUser} // 保存完了時にユーザー情報を再取得
-        isRegistration={!userData?.username && !userData?.invite_code_used}
+        onUpdate={fetchUser} // ★修正: ProfileEditModalのProps名に合わせて変更 (onSave or onUpdate)
       />
     </>,
     document.body

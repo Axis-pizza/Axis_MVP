@@ -109,7 +109,7 @@ export const ListDiscoverView = ({ onToggleView, onStrategySelect }: ListDiscove
     
     fetchStrategies();
   }, [publicKey]);
-  
+
   const filteredStrategies = strategies
     .filter(s => 
       s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -333,16 +333,9 @@ export const ListDiscoverView = ({ onToggleView, onStrategySelect }: ListDiscove
         strategy={selectedStrategy ? {
           ...selectedStrategy,
           address: selectedStrategy.id, 
-          pnl: 0 // Mock pnl
+          pnl: 0 
         } : null}
         onClose={() => setSelectedStrategy(null)}
-        onSelect={() => {
-          if (selectedStrategy) {
-            onStrategySelect(selectedStrategy);
-            setSelectedStrategy(null);
-          }
-        }}
-        showSelectButton={true} 
       />
     </div>
   );
