@@ -106,7 +106,9 @@ app.post('/request-invite', async (c) => {
 app.get('/user', async (c) => { 
   const wallet = c.req.query('wallet');
   
-  if (!wallet) return c.json({ error: 'Wallet address required' }, 400);
+  if (!wallet) {
+    return c.json({ error: 'Wallet address required' }, 400);
+  }
 
   try {
     const user = await UserModel.findUserByWallet(c.env.axis_db, wallet);
@@ -117,9 +119,11 @@ app.get('/user', async (c) => {
       bio: user.bio,
       pfpUrl: user.avatar_url,
       badges: user.badges ? JSON.parse(user.badges) : [],
+      // ★追加
       total_xp: user.total_xp || 500,
       rank_tier: user.rank_tier || 'Novice',
-      last_checkin: user.last_checkin || 0
+      pnl_percent: user.pnl_percent || 0,
+      total_invested: user.total_invested_usd || 0
     });
 
   } catch (e: any) {
@@ -192,6 +196,59 @@ app.get('/my-invites', async (c) => {
     if(!user) return c.json([]);
     const invites = await InviteModel.findInvitesByCreator(c.env.axis_db, user.id);
     return c.json(invites);
+});
+
+
+
+
+app.get('/leaderboard', async (c) => {
+  try {
+    // pnl_percent の高い順に上位50人を取得
+    const query = `
+      SELECT name, wallet_address, avatar_url, total_xp, rank_tier, pnl_percent 
+      FROM users 
+      ORDER BY pnl_percent DESC 
+      LIMIT 50
+    `;
+    const { results } = await c.env.axis_db.prepare(query).all();
+
+    return c.json({ 
+      success: true, 
+      leaderboard: results.map((u: any) => ({
+        pubkey: u.wallet_address,
+        username: u.name,
+        avatar_url: u.avatar_url,
+        rank_tier: u.rank_tier,
+        total_xp: u.total_xp,
+        pnl_percent: u.pnl_percent || 0 // 追加: PnL
+      }))
+    });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+// 2. 投資成績の同期 (Sync)
+app.post('/user/stats', async (c) => {
+  try {
+      const { wallet_address, pnl_percent, total_invested_usd } = await c.req.json();
+
+      if (!wallet_address) return c.json({ error: 'Wallet required' }, 400);
+
+      // DB更新
+      await c.env.axis_db.prepare(
+          `UPDATE users SET pnl_percent = ?, total_invested_usd = ?, last_snapshot_at = ? WHERE wallet_address = ?`
+      ).bind(
+          pnl_percent || 0, 
+          total_invested_usd || 0, 
+          Math.floor(Date.now() / 1000), 
+          wallet_address
+      ).run();
+
+      return c.json({ success: true });
+  } catch (e: any) {
+      return c.json({ success: false, error: e.message }, 500);
+  }
 });
 
 export default app;

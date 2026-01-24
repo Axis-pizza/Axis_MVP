@@ -18,6 +18,9 @@ export interface User {
   total_xp?: number;
   rank_tier?: string;
   last_checkin?: number;
+  pnl_percent?: number;
+  total_invested_usd?: number;
+  last_snapshot_at?: number;
 }
 
 // --- Read Functions ---
@@ -72,32 +75,32 @@ export async function createOtpUser(db: D1Database, id: string, email: string, c
 // --- Update Functions ---
 
 export async function updateUser(db: D1Database, wallet: string, updates: { name?: string, bio?: string, avatar_url?: string, badges?: string }): Promise<void> {
-    const setClauses: string[] = [];
-    const values: any[] = [];
+  const setClauses: string[] = [];
+  const values: any[] = [];
 
-    if (updates.name !== undefined) {
-        setClauses.push("name = ?");
-        values.push(updates.name ?? null);
-    }
-    if (updates.bio !== undefined) {
-        setClauses.push("bio = ?");
-        values.push(updates.bio ?? null);
-    }
-    if (updates.avatar_url !== undefined) {
-        setClauses.push("avatar_url = ?");
-        values.push(updates.avatar_url ?? null);
-    }
-    if (updates.badges !== undefined) {
-        setClauses.push("badges = ?");
-        values.push(updates.badges ?? null);
-    }
+  if (updates.name !== undefined) {
+      setClauses.push("name = ?");
+      values.push(updates.name ?? null);
+  }
+  if (updates.bio !== undefined) {
+      setClauses.push("bio = ?");
+      values.push(updates.bio ?? null);
+  }
+  if (updates.avatar_url !== undefined) {
+      setClauses.push("avatar_url = ?");
+      values.push(updates.avatar_url ?? null);
+  }
+  if (updates.badges !== undefined) {
+      setClauses.push("badges = ?");
+      values.push(updates.badges ?? null);
+  }
 
-    if (setClauses.length === 0) return;
+  if (setClauses.length === 0) return;
 
-    values.push(wallet);
+  values.push(wallet);
 
-    const query = `UPDATE users SET ${setClauses.join(", ")} WHERE wallet_address = ?`;
-    await db.prepare(query).bind(...values).run();
+  const query = `UPDATE users SET ${setClauses.join(", ")} WHERE wallet_address = ?`;
+  await db.prepare(query).bind(...values).run();
 }
 
 export async function updateUserXp(db: D1Database, wallet: string, xp: number, lastCheckin: number): Promise<void> {
@@ -115,4 +118,23 @@ export async function updateUserWalletAndInvite(db: D1Database, email: string, w
 export async function updateUserOtp(db: D1Database, email: string, code: string, expires: number): Promise<void> {
     await db.prepare("UPDATE users SET otp_code = ?, otp_expires = ? WHERE email = ?")
       .bind(code ?? null, expires ?? null, email ?? null).run();
+}
+
+export async function updateUserStats(db: D1Database, wallet: string, pnl: number, invested: number): Promise<void> {
+  const now = Math.floor(Date.now() / 1000); // Unix Timestamp
+  
+  // ランク判定ロジック (簡易版)
+  let rank = 'Novice';
+  if (invested > 10000) rank = 'Whale';
+  else if (pnl > 50) rank = 'Alpha';
+  else if (invested > 1000) rank = 'Degen';
+
+  await db.prepare(
+    `UPDATE users SET 
+       pnl_percent = ?, 
+       total_invested_usd = ?, 
+       rank_tier = ?,
+       last_snapshot_at = ? 
+     WHERE wallet_address = ?`
+  ).bind(pnl, invested, rank, now, wallet).run();
 }

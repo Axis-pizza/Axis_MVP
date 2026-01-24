@@ -11,6 +11,7 @@ import vaultRoutes from './routes/vault';
 import miscRoutes from './routes/misc';
 import kagemushaRoutes from './routes/kagemusha';
 import uploadRoutes from './routes/upload';
+import shareRoutes from './routes/share';
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -38,6 +39,7 @@ app.route('/', vaultRoutes);
 app.route('/', miscRoutes);
 app.route('/', kagemushaRoutes);
 app.route('/upload', uploadRoutes);
+app.route('/share', shareRoutes);
 
 // ★追加: テスト用に手動でXP配布を実行する隠しルート
 app.post('/admin/run-daily-xp', async (c) => {

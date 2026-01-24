@@ -13,7 +13,10 @@
     "bs58": "^6.0.0",
     "buffer": "^6.0.3",
     "hono": "^4.11.3",
-    "mimetext": "^3.0.27"
+    "mimetext": "^3.0.27",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "satori": "^0.19.1"
   },
   "devDependencies": {
     "wrangler": "^4.60.0"

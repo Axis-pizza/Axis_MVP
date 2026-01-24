@@ -188,14 +188,40 @@ export const api = {
     }
   },
 
-  async getLeaderboard() {
+  async syncUserStats(wallet: string, pnl: number, invested: number) {
     try {
-      const res = await fetch(`${API_BASE}/leaderboard`);
-      return await res.json();
-    } catch (error) {
-      return { success: false, leaderboard: [] };
+      await fetch(`${API_BASE}/user/stats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wallet_address: wallet,
+          pnl_percent: pnl,
+          total_invested_usd: invested
+        }),
+      });
+    } catch (e) {
+      console.error("Sync stats failed", e);
     }
   },
+
+  // ★修正: リーダーボード取得
+  async getLeaderboard() {
+    const res = await fetch(`${API_BASE}/user/leaderboard`);
+    return await res.json();
+  },
+
+  async getSolPrice() {
+    try {
+      const res = await fetch(`${API_BASE}/price/sol`); 
+      const data = await res.json();
+      return data.price;
+    } catch (e) {
+      console.error("Price fetch failed", e);
+      return 0;
+    }
+  },
+
+  
 
   async getTokens() {
     const res = await fetch(`${API_BASE}/tokens`);

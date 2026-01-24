@@ -12,15 +12,30 @@ DROP TABLE IF EXISTS xp_ledger;
 -- 2. ユーザー管理 (XP & Referral統合)
 -- =====================================================
 CREATE TABLE users (
-  pubkey TEXT PRIMARY KEY,
-  username TEXT,
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE,
+  wallet_address TEXT UNIQUE,
+  twitter_id TEXT,
+  google_id TEXT,
+  name TEXT,
   avatar_url TEXT,
+  bio TEXT,
+  badges TEXT,
+  invite_code TEXT UNIQUE,
+  invite_code_used TEXT,
+  otp_code TEXT,
+  otp_expires INTEGER,
   
-  -- XPシステム
-  total_xp REAL DEFAULT 0,           -- 累計XP
-  rank_tier TEXT DEFAULT 'Novice',   -- ランク
-  referrer_id TEXT,                  -- 親(紹介者)のPubkey
-  
+  -- ゲーム要素（既存）
+  total_xp INTEGER DEFAULT 500,
+  rank_tier TEXT DEFAULT 'Novice',
+  last_checkin INTEGER DEFAULT 0,
+
+  -- ★追加: 投資成績データ
+  pnl_percent REAL DEFAULT 0,       -- 通算損益率 (例: 12.5)
+  total_invested_usd REAL DEFAULT 0, -- 総投資額 (USD)
+  last_snapshot_at INTEGER,         -- 最終更新日時 (Unix Timestamp)
+
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
