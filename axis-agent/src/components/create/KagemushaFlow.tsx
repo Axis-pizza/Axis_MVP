@@ -1,5 +1,5 @@
 /**
- * Kagemusha Create Flow - Corrected Data Passing
+ * Kagemusha Create Flow - Integrated with Manual Dashboard
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -14,20 +14,23 @@ import { DepositFlow } from './DepositFlow';
 import { StrategyDashboard } from './StrategyDashboard';
 import { RebalanceFlow } from './RebalanceFlow';
 import { CreateModeSelector } from './CreateModeSelector';
-import { ManualFlow, type ManualData } from './manual/ManualFlow'; // 型をimport
-import { StrategySettings } from './manual/StrategySettings';
+
+// --- Change 1: Import new Dashboard & Type ---
+import { ManualDashboard, type ManualData } from './manual/ManualDashboard'; 
+import { StrategySettings } from './manual/StrategySettings'; // AI Flow用 (もしManualDashboard内に統合されていれば不要だが、AI側で使うため残す)
+
 import { api } from '../../services/api';
 import { getUserStrategies, type OnChainStrategy } from '../../services/kagemusha';
 import type { Strategy } from '../../types/index';
 
 type CreateStep = 'DIRECTIVE' | 'SIMULATION' | 'CUSTOMIZE' | 'SETTINGS' | 'DEPOSIT' | 'DASHBOARD' | 'REBALANCE';
 
-
 interface DeployedStrategy {
   address: string;
   name: string;
   type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
-  tokens: { symbol: string; weight: number }[];
+  // --- Change 2: Allow mint address (Manual mode provides this) ---
+  tokens: { symbol: string; weight: number; mint?: string }[];
 }
 
 export const KagemushaFlow = () => {
@@ -123,21 +126,17 @@ export const KagemushaFlow = () => {
   };
 
   // --- Common Handlers ---
-  // ★重要: ここでデータを受け取る (manualData引数を追加)
   const handleDeploySuccess = (
     strategyAddress: string, 
-    manualData?: ManualData // 型定義を使用
+    manualData?: ManualData 
   ) => {
-    // データソースの決定: マニュアルデータがあればそれを使用、なければAIのStateを使用
+    // manualData.config から情報を取得するように修正
     const finalTokens = manualData?.tokens || customTokens;
-    const finalName = manualData?.name || pizzaName;
-    const finalType = manualData?.type || selectedStrategy?.type || 'BALANCED';
-
-    // データの整合性チェック（デバッグ用）
-    if (!finalTokens || finalTokens.length === 0) {
-      console.warn("Warning: Token data is empty in handleDeploySuccess");
-    }
-
+    const finalName = manualData?.config?.name || pizzaName; 
+    
+    // type プロパティは現在 config 内にないため、暫定的に 'BALANCED'
+    const finalType = 'BALANCED'; 
+  
     setDeployedStrategy({
       address: strategyAddress,
       name: finalName,
@@ -171,7 +170,10 @@ export const KagemushaFlow = () => {
   };
 
   const getProgress = () => {
-    if (createMode === 'MANUAL' && step === 'DIRECTIVE') return '0%';
+    // ManualモードのDashboardは1画面完結なので、プログレスバーは不要または100%でも良いが、
+    // ここではステップ管理外の扱いとして非表示にする制御をRender側で行う
+    if (createMode === 'MANUAL') return '50%'; 
+    
     switch (step) {
       case 'DIRECTIVE': return '20%';
       case 'SIMULATION': return '40%';
@@ -185,7 +187,8 @@ export const KagemushaFlow = () => {
 
   return (
     <div className="min-h-screen bg-[#030303]">
-      {(createMode === 'AI' || step !== 'DIRECTIVE') && (
+      {/* Progress Bar (AI Mode Only) */}
+      {(createMode === 'AI' && step !== 'DASHBOARD' && step !== 'DEPOSIT') && (
         <div className="fixed top-0 left-0 right-0 h-1 bg-white/5 z-50">
           <motion.div
             className="h-full bg-gradient-to-r from-orange-500 to-amber-500"
@@ -195,11 +198,16 @@ export const KagemushaFlow = () => {
         </div>
       )}
 
-      <div className="pt-20 px-4 pb-32 max-w-4xl mx-auto">
+      <div className="pt-20 px-4 pb-32 max-w-6xl mx-auto"> {/* Width increased for Dashboard */}
+        
+        {/* Step 1: Mode Selector (Only visible at start) */}
         {step === 'DIRECTIVE' && (
           <CreateModeSelector mode={createMode} onChange={setCreateMode} />
         )}
 
+        {/* --- MAIN CONTENT AREA --- */}
+        
+        {/* Case 1: Post-Deployment Steps (Deposit / Dashboard / Rebalance) */}
         {step === 'DASHBOARD' || step === 'REBALANCE' || step === 'DEPOSIT' ? (
            <AnimatePresence mode="wait">
              {step === 'DEPOSIT' && deployedStrategy && (
@@ -241,17 +249,24 @@ export const KagemushaFlow = () => {
                </motion.div>
              )}
            </AnimatePresence>
+        
         ) : createMode === 'MANUAL' ? (
           
-          /* --- Manual Flow --- */
-          <ManualFlow 
-            // ★重要修正: 子(data)から受け取ったデータを、親の関数に引数として渡す！
-            onDeploySuccess={(data) => handleDeploySuccess("So11111111111111111111111111111111111111112", data)} 
-          />
+          /* --- Case 2: New Manual Flow (Dashboard) --- */
+          /* Change 3: Use ManualDashboard */
+          <motion.div 
+            key="manual-dashboard"
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <ManualDashboard 
+              onDeploySuccess={(data) => handleDeploySuccess("So11111111111111111111111111111111111111112", data)} 
+            />
+          </motion.div>
         
         ) : (
           
-          /* --- AI Flow --- */
+          /* --- Case 3: AI Flow (Wizard Steps) --- */
           <AnimatePresence mode="wait">
             {step === 'DIRECTIVE' && (
               <motion.div key="directive" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>

@@ -7,6 +7,7 @@ import { sendInviteEmail } from '../services/email';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+// --- Register ---
 app.post('/register', async (c) => {
   try {
     const { email, wallet_address, invite_code_used, avatar_url, name, bio } = await c.req.json()
@@ -18,14 +19,14 @@ app.post('/register', async (c) => {
     let referrerId: string | null = null;
     let isSystemInvite = false;
 
-    // 1. Check if it's a User Referral Code (Permanent)
+    // Check User Code
     const referrerUser = await c.env.axis_db.prepare('SELECT id FROM users WHERE invite_code = ?').bind(invite_code_used).first();
     
     if (referrerUser) {
       // @ts-ignore
       referrerId = referrerUser.id;
     } else {
-      // 2. Check if it's a System/One-time Invite Code
+      // Check System Code
       const invite = await InviteModel.findInviteByCode(c.env.axis_db, invite_code_used);
       if (invite) {
         referrerId = (invite.creator_id === 'system') ? null : invite.creator_id;
@@ -48,62 +49,60 @@ app.post('/register', async (c) => {
     const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
     const newInviteCode = `AXIS-${randomSuffix}`
 
-    // @ts-ignore
     await UserModel.createRegisteredUser(c.env.axis_db, newId, email, wallet_address, newInviteCode, invite_code_used, avatar_url, name, bio);
 
-    // If it was a one-time invite, mark it as used
     if (isSystemInvite) {
       await InviteModel.markInviteUsed(c.env.axis_db, invite_code_used, newId);
     }
 
-    // Send Invite Email (async, don't block response)
-    c.executionCtx.waitUntil(
-      sendInviteEmail(c.env, email, newInviteCode)
-    );
+    try {
+      await sendInviteEmail(c.env, email, newInviteCode);
+    } catch (err) {
+      console.error("Email send failed (non-fatal):", err);
+    }
 
     return c.json({ 
       success: true, 
-      user: { 
-        id: newId, 
-        invite_code: newInviteCode,
-        is_existing: false
-      } 
+      user: { id: newId, invite_code: newInviteCode, is_existing: false } 
     })
 
-  } catch (e) {
-    console.error(e)
-    return c.json({ error: 'Internal Server Error' }, 500)
+  } catch (e: any) {
+    console.error('Register Error:', e)
+    return c.json({ error: e.message || 'Internal Server Error' }, 500)
   }
 })
 
+// --- Request Invite ---
 app.post('/request-invite', async (c) => {
   try {
     const { email } = await c.req.json();
     
     if (!email) return c.json({ error: 'Email is required' }, 400);
 
-    // 1. Check if user already exists
     const existingUser = await UserModel.findUserByEmail(c.env.axis_db, email);
     if (existingUser) {
         return c.json({ error: 'User already registered' }, 409);
     }
 
-    // 2. Generate new invite code (assigned to 'system')
-    const code = await InviteModel.createOneInvite(c.env.axis_db, 'system');
+    // ★修正: createOneInviteにemailを渡す
+    const code = await InviteModel.createOneInvite(c.env.axis_db, 'system', email);
 
-    // 3. Send Email
-    c.executionCtx.waitUntil(
-        sendInviteEmail(c.env, email, code)
-    );
+    try {
+        await sendInviteEmail(c.env, email, code);
+    } catch (emailError: any) {
+        console.error('Send Email Error:', emailError);
+        return c.json({ error: 'Failed to send invite email' }, 500);
+    }
 
     return c.json({ success: true, message: 'Invite code sent' });
 
-  } catch (e) {
+  } catch (e: any) {
     console.error('Request Invite Error:', e);
-    return c.json({ error: 'Internal Server Error' }, 500);
+    return c.json({ error: e.message || 'Internal Server Error' }, 500);
   }
 });
 
+// --- Get User ---
 app.get('/user', async (c) => { 
   const wallet = c.req.query('wallet');
   
@@ -119,7 +118,12 @@ app.get('/user', async (c) => {
       username: user.name,
       bio: user.bio,
       pfpUrl: user.avatar_url,
-      badges: user.badges ? JSON.parse(user.badges) : []
+      badges: user.badges ? JSON.parse(user.badges) : [],
+      // ★追加
+      total_xp: user.total_xp || 500,
+      rank_tier: user.rank_tier || 'Novice',
+      pnl_percent: user.pnl_percent || 0,
+      total_invested: user.total_invested_usd || 0
     });
 
   } catch (e: any) {
@@ -128,6 +132,7 @@ app.get('/user', async (c) => {
   }
 });
 
+// --- Update Profile ---
 app.post('/user', async (c) => { 
   let body;
   try {
@@ -138,16 +143,12 @@ app.post('/user', async (c) => {
 
   const { wallet_address, name, bio, avatar_url, badges } = body;
 
-  if (!wallet_address || typeof wallet_address !== 'string') {
-    return c.json({ success: false, error: 'Wallet address is required and must be a string' }, 400);
-  }
-  if (name && name.length > 50) return c.json({ success: false, error: 'Username must be 50 characters or less' }, 400);
-  if (bio && bio.length > 200) return c.json({ success: false, error: 'Bio must be 200 characters or less' }, 400);
-
+  if (!wallet_address) return c.json({ success: false, error: 'Wallet address is required' }, 400);
+  
   try {
     const existing = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
     if (!existing) {
-      return c.json({ success: false, error: "User not found. Please register first." }, 404);
+      return c.json({ success: false, error: "User not found" }, 404);
     }
 
     const badgesStr = Array.isArray(badges) ? JSON.stringify(badges) : (badges || null);
@@ -158,23 +159,96 @@ app.post('/user', async (c) => {
 
   } catch (e: any) {
     console.error("[DB Error]", e);
-    if (e.message.includes('UNIQUE constraint failed')) {
-      return c.json({ success: false, error: 'This username is already taken' }, 409);
-    }
-    throw new HTTPException(500, { message: 'Database operation failed' });
+    return c.json({ success: false, error: 'Database operation failed' }, 500);
   }
 });
 
+// --- Daily Check-in ---
+app.post('/users/:wallet/checkin', async (c) => {
+    const wallet = c.req.param('wallet');
+    try {
+        const user = await UserModel.findUserByWallet(c.env.axis_db, wallet);
+        if (!user) return c.json({ success: false, message: 'User not found' }, 404);
+
+        const now = Math.floor(Date.now() / 1000);
+        const lastCheckin = user.last_checkin || 0;
+        
+        if (now - lastCheckin < 20 * 60 * 60) { 
+             return c.json({ success: false, message: 'Already checked in today' });
+        }
+
+        const newXp = (user.total_xp || 0) + 10;
+        await UserModel.updateUserXp(c.env.axis_db, wallet, newXp, now);
+
+        return c.json({ 
+            success: true, 
+            user: { ...user, total_xp: newXp, last_checkin: now } 
+        });
+    } catch (e: any) {
+        return c.json({ success: false, error: e.message }, 500);
+    }
+});
 
 app.get('/my-invites', async (c) => { 
     const email = c.req.query('email');
     if(!email) return c.json([]);
-  
     const user = await UserModel.findUserByEmail(c.env.axis_db, email);
     if(!user) return c.json([]);
-  
     const invites = await InviteModel.findInvitesByCreator(c.env.axis_db, user.id);
     return c.json(invites);
+});
+
+
+
+
+app.get('/leaderboard', async (c) => {
+  try {
+    // pnl_percent の高い順に上位50人を取得
+    const query = `
+      SELECT name, wallet_address, avatar_url, total_xp, rank_tier, pnl_percent 
+      FROM users 
+      ORDER BY pnl_percent DESC 
+      LIMIT 50
+    `;
+    const { results } = await c.env.axis_db.prepare(query).all();
+
+    return c.json({ 
+      success: true, 
+      leaderboard: results.map((u: any) => ({
+        pubkey: u.wallet_address,
+        username: u.name,
+        avatar_url: u.avatar_url,
+        rank_tier: u.rank_tier,
+        total_xp: u.total_xp,
+        pnl_percent: u.pnl_percent || 0 // 追加: PnL
+      }))
+    });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+// 2. 投資成績の同期 (Sync)
+app.post('/user/stats', async (c) => {
+  try {
+      const { wallet_address, pnl_percent, total_invested_usd } = await c.req.json();
+
+      if (!wallet_address) return c.json({ error: 'Wallet required' }, 400);
+
+      // DB更新
+      await c.env.axis_db.prepare(
+          `UPDATE users SET pnl_percent = ?, total_invested_usd = ?, last_snapshot_at = ? WHERE wallet_address = ?`
+      ).bind(
+          pnl_percent || 0, 
+          total_invested_usd || 0, 
+          Math.floor(Date.now() / 1000), 
+          wallet_address
+      ).run();
+
+      return c.json({ success: true });
+  } catch (e: any) {
+      return c.json({ success: false, error: e.message }, 500);
+  }
 });
 
 export default app;
