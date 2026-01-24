@@ -173,11 +173,10 @@ export const api = {
   },
 
   async dailyCheckIn(pubkey: string) {
-    // URL生成
-    const url = `${API_BASE}/users/${pubkey}/checkin`;
+    // URLをバックエンドのルート定義 (/users/:wallet/checkin) に合わせる
+    const url = `${API_BASE}/users/${pubkey}/checkin`; 
     try {
       const res = await fetch(url, { method: 'POST' });
-      // レスポンスがJSONでない場合の対策
       const text = await res.text();
       try {
         return JSON.parse(text);

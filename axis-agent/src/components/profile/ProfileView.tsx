@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Medal, Users, Copy, CheckCircle, PlusCircle, TrendingUp, Sparkles, Crown, Shield } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'; // 追加
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -23,6 +24,7 @@ export const ProfileView = () => { // コンポーネント名はProfileViewの�
 
   // データ取得
   useEffect(() => {
+    // ウォレット未接続時はリーダーボードのフェッチのみ行う（ユーザー情報は取得しない）
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -73,6 +75,26 @@ export const ProfileView = () => { // コンポーネント名はProfileViewの�
   // 自分の順位を計算
   const myIndex = leaderboard.findIndex(u => u.pubkey === publicKey?.toBase58());
   const myRankNumber = myIndex !== -1 ? myIndex + 1 : '-';
+
+  // ★修正: ウォレット未接続時の表示を追加
+  if (!publicKey) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center pt-4 px-4 pb-24 safe-area-top text-center">
+        <div className="p-6 bg-[#D97706]/10 rounded-full mb-6 ring-1 ring-[#D97706]/30">
+          <Trophy className="w-16 h-16 text-[#D97706]" />
+        </div>
+        <h2 className="text-3xl font-serif font-bold text-white mb-3">Join the Leaderboard</h2>
+        <p className="text-white/50 text-sm mb-8 max-w-xs leading-relaxed">
+          Connect your wallet to compete for Season 0 Airdrop rewards and track your rankings.
+        </p>
+        
+        {/* Wallet Adapter UI のスタイルを上書きして使用 */}
+        <div className="wallet-adapter-button-trigger">
+            <WalletMultiButton style={{ backgroundColor: '#D97706', borderRadius: '12px', fontWeight: 'bold' }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto h-full flex flex-col pt-4 px-4 pb-24 safe-area-top">

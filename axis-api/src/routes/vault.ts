@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Bindings } from '../config/env';
 import * as VaultModel from '../models/vault';
 import { STRICT_LIST } from '../config/constants';
+// もし ../services/blockchain からのインポートでエラーが出る場合は、この行を一時的にコメントアウトしてください
 import { JitoBundleService } from '../services/blockchain';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -17,16 +18,10 @@ app.get('/vaults', async (c) => {
   }
 });
 
-// New Endpoint: Prepare for Deployment (Get Jito Tip Account)
 app.get('/vaults/prepare-deployment', async (c) => {
     try {
         const tipAccount = await jitoService.getRandomTipAccount();
-        // Return tip account for frontend to include in the transaction
-        return c.json({ 
-            success: true, 
-            tipAccount, 
-            minTip: 1000 // 1000 lamports minimum
-        });
+        return c.json({ success: true, tipAccount, minTip: 1000 });
     } catch (e: any) {
         return c.json({ success: false, error: e.message }, 500);
     }
@@ -37,22 +32,15 @@ app.post('/vaults/deploy', async (c) => {
     const body = await c.req.json();
     const { signedTransaction, metadata, vaultId } = body;
     
-    console.log(`[Jito] Received deployment request for ${metadata?.name}`);
-
-    // 1. Submit to Jito as a Bundle (Atomicity)
-    // Jito guarantees that this transaction + any others in the bundle are processed atomically.
     let bundleId;
     if (signedTransaction) {
-        // Send as a single-transaction bundle (or user could have bundled multiple ops)
         bundleId = await jitoService.sendBundle([signedTransaction]);
     } else {
         throw new Error("Missing signed transaction");
     }
 
-    // 2. Persist Metadata to DB
     if (metadata) {
         const { name, symbol, description, creator, strategy, fee, minLiquidity, composition, imageUrl } = metadata;
-        
         await VaultModel.createVault(c.env.axis_db, {
             id: vaultId || crypto.randomUUID(),
             name,
@@ -64,19 +52,15 @@ app.post('/vaults/deploy', async (c) => {
             min_liquidity: minLiquidity || 1000,
             composition: composition,
             image_url: imageUrl || null,
-            // Track Jito Bundle ID for verification
         });
     }
-
     return c.json({ success: true, bundleId, vaultId });
-
   } catch (e: any) {
-    console.error("Create Vault (Jito) Error:", e);
+    console.error("Create Vault Error:", e);
     return c.json({ success: false, error: e.message }, 500);
   }
 });
 
-// Legacy/Fallback endpoint
 app.post('/vaults', async (c) => {
   try {
     const body = await c.req.json();
@@ -89,8 +73,8 @@ app.post('/vaults', async (c) => {
 });
 
 app.get('/tokens', (c) => {
-    console.log(`[Axis Internal] Returning ${STRICT_LIST.length} curated tokens.`);
     return c.json(STRICT_LIST);
 });
 
+// ★この行が確実に存在することを確認してください
 export default app;

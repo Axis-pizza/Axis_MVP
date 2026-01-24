@@ -10,11 +10,14 @@ export interface User {
   avatar_url?: string;
   invite_code: string;
   referred_by?: string;
-  badges?: string; // JSON string
+  badges?: string; 
   otp_code?: string;
   otp_expires?: number;
   invite_code_used?: string;
   is_existing?: boolean;
+  total_xp?: number;
+  rank_tier?: string;
+  last_checkin?: number;
 }
 
 // --- Read Functions ---
@@ -36,23 +39,6 @@ export async function findUserByWallet(db: D1Database, wallet: string): Promise<
 
 // --- Create Functions ---
 
-export async function createUser(db: D1Database, user: Partial<User>): Promise<void> {
-    throw new Error("Use specific create functions");   
-}
-
-export async function createTwitterUser(db: D1Database, id: string, twitterId: string, name: string, avatar: string, inviteCode: string): Promise<void> {
-    await db.prepare(
-        "INSERT INTO users (id, twitter_id, name, avatar_url, invite_code) VALUES (?, ?, ?, ?, ?)"
-    ).bind(id ?? null, twitterId ?? null, name ?? null, avatar ?? null, inviteCode ?? null).run();
-}
-
-export async function createSocialUser(db: D1Database, id: string, email: string | null, wallet: string | null, inviteCode: string): Promise<void> {
-     await db.prepare(
-      `INSERT INTO users (id, email, wallet_address, invite_code) VALUES (?, ?, ?, ?)`
-    ).bind(id ?? null, email ?? null, wallet ?? null, inviteCode ?? null).run();
-}
-
-// ★一番重要な修正箇所 (undefinedガードを追加)
 export async function createRegisteredUser(
     db: D1Database, 
     id: string, 
@@ -65,7 +51,7 @@ export async function createRegisteredUser(
     bio?: string
 ): Promise<void> {
     await db.prepare(
-        'INSERT INTO users (id, email, wallet_address, invite_code, invite_code_used, avatar_url, name, bio, total_xp, rank_tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 500, "Novice")'
+        'INSERT INTO users (id, email, wallet_address, invite_code, invite_code_used, avatar_url, name, bio, total_xp, rank_tier, last_checkin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 500, "Novice", 0)'
       ).bind(
         id ?? null, 
         email ?? null, 
@@ -85,7 +71,6 @@ export async function createOtpUser(db: D1Database, id: string, email: string, c
 
 // --- Update Functions ---
 
-// ★修正: 値があるものだけを更新するように変更 (以前のコードだと未指定の項目が消えてしまうため)
 export async function updateUser(db: D1Database, wallet: string, updates: { name?: string, bio?: string, avatar_url?: string, badges?: string }): Promise<void> {
     const setClauses: string[] = [];
     const values: any[] = [];
@@ -107,26 +92,27 @@ export async function updateUser(db: D1Database, wallet: string, updates: { name
         values.push(updates.badges ?? null);
     }
 
-    // 更新するものがなければ終了
     if (setClauses.length === 0) return;
 
-    values.push(wallet); // WHERE句用
+    values.push(wallet);
 
     const query = `UPDATE users SET ${setClauses.join(", ")} WHERE wallet_address = ?`;
     await db.prepare(query).bind(...values).run();
 }
 
-export async function updateUserOtp(db: D1Database, email: string, code: string, expires: number): Promise<void> {
-    await db.prepare("UPDATE users SET otp_code = ?, otp_expires = ? WHERE email = ?")
-      .bind(code ?? null, expires ?? null, email ?? null).run();
+export async function updateUserXp(db: D1Database, wallet: string, xp: number, lastCheckin: number): Promise<void> {
+    await db.prepare("UPDATE users SET total_xp = ?, last_checkin = ? WHERE wallet_address = ?")
+        .bind(xp, lastCheckin, wallet).run();
 }
 
+// ★前回不足していた関数を追加
 export async function updateUserWalletAndInvite(db: D1Database, email: string, wallet: string | null, inviteCode: string): Promise<void> {
      await db.prepare(
     "UPDATE users SET otp_code = NULL, wallet_address = ?, invite_code_used = ? WHERE email = ?"
   ).bind(wallet ?? null, inviteCode ?? null, email ?? null).run();
 }
 
-export async function updateUserWallet(db: D1Database, id: string, wallet: string): Promise<void> {
-    await db.prepare("UPDATE users SET wallet_address = ? WHERE id = ?").bind(wallet ?? null, id ?? null).run();
+export async function updateUserOtp(db: D1Database, email: string, code: string, expires: number): Promise<void> {
+    await db.prepare("UPDATE users SET otp_code = ?, otp_expires = ? WHERE email = ?")
+      .bind(code ?? null, expires ?? null, email ?? null).run();
 }
