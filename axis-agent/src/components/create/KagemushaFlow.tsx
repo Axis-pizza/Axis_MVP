@@ -25,12 +25,19 @@ import type { Strategy } from '../../types/index';
 
 type CreateStep = 'DIRECTIVE' | 'SIMULATION' | 'CUSTOMIZE' | 'SETTINGS' | 'DEPOSIT' | 'DASHBOARD' | 'REBALANCE';
 
+interface FlowToken {
+  symbol: string;
+  weight: number;
+  mint?: string;
+  logoURI?: string;
+}
+
 interface DeployedStrategy {
   address: string;
   name: string;
   type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
   // --- Change 2: Allow mint address (Manual mode provides this) ---
-  tokens: { symbol: string; weight: number; mint?: string }[];
+  tokens: FlowToken[];
 }
 
 export const KagemushaFlow = () => {
@@ -44,7 +51,12 @@ export const KagemushaFlow = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
-  const [customTokens, setCustomTokens] = useState<{ symbol: string; weight: number }[]>([]);
+  const [customTokens, setCustomTokens] = useState<{ 
+    symbol: string; 
+    weight: number; 
+    mint?: string; 
+    logoURI?: string; 
+  }[]>([]);
   const [pizzaName, setPizzaName] = useState('');
   const [customToppings, setCustomToppings] = useState<Topping[]>([]);
   
@@ -126,26 +138,67 @@ export const KagemushaFlow = () => {
   };
 
   // --- Common Handlers ---
-  const handleDeploySuccess = (
-    strategyAddress: string, 
+  const handleDeploySuccess = async (
+    strategyAddress: string, // マニュアルモードではダミーが入る前提
     manualData?: ManualData 
   ) => {
-    // manualData.config から情報を取得するように修正
-    const finalTokens = manualData?.tokens || customTokens;
-    const finalName = manualData?.config?.name || pizzaName; 
+    if (!publicKey) {
+      alert("Please connect your wallet first.");
+      return;
+    }
+
+    const finalTokens: FlowToken[] = (manualData?.tokens || customTokens) as FlowToken[];
+    const finalName = manualData?.config?.name || pizzaName;
+    const finalTicker = manualData?.config?.ticker || "UNKNOWN";
+    const finalDesc = manualData?.config?.description || "";
     
-    // type プロパティは現在 config 内にないため、暫定的に 'BALANCED'
-    const finalType = 'BALANCED'; 
-  
-    setDeployedStrategy({
-      address: strategyAddress,
-      name: finalName,
-      type: finalType,
-      tokens: finalTokens,
-    });
-    
-    setInitialDepositAmount(0);
-    setStep('DEPOSIT');
+    // configが存在しない場合（AIフローなど）のフォールバック
+    const finalConfig = manualData?.config || {
+      curatorFee: 0.5,
+      protocolFee: 0.2,
+      rebalanceTrigger: 'THRESHOLD',
+      rebalanceValue: 2.5
+    };
+
+    setIsLoading(true); // 全体ローディング開始
+
+    try {
+      // 1. バックエンドへデータを送信 (DB保存)
+      const result = await api.createStrategy({
+        owner_pubkey: publicKey.toBase58(),
+        name: finalName,
+        ticker: finalTicker,
+        description: finalDesc,
+        type: 'MANUAL',
+        tokens: finalTokens.map(t => ({
+          symbol: t.symbol,
+          mint: t.mint || "So11111111111111111111111111111111111111112",
+          weight: t.weight,
+          logoURI: t.logoURI // ★追加: 画像URLも保存対象にする
+        })),
+        config: finalConfig
+      });
+
+      if (result.success) {
+        // 2. 成功したらローカルステートを更新してデポジット画面へ
+        setDeployedStrategy({
+          address: result.strategy_id || strategyAddress, // DBのIDがあればそれを使う
+          name: finalName,
+          type: 'BALANCED',
+          tokens: finalTokens,
+        });
+        
+        setInitialDepositAmount(0);
+        setStep('DEPOSIT');
+      } else {
+        console.error("Save failed:", result.error);
+        alert("Failed to save strategy. Please try again.");
+      }
+    } catch (e) {
+      console.error("Error:", e);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDepositComplete = () => {

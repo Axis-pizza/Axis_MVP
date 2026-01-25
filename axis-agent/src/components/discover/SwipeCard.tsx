@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
 import { TrendingUp, TrendingDown, Clock, Copy, ExternalLink } from 'lucide-react';
 
+// --- Types ---
 interface Token {
   symbol: string;
   weight: number;
-  address?: string; 
+  address?: string; // Mint Address
   logoURI?: string | null;
   currentPrice?: number;
 }
@@ -36,32 +37,50 @@ interface SwipeCardProps {
 const SWIPE_THRESHOLD = 100;
 const ROTATION_RANGE = 15;
 
-// --- TokenIcon: 修正版 ---
-// src があってもなくても、まずは表示を試みるロジック
-const TokenIcon = ({ symbol, src, className }: { symbol: string, src?: string | null, className?: string }) => {
-  // 初期値: 親から渡されたsrc、なければJupiter CDN
-  const initialSrc = src || `https://jup.ag/tokens/${symbol}.svg`;
-  const [imgSrc, setImgSrc] = useState<string>(initialSrc);
+/**
+ * 🛠 TokenIcon: 修正版 (Reliable Sources)
+ * 1. DB/APIからのURL (http...)
+ * 2. Jupiter Static CDN (Mint Address)
+ * 3. Jupiter Symbol Fallback
+ * 4. GitHub Token List / UI Avatars
+ */
+const TokenIcon = ({ symbol, src, address, className }: { symbol: string, src?: string | null, address?: string, className?: string }) => {
+  
+  // 初期画像の決定ロジック
+  const getInitialSrc = () => {
+    // 1. 親から渡されたURL (DB保存値やCoinGecko等) があれば最優先
+    if (src && src.startsWith('http')) return src;
+    
+    // 2. Mint Addressがあるなら Jupiter Token List (高画質・確実)
+    if (address) return `https://static.jup.ag/tokens/${address}.png`; 
+    
+    // 3. 最終手段: シンボルベース
+    return `https://jup.ag/tokens/${symbol}.svg`;
+  };
+
+  const [imgSrc, setImgSrc] = useState<string>(getInitialSrc());
   const [errorCount, setErrorCount] = useState(0);
 
-  // srcプロパティが変わったらリセット
+  // propsが変わったらリセット
   useEffect(() => {
-    setImgSrc(src || `https://jup.ag/tokens/${symbol}.svg`);
     setErrorCount(0);
-  }, [src, symbol]);
+    setImgSrc(getInitialSrc());
+  }, [src, address, symbol]);
 
   const handleError = () => {
-    if (errorCount === 0) {
-      // 1回目失敗: Jupiter CDN (もし初期値がJupiterじゃなかった場合や、念のため再試行)
-      setImgSrc(`https://jup.ag/tokens/${symbol}.svg`);
-      setErrorCount(1);
-    } else if (errorCount === 1) {
-      // 2回目失敗: GitHub Token List
-      setImgSrc(`https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${symbol}/logo.png`);
-      setErrorCount(2);
-    } else {
-      // 3回目失敗: UI Avatars (最終手段)
-      setImgSrc(`https://ui-avatars.com/api/?name=${symbol}&background=random&color=fff&size=128`);
+    const nextCount = errorCount + 1;
+    setErrorCount(nextCount);
+
+    if (nextCount === 1) {
+      // 1回目失敗: GitHub Token List (Solana Labs公式) を試す
+      if (address) {
+        setImgSrc(`https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${address}/logo.png`);
+      } else {
+        setImgSrc(`https://ui-avatars.com/api/?name=${symbol}&background=random&color=fff&size=128&bold=true`);
+      }
+    } else if (nextCount === 2) {
+      // 2回目失敗: 最終手段 (文字アバター)
+      setImgSrc(`https://ui-avatars.com/api/?name=${symbol}&background=random&color=fff&size=128&bold=true`);
     }
   };
 
@@ -71,11 +90,12 @@ const TokenIcon = ({ symbol, src, className }: { symbol: string, src?: string | 
       alt={symbol}
       className={className}
       onError={handleError}
+      loading="lazy"
     />
   );
 };
 
-// ... (helpers)
+// --- Helpers ---
 const timeAgo = (timestamp: number) => {
   if (!timestamp) return 'Recently';
   const seconds = Math.floor(Date.now() / 1000) - timestamp;
@@ -90,6 +110,7 @@ const formatCurrency = (val: number) => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 };
 
+// --- Main Component ---
 export const SwipeCard = ({ 
   strategy, 
   onSwipeLeft, 
@@ -102,14 +123,35 @@ export const SwipeCard = ({
   const rotate = useTransform(x, [-200, 200], [-ROTATION_RANGE, ROTATION_RANGE]);
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
   
+  // 左スワイプ (PASS) 用の不透明度
   const nopeOpacity = useTransform(x, [-100, -20], [1, 0]);
+  // 右スワイプ (LIKE) 用の不透明度
   const likeOpacity = useTransform(x, [20, 100], [0, 1]);
+
+  // ★ドラッグ誤爆防止用のRef
+  const isDragging = useRef(false);
+
+  const handleDragStart = () => {
+    isDragging.current = true;
+  };
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x > SWIPE_THRESHOLD) {
       onSwipeRight();
     } else if (info.offset.x < -SWIPE_THRESHOLD) {
       onSwipeLeft();
+    }
+
+    // ドラッグ終了後、少し待ってからフラグを下ろす (クリックイベント誤発火防止)
+    setTimeout(() => {
+      isDragging.current = false;
+    }, 200);
+  };
+
+  const handleClick = () => {
+    // ドラッグ中でなければクリック(タップ)処理を実行
+    if (!isDragging.current && isTop) {
+      onTap();
     }
   };
 
@@ -133,8 +175,9 @@ export const SwipeCard = ({
       drag={isTop ? 'x' : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.7}
+      onDragStart={isTop ? handleDragStart : undefined}
       onDragEnd={isTop ? handleDragEnd : undefined}
-      onClick={isTop ? onTap : undefined}
+      onClick={handleClick} // onTapの代わりにこれを使う
       initial={{ scale: 0.95, opacity: 0 }}
       animate={{ scale: 1 - index * 0.05, opacity: 1, y: index * 10 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -144,14 +187,17 @@ export const SwipeCard = ({
         {/* Swipe Indicators */}
         {isTop && (
           <>
+            {/* LIKE: 右スワイプ時に左上に表示 */}
             <motion.div 
-              className="absolute top-10 right-10 z-50 border-[6px] border-emerald-500 text-emerald-500 font-black text-4xl px-4 py-2 rounded-xl transform rotate-12 bg-black/40 backdrop-blur-sm pointer-events-none"
+              className="absolute top-10 left-10 z-50 border-[6px] border-emerald-500 text-emerald-500 font-black text-4xl px-4 py-2 rounded-xl transform -rotate-12 bg-black/40 backdrop-blur-sm pointer-events-none"
               style={{ opacity: likeOpacity }}
             >
               LIKE
             </motion.div>
+
+            {/* PASS: 左スワイプ時に右上に表示 */}
             <motion.div 
-              className="absolute top-10 left-10 z-50 border-[6px] border-red-500 text-red-500 font-black text-4xl px-4 py-2 rounded-xl transform -rotate-12 bg-black/40 backdrop-blur-sm pointer-events-none"
+              className="absolute top-10 right-10 z-50 border-[6px] border-red-500 text-red-500 font-black text-4xl px-4 py-2 rounded-xl transform rotate-12 bg-black/40 backdrop-blur-sm pointer-events-none"
               style={{ opacity: nopeOpacity }}
             >
               PASS
@@ -163,7 +209,7 @@ export const SwipeCard = ({
         <div className="p-5 pb-2">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${typeColors[strategy.type]} mb-2`}>
+              <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${typeColors[strategy.type] || typeColors.BALANCED} mb-2`}>
                 {strategy.type}
               </div>
               <h2 className="text-2xl font-bold text-white leading-tight line-clamp-1">{strategy.name}</h2>
@@ -230,7 +276,7 @@ export const SwipeCard = ({
            </div>
         </div>
 
-        {/* --- Composition List (Updated) --- */}
+        {/* --- Composition List --- */}
         <div className="flex-1 px-5 py-2 overflow-hidden flex flex-col">
            <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-white/40 uppercase tracking-widest">Composition</span>
@@ -246,13 +292,14 @@ export const SwipeCard = ({
                           <TokenIcon 
                             symbol={token.symbol} 
                             src={token.logoURI} 
+                            address={token.address}
                             className="w-full h-full object-cover"
                           />
                        </div>
                        <div>
                           <div className="font-bold text-sm text-white">{token.symbol}</div>
                           <div className="text-[11px] text-white/50 font-mono">
-                             {/* ★価格を表示★ */}
+                             {/* @ts-ignore */}
                              {token.currentPrice ? formatCurrency(token.currentPrice) : '$---'}
                           </div>
                        </div>
@@ -276,7 +323,7 @@ export const SwipeCard = ({
               href={`https://explorer.solana.com/address/${strategy.id}?cluster=devnet`}
               target="_blank" 
               rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()} // リンククリック時のイベント伝播防止
               className="text-[10px] text-white/20 font-mono hover:text-white/50 flex items-center gap-1 transition-colors"
            >
               Contract: {strategy.id.slice(0, 8)}... <ExternalLink className="w-2.5 h-2.5" />
