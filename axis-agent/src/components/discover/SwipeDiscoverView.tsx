@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { RefreshCw, Loader2, Sparkles } from 'lucide-react';
 import { SwipeCard } from './SwipeCard';
 import { api } from '../../services/api';
@@ -23,90 +23,74 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   
-  // レンダリング回数を減らすため、State更新をまとめる
+  // マスタデータ
   const [tokenMap, setTokenMap] = useState<Record<string, TokenData>>({});
   const [userMap, setUserMap] = useState<Record<string, any>>({});
   
-  // 読み込み済みフラグ (StrictModeでの2回実行防止)
   const isLoaded = useRef(false);
 
   useEffect(() => {
-    // すでに読み込み済みならスキップ (またはpublicKeyが変わった時だけ再実行)
-    if (isLoaded.current && !publicKey) return;
+    // 2回実行防止
+    if (isLoaded.current) return;
 
     const loadData = async () => {
       setLoading(true);
       console.log("🚀 Loading Data...");
 
       try {
-        // --- 1. 戦略とトークンを一気に並列取得 (最速) ---
+        // 1. 戦略、自分の戦略、トークンマスタを並列取得
         const [publicRes, myRes, tokensRes] = await Promise.all([
           api.discoverStrategies(50).catch(e => ({ strategies: [] })),
           publicKey ? api.getUserStrategies(publicKey.toBase58()).catch(() => ({ strategies: [] })) : Promise.resolve({ strategies: [] }),
           api.getTokens().catch(() => ({ tokens: [] }))
         ]);
 
-        // --- 2. トークンMapの作成 (1回だけ実行) ---
+        // 2. トークンMap作成 (ロゴと価格用)
         const tMap: Record<string, TokenData> = {};
         const tokenList = tokensRes.tokens || [];
         tokenList.forEach((t: any) => {
            tMap[t.symbol.toUpperCase()] = {
              price: t.price || 0,
              change24h: t.change24h || 0,
-             logoURI: t.logoURI,
-             address: t.address
+             
            };
         });
-        // フォールバック
-        if (!tMap['SOL']) tMap['SOL'] = { price: 150, change24h: 0, logoURI: 'https://assets.coingecko.com/coins/images/4128/large/solana.png' };
-        if (!tMap['USDC']) tMap['USDC'] = { price: 1, change24h: 0, logoURI: 'https://assets.coingecko.com/coins/images/6319/large/USD_Coin_icon.png' };
-        setTokenMap(tMap); // ★描画1回目
+        setTokenMap(tMap);
 
-        // --- 3. 戦略リストの結合 ---
-        let rawList: any[] = [];
-        // ローカルデータ読み込み (エラー無視)
-        try {
-          const local = JSON.parse(localStorage.getItem('my_local_strategies') || '[]');
-          if (publicKey) {
-             const myLocal = local.filter((s: any) => s.ownerPubkey === publicKey.toBase58());
-             rawList = [...myLocal];
-          }
-        } catch(e) {}
-
+        // 3. 戦略リスト結合 & 重複排除
         const myApiStrats = (myRes.strategies || myRes || []);
         const publicStrats = publicRes.strategies || [];
-        rawList = [...rawList, ...myApiStrats, ...publicStrats];
+        const combined = [...myApiStrats, ...publicStrats];
 
-        // 重複排除
         const uniqueMap = new Map();
-        rawList.forEach(item => {
-          const key = item.id || item.signature || Math.random().toString();
-          if (!uniqueMap.has(key)) uniqueMap.set(key, item);
+        combined.forEach(item => {
+          if (!item.id) return; // IDがないものは除外
+          if (!uniqueMap.has(item.id)) uniqueMap.set(item.id, item);
         });
         const uniqueStrategies = Array.from(uniqueMap.values());
-        
-        setStrategies(uniqueStrategies); // ★描画2回目
-        
-        // --- 4. ユーザープロフィールの一括取得 (ここが重かった原因) ---
-        const creators = new Set(uniqueStrategies.map((s: any) => s.ownerPubkey || s.creator).filter(Boolean));
+        setStrategies(uniqueStrategies);
+
+        // 4. ★重要★ 作成者のプロフィール情報を一括取得
+        const creators = new Set<string>();
+        uniqueStrategies.forEach((s: any) => {
+          if (s.ownerPubkey) creators.add(s.ownerPubkey);
+          if (s.creator) creators.add(s.creator);
+        });
         
         if (creators.size > 0) {
-          // Promise.allで並列リクエストし、終わってからまとめてセットする
           const userPromises = Array.from(creators).map(pubkey => 
-            api.getUser(pubkey as string).catch(() => null)
+            api.getUser(pubkey).then(res => res.success ? res.user : null).catch(() => null)
           );
           
           const users = await Promise.all(userPromises);
           
           const newUserMap: Record<string, any> = {};
-          users.forEach((user, index) => {
-            const pubkey = Array.from(creators)[index] as string;
-            if (user) {
-              newUserMap[pubkey] = user;
+          users.forEach((user) => {
+            if (user && user.pubkey) {
+              newUserMap[user.pubkey] = user;
             }
           });
-          
-          setUserMap(newUserMap); // ★描画3回目 (これでループ地獄回避)
+          setUserMap(newUserMap);
         }
 
       } catch (e) {
@@ -118,23 +102,28 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
     };
 
     loadData();
-  }, [publicKey]); // publicKeyが変わった時のみ再取得
+  }, [publicKey]);
 
-  // ROI計算 (メモ化で軽量化)
+  // データ結合処理 (PFPとTokenロゴを注入)
   const enrichedStrategies = useMemo(() => {
     return strategies.map(s => {
       let tokens = s.tokens || s.composition || [];
-      if (!Array.isArray(tokens)) tokens = [];
+      if (typeof tokens === 'string') {
+        try { tokens = JSON.parse(tokens); } catch(e) { tokens = []; }
+      }
 
       const enrichedTokens = tokens.map((t: any) => {
         const symbolUpper = t.symbol?.toUpperCase();
         const data = tokenMap[symbolUpper];
+        
         return {
            ...t,
            symbol: symbolUpper, 
            currentPrice: data?.price || 0,
-           logoURI: data?.logoURI || null, 
-           address: data?.address || null
+           // ★修正ポイント: DBに保存された t.logoURI があればそれを最優先！
+           // なければAPIマスタ(data.logoURI)を使う
+           logoURI: t.logoURI || data?.logoURI || null, 
+           address: t.mint || data?.address || null 
         };
       });
 
@@ -149,26 +138,30 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
       });
       const roi = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
-      const owner = s.ownerPubkey || s.creator;
-      const userProfile = userMap[owner];
+      // ユーザー情報の補完
+      const ownerAddress = s.ownerPubkey || s.creator;
+      const userProfile = userMap[ownerAddress];
 
       return {
         ...s,
-        id: s.id || s.signature,
+        id: s.id,
         name: s.name || 'Untitled Strategy',
         type: s.type || 'BALANCED',
         tokens: enrichedTokens,
         roi: roi, 
-        tvl: Number(s.tvl || s.initialInvestment || 0),
-        creatorAddress: owner || 'Unknown',
+        tvl: Number(s.tvl || 0),
+        creatorAddress: ownerAddress || 'Unknown',
+        // ★ ここでPFPを注入 (api.getProxyUrlを通す)
         creatorPfpUrl: userProfile?.avatar_url ? api.getProxyUrl(userProfile.avatar_url) : null,
         description: s.description || userProfile?.bio || '',
-        createdAt: s.createdAt || (Date.now() / 1000)
+        createdAt: s.createdAt || (Date.now() / 1000),
+        rebalanceType: s.config?.rebalanceTrigger === 'THRESHOLD' ? 'Threshold' : 'Weekly'
       };
     });
   }, [strategies, tokenMap, userMap]);
 
   const handleSwipe = (direction: 'left' | 'right') => {
+    // スワイプアニメーション後にIndexを進める
     setTimeout(() => {
       setCurrentIndex(prev => prev + 1);
     }, 200);
@@ -221,8 +214,11 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
                   index={stackIndex} 
                   isTop={stackIndex === 0}
                   strategy={strategy}
+                  // ★修正: 左 (PASS) は次のカードへスキップ
                   onSwipeLeft={() => handleSwipe('left')}
-                  onSwipeRight={() => handleSwipe('right')}
+                  // ★修正: 右 (LIKE) は詳細ページを開く
+                  onSwipeRight={() => onStrategySelect(strategy)}
+                  // タップも詳細ページ
                   onTap={() => onStrategySelect(strategy)}
                 />
               );

@@ -14,12 +14,14 @@ import {
 } from '@solana/web3.js';
 import { PizzaChart } from '../common/PizzaChart';
 import { api } from '../../services/api';
-// Bufferを使うために必要（もしエラーが出る場合は、buffer npmパッケージが必要ですが、solana-web3が入っていれば通常動きます）
 import { Buffer } from 'buffer';
 
+// ★修正: ここに mint と logoURI を追加して受け取れるようにする
 interface TokenAllocation {
   symbol: string;
   weight: number;
+  mint?: string;
+  logoURI?: string;
 }
 
 interface DepositFlowProps {
@@ -99,8 +101,6 @@ export const DepositFlow = ({
       transaction.feePayer = publicKey;
 
       const signedTx = await signTransaction(transaction);
-      
-      // ★ここで署名済みデータをシリアライズしておく
       const serializedTx = signedTx.serialize();
       const signature = await connection.sendRawTransaction(serializedTx);
       
@@ -115,40 +115,34 @@ export const DepositFlow = ({
       // --- 2. API Saving ---
       setStatus('SAVING');
 
-      // ★修正: サーバーが要求している「signedTransaction」を含める
-      // Bufferを使ってBase64文字列に変換します
       const base64Tx = Buffer.from(serializedTx).toString('base64');
 
       const payload = {
-        // 1. 基本情報
         name: String(strategyName).trim(),
-        // 説明文がないと一覧で寂しいので、自動生成して送ります
         description: `${strategyType} Strategy created by ${publicKey.toBase58().slice(0, 6)}...`, 
         type: strategyType,
         
-        // 2. データ構造の不一致を解消 (Discoverは "tokens" を探しています)
+        // ★修正: ここで mint と logoURI をバックエンドへ送る
         tokens: tokens.map(t => ({
           symbol: String(t.symbol),
-          weight: Math.floor(Number(t.weight))
+          weight: Math.floor(Number(t.weight)),
+          mint: t.mint || "So11111111111111111111111111111111111111112",
+          logoURI: t.logoURI
         })),
-        // 念のため、古いバックエンド仕様向けに composition も残しておきます
+        
+        // composition も同様に
         composition: tokens.map(t => ({
           symbol: String(t.symbol),
-          weight: Math.floor(Number(t.weight))
+          weight: Math.floor(Number(t.weight)),
+          mint: t.mint || "So11111111111111111111111111111111111111112",
+          logoURI: t.logoURI
         })),
 
-        // 3. 作成者情報 (Discoverは "ownerPubkey" を探しています)
         ownerPubkey: publicKey.toBase58(),
         creator: publicKey.toBase58(),
-
-        // 4. 金額情報 (Discoverは "tvl" を探しています)
         tvl: Number(parsedAmount),
         initialInvestment: Number(parsedAmount),
-
-        // 5. 画像データ (現状アップロード機能がないため、空文字を送ってエラーを防ぎます)
         image: "", 
-        
-        // 6. 証拠データ
         signedTransaction: base64Tx 
       };
 
@@ -158,8 +152,6 @@ export const DepositFlow = ({
         await api.deploy(signature, payload);
       } catch (apiError: any) {
         console.error("🔥 API Error (Saving failed but tx successful):", apiError);
-        // 送金は成功しているので、ここではエラー画面に飛ばさず成功として扱う
-        // 必要ならここで toast.error("Strategy saved locally only") など出す
       }
 
       setStatus('SUCCESS');
@@ -285,7 +277,6 @@ export const DepositFlow = ({
                   ))}
                 </div>
 
-                {/* エラーメッセージ表示 */}
                 {errorMessage && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-red-400" />
@@ -320,7 +311,6 @@ export const DepositFlow = ({
   );
 };
 
-// Success View (変更なし)
 const DepositSuccess = ({
   amount,
   txSignature,

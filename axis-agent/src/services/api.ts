@@ -221,6 +221,35 @@ export const api = {
     }
   },
 
+  createStrategy: async (data: {
+    owner_pubkey: string;
+    name: string;
+    ticker: string;
+    description?: string;
+    type: string;
+    // ★修正: ここに logoURI?: string を追加してください
+    tokens: { symbol: string; mint: string; weight: number; logoURI?: string }[];
+    config?: any; 
+  }) => {
+    try {
+      const res = await fetch(`${API_BASE}/strategies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("Create Strategy Failed:", err);
+        return { success: false, error: err };
+      }
+
+      return await res.json();
+    } catch (e) {
+      console.error("Network Error:", e);
+      return { success: false, error: 'Network Error' };
+    }
+  },
   
 
   async getTokens() {

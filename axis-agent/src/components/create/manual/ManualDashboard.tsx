@@ -1,34 +1,27 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Search, Plus, Trash2, Lock, Unlock, 
-  ArrowRight, X, Loader2, BarChart3,
+  Search, Plus, ArrowRight, X, Loader2, BarChart3,
   RefreshCw, Percent, Rocket, Info,
   DollarSign, Zap, AlertTriangle
 } from 'lucide-react';
 import { JupiterService, type JupiterToken } from '../../../services/jupiter';
 import { BacktestChart } from '../../common/BacktestChart';
+import { PortfolioItem } from './PortfolioItem'; // ★分離したコンポーネント
+import { TokenImage } from '../../common/TokenImage'; // ★分離した画像コンポーネント
 
 // --- Types ---
 export interface ManualData {
-    tokens: { symbol: string; weight: number; mint: string }[];
-    config: {
-      name: string;
-      ticker: string;
-      description: string;
-      curatorFee: number;
-      protocolFee: number;
-      rebalanceTrigger: 'THRESHOLD' | 'PERIODIC';
-      rebalanceValue: number;
-    };
-  }
+  tokens: { symbol: string; weight: number; mint: string }[];
+  config: StrategyConfig;
+}
 
 interface StrategyConfig {
   name: string;
   ticker: string;
   description: string;
   curatorFee: number;
-  protocolFee: number; // 固定 0.20%
+  protocolFee: number;
   swapFee: number;
   rebalanceTrigger: 'THRESHOLD' | 'PERIODIC';
   rebalanceValue: number;
@@ -44,18 +37,15 @@ interface ManualDashboardProps {
   onDeploySuccess: (data: ManualData) => void;
 }
 
-// --- Styles ---
-// 数値用のフォントスタイル (Times New Roman)
 const numberStyle = { fontFamily: '"Times New Roman", Times, serif' };
 
-// --- Helper: Haptic ---
 const triggerHaptic = () => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     navigator.vibrate(10);
   }
 };
 
-// --- Helper: Simulation ---
+// --- Simulation Logic (Outside component to avoid recreation) ---
 const generateSimulationData = (portfolio: AssetItem[]) => {
   const days = 30;
   let currentValue = 1000;
@@ -108,11 +98,11 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
     name: '',
     ticker: '',
     description: '',
-    curatorFee: 0.5, // Default 0.5%
-    protocolFee: 0.20, // Fixed Protocol Fee
+    curatorFee: 0.5,
+    protocolFee: 0.20,
     swapFee: 0.1,
     rebalanceTrigger: 'THRESHOLD',
-    rebalanceValue: 2.5, // Default 2.5%
+    rebalanceValue: 2.5,
   });
 
   // --- UI Flags ---
@@ -123,11 +113,66 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   
-  // --- Simulation Data ---
   const [chartData, setChartData] = useState<{ values: number[]; sharpeRatio?: number; maxDrawdown?: number }>({ values: [] });
   const [roi, setRoi] = useState(0);
 
-  // --- Init ---
+  // --- Optimization: useCallback ---
+  // ハンドラーをメモ化して、子コンポーネントの不要な再レンダリングを防ぐ
+
+  const updateWeight = useCallback((address: string, newWeight: number) => {
+    setPortfolio(prev => prev.map(p => 
+      p.token.address === address ? { ...p, weight: Math.min(100, Math.max(0, newWeight)) } : p
+    ));
+  }, []);
+
+  const toggleLock = useCallback((address: string) => {
+    triggerHaptic();
+    setPortfolio(prev => prev.map(p => 
+      p.token.address === address ? { ...p, locked: !p.locked } : p
+    ));
+  }, []);
+
+  const removeToken = useCallback((address: string) => {
+    triggerHaptic();
+    setPortfolio(prev => prev.filter(p => p.token.address !== address));
+  }, []);
+
+  const addToken = useCallback((token: JupiterToken) => {
+    triggerHaptic();
+    setPortfolio(prev => {
+      if (prev.some(p => p.token.address === token.address)) return prev;
+      const currentTotal = prev.reduce((sum, i) => sum + i.weight, 0);
+      const remaining = Math.max(0, 100 - currentTotal);
+      return [...prev, { token, weight: remaining, locked: false }];
+    });
+    setIsSearchOpen(false);
+    setSearchQuery('');
+  }, []);
+
+  const autoBalance = useCallback(() => {
+    triggerHaptic();
+    setPortfolio(prev => {
+      const lockedItems = prev.filter(p => p.locked);
+      const unlockedItems = prev.filter(p => !p.locked);
+      if (unlockedItems.length === 0) return prev;
+
+      const lockedWeight = lockedItems.reduce((sum, p) => sum + p.weight, 0);
+      const targetWeight = 100 - lockedWeight;
+      if (targetWeight < 0) return prev;
+
+      const perItem = Math.floor(targetWeight / unlockedItems.length);
+      const remainder = targetWeight % unlockedItems.length;
+
+      return prev.map(p => {
+        if (p.locked) return p;
+        // 最初の非ロックアイテムに残りを加算
+        const isFirst = unlockedItems[0].token.address === p.token.address;
+        return { ...p, weight: perItem + (isFirst ? remainder : 0) };
+      });
+    });
+  }, []);
+
+  // Init Data
   useEffect(() => {
     const init = async () => {
       const list = await JupiterService.getLiteList();
@@ -137,7 +182,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
     init();
   }, []);
 
-  // --- Search ---
+  // Search Logic
   useEffect(() => {
     if (!searchQuery.trim()) {
       setDisplayedTokens(defaultTokens);
@@ -158,56 +203,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, defaultTokens]);
 
-  // --- Actions ---
   const totalWeight = useMemo(() => portfolio.reduce((sum, i) => sum + i.weight, 0), [portfolio]);
-
-  const addToken = (token: JupiterToken) => {
-    triggerHaptic();
-    if (portfolio.some(p => p.token.address === token.address)) return;
-    const remaining = 100 - totalWeight;
-    setPortfolio([...portfolio, { token, weight: remaining > 0 ? remaining : 0, locked: false }]);
-    setIsSearchOpen(false);
-    setSearchQuery('');
-    setDisplayedTokens(defaultTokens);
-  };
-
-  const removeToken = (address: string) => {
-    triggerHaptic();
-    setPortfolio(portfolio.filter(p => p.token.address !== address));
-  };
-
-  const updateWeight = (address: string, newWeight: number) => {
-    setPortfolio(prev => prev.map(p => 
-      p.token.address === address ? { ...p, weight: Math.min(100, Math.max(0, newWeight)) } : p
-    ));
-  };
-
-  const toggleLock = (address: string) => {
-    triggerHaptic();
-    setPortfolio(prev => prev.map(p => 
-      p.token.address === address ? { ...p, locked: !p.locked } : p
-    ));
-  };
-
-  const autoBalance = () => {
-    triggerHaptic();
-    const lockedItems = portfolio.filter(p => p.locked);
-    const unlockedItems = portfolio.filter(p => !p.locked);
-    if (unlockedItems.length === 0) return;
-
-    const lockedWeight = lockedItems.reduce((sum, p) => sum + p.weight, 0);
-    const targetWeight = 100 - lockedWeight;
-    if (targetWeight < 0) return;
-
-    const perItem = Math.floor(targetWeight / unlockedItems.length);
-    const remainder = targetWeight % unlockedItems.length;
-
-    setPortfolio(prev => prev.map(p => {
-      if (p.locked) return p;
-      const isFirst = unlockedItems[0].token.address === p.token.address;
-      return { ...p, weight: perItem + (isFirst ? remainder : 0) };
-    }));
-  };
 
   const runSimulation = () => {
     triggerHaptic();
@@ -222,7 +218,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
         setRoi(((end - start) / start) * 100);
       }
       setIsSimulating(false);
-    }, 1000);
+    }, 800); // Wait time reduced for snappy feel
   };
 
   const handleDeploy = () => {
@@ -233,14 +229,15 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
       tokens: portfolio.map(p => ({
         symbol: p.token.symbol,
         weight: p.weight,
-        mint: p.token.address
+        mint: p.token.address,
+        logoURI: p.token.logoURI // ★追加: ここで画像URLを含める
       })),
       config: config
     });
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] bg-black text-white relative overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-100px)]  text-white relative overflow-hidden">
       
       {/* --- Step 1 Header --- */}
       <div className="flex-none px-4 py-3 flex items-center justify-between border-b border-white/5 bg-[#050505]">
@@ -267,7 +264,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
         </button>
       </div>
 
-      {/* --- Chart Area (On Demand) --- */}
+      {/* --- Chart Area --- */}
       <AnimatePresence>
         {showChart && (
           <motion.div 
@@ -300,7 +297,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
         )}
       </AnimatePresence>
 
-      {/* --- Asset List --- */}
+      {/* --- Asset List (Optimized) --- */}
       <div className="flex-1 overflow-y-auto pb-32 custom-scrollbar p-4 space-y-3">
         <AnimatePresence mode="popLayout">
           {portfolio.length === 0 && (
@@ -310,51 +307,16 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
             </div>
           )}
           {portfolio.map((item) => (
-            <motion.div
+            // ★ 高速化ポイント: Memo化したコンポーネントを使用
+            <PortfolioItem
               key={item.token.address}
-              layout
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, x: -20 }}
-              className={`group relative p-4 rounded-2xl border transition-colors ${
-                item.locked ? 'bg-white/5 border-orange-500/30' : 'bg-[#0A0A0A] border-white/5'
-              }`}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={item.token.logoURI || "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png"} 
-                    className="w-10 h-10 rounded-full bg-white/10 object-cover" 
-                    onError={(e) => { (e.target as HTMLImageElement).src = "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png"; }}
-                  />
-                  <div>
-                    <div className="font-bold text-base">{item.token.symbol}</div>
-                    <div className="text-[10px] text-white/40 truncate max-w-[120px]">{item.token.name}</div>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={() => toggleLock(item.token.address)} className={`p-2 rounded-full transition-colors ${item.locked ? 'text-orange-400 bg-orange-500/10' : 'text-white/20 hover:text-white'}`}>
-                    {item.locked ? <Lock size={14} /> : <Unlock size={14} />}
-                  </button>
-                  <button onClick={() => removeToken(item.token.address)} className="p-2 rounded-full text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range" min="0" max="100" step="1"
-                  disabled={item.locked}
-                  value={item.weight}
-                  onChange={(e) => { triggerHaptic(); updateWeight(item.token.address, parseInt(e.target.value)); }}
-                  className="flex-1 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-orange-500 hover:bg-white/20 transition-colors"
-                />
-                <div className="w-12 text-right">
-                  <span className="text-xl font-bold" style={numberStyle}>{item.weight}</span>
-                  <span className="text-[10px] text-white/40 ml-0.5">%</span>
-                </div>
-              </div>
-            </motion.div>
+              item={item}
+              numberStyle={numberStyle}
+              onUpdateWeight={updateWeight}
+              onToggleLock={toggleLock}
+              onRemove={removeToken}
+              triggerHaptic={triggerHaptic}
+            />
           ))}
         </AnimatePresence>
 
@@ -367,7 +329,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
         </button>
       </div>
 
-      {/* --- Step 1 Footer: Next Action --- */}
+      {/* --- Footer Button --- */}
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/95 to-transparent z-10">
         <button
           disabled={totalWeight !== 100 || portfolio.length < 2}
@@ -379,7 +341,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
         </button>
       </div>
 
-      {/* --- MODAL 1: Token Search --- */}
+      {/* --- MODAL 1: Search --- */}
       <AnimatePresence>
         {isSearchOpen && (
           <motion.div
@@ -416,10 +378,10 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
                       disabled={isSelected}
                       className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 disabled:opacity-30 text-left transition-colors border-b border-white/5 last:border-0"
                     >
-                      <img 
-                        src={token.logoURI || "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png"} 
+                      <TokenImage 
+                        src={token.logoURI} 
+                        alt={token.symbol}
                         className="w-10 h-10 rounded-full bg-white/10 object-cover"
-                        onError={(e) => {(e.target as HTMLImageElement).src = "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png";}}
                       />
                       <div className="flex-1">
                         <div className="font-bold">{token.symbol}</div>
@@ -435,7 +397,10 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
         )}
       </AnimatePresence>
 
-      {/* --- MODAL 2: Strategy Configuration --- */}
+      {/* --- MODAL 2: Config (Step 2) --- */}
+      {/* NOTE: Step 2 Modal implementation is large but same as before. 
+          It's not the main performance bottleneck, so keeping it inside is fine 
+          as long as it's conditionally rendered. */}
       <AnimatePresence>
         {isConfigOpen && (
           <motion.div
@@ -449,6 +414,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
               className="w-full lg:w-[500px] h-[95vh] lg:h-auto lg:max-h-[90vh] bg-[#111] border-t lg:border border-white/10 rounded-t-3xl lg:rounded-3xl flex flex-col overflow-hidden shadow-2xl"
               onClick={e => e.stopPropagation()}
             >
+              {/* Header */}
               <div className="p-5 border-b border-white/10 flex justify-between items-center bg-[#111]">
                 <div>
                   <h3 className="text-xl font-bold">Configure Strategy</h3>
@@ -457,6 +423,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
                 <button onClick={() => setIsConfigOpen(false)} className="p-2 bg-white/5 rounded-full hover:bg-white/10"><X size={20} /></button>
               </div>
 
+              {/* Content */}
               <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
                 
                 {/* 1. Identity */}
@@ -464,7 +431,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
                   <h4 className="text-xs font-bold text-white/30 uppercase tracking-widest mb-3">1. Identity</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-xs text-white/70">Strategy Name</label>
+                      <label className="text-xs text-white/70">Name</label>
                       <input 
                         type="text" placeholder="Solana DeFi Index"
                         value={config.name}
@@ -486,7 +453,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
                     <label className="text-xs text-white/70">Description</label>
                     <textarea 
                       rows={3}
-                      placeholder="Describe your strategy rationale, asset selection criteria, and target audience..."
+                      placeholder="Strategy rationale..."
                       value={config.description}
                       onChange={e => setConfig({...config, description: e.target.value})}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-orange-500/50 outline-none resize-none"
@@ -494,19 +461,17 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
                   </div>
                 </section>
 
-                {/* 2. Economics (Fees) */}
+                {/* 2. Economics */}
                 <section>
                   <h4 className="text-xs font-bold text-white/30 uppercase tracking-widest mb-3">2. Economics</h4>
                   <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-6">
-                    
-                    {/* Curator Fee Slider */}
                     <div>
                       <div className="flex justify-between items-end mb-2">
                         <label className="text-sm font-bold flex items-center gap-1">
                           Curator Fee <span className="text-emerald-400 text-xs font-normal">(Your Earnings)</span>
                         </label>
                         <span className="text-2xl font-bold text-emerald-400" style={numberStyle}>
-                          {config.curatorFee.toFixed(1)}% <span className="text-xs text-white/40" style={{fontFamily: 'sans-serif'}}>/yr</span>
+                          {config.curatorFee.toFixed(1)}%
                         </span>
                       </div>
                       <input 
@@ -515,65 +480,32 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
                         onChange={e => setConfig({...config, curatorFee: parseFloat(e.target.value)})}
                         className="w-full accent-emerald-500 h-2 bg-white/10 rounded-full appearance-none cursor-pointer"
                       />
-                      <div className="flex justify-between text-[10px] text-white/20 mt-1">
-                        <span style={numberStyle}>0%</span>
-                        <span style={numberStyle}>Max 5.0%</span>
-                      </div>
                     </div>
 
-                    {/* Fee Structure Preview */}
                     <div className="bg-black/40 rounded-xl p-4 space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-white/60 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Your Earnings
-                        </span>
+                        <span className="text-white/60">Your Earnings</span>
                         <span className="text-emerald-400 font-bold" style={numberStyle}>{config.curatorFee.toFixed(2)}%</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-white/60 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-white/20"></span> Protocol Fee (Axis)
-                        </span>
+                        <span className="text-white/60">Protocol Fee (Axis)</span>
                         <span className="text-white/60 font-bold" style={numberStyle}>{config.protocolFee.toFixed(2)}%</span>
                       </div>
                       <div className="h-px bg-white/10 my-2" />
                       <div className="flex justify-between items-center">
-                        <span className="text-sm font-bold text-white/90">Total Cost to Investor</span>
-                        <span className={`font-bold text-lg ${
-                          (config.curatorFee + config.protocolFee) > 1.5 ? 'text-red-400' : 'text-white'
-                        }`} style={numberStyle}>
+                        <span className="text-sm font-bold text-white/90">Total Cost</span>
+                        <span className={`font-bold text-lg ${ (config.curatorFee + config.protocolFee) > 1.5 ? 'text-red-400' : 'text-white' }`} style={numberStyle}>
                           {(config.curatorFee + config.protocolFee).toFixed(2)}%
                         </span>
                       </div>
                     </div>
 
-                    {/* Competitiveness & Simulation */}
-                    <div className="grid grid-cols-1 gap-3">
-                      {/* Hint */}
-                      <div className={`p-3 rounded-xl border flex items-start gap-2 ${
-                        (config.curatorFee + config.protocolFee) > 1.5 
-                          ? 'bg-red-500/10 border-red-500/20' 
-                          : 'bg-blue-500/10 border-blue-500/20'
-                      }`}>
-                        <Info className={`w-4 h-4 shrink-0 mt-0.5 ${
-                          (config.curatorFee + config.protocolFee) > 1.5 ? 'text-red-400' : 'text-blue-400'
-                        }`} />
-                        <div className="text-[10px] leading-relaxed opacity-80">
-                          {(config.curatorFee + config.protocolFee) > 1.5 
-                            ? "Total fees > 1.5% may reduce competitiveness. Consider lowering curator fee."
-                            : "Competitive fee structure (0.5% - 1.5% range)."}
-                        </div>
+                    <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl flex items-center justify-between">
+                      <div className="text-[10px] text-emerald-400 uppercase tracking-wide flex items-center gap-1">
+                        <DollarSign className="w-3 h-3" /> Revenue Sim ($1M TVL)
                       </div>
-
-                      {/* Revenue Sim */}
-                      <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl flex items-center justify-between">
-                        <div>
-                          <div className="text-[10px] text-emerald-400 uppercase tracking-wide flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" /> Revenue Sim (at $1M TVL)
-                          </div>
-                        </div>
-                        <div className="text-lg font-bold text-white" style={numberStyle}>
-                          ${(1000000 * (config.curatorFee / 100)).toLocaleString()} <span className="text-xs text-white/40 font-sans">/yr</span>
-                        </div>
+                      <div className="text-lg font-bold text-white" style={numberStyle}>
+                        ${(1000000 * (config.curatorFee / 100)).toLocaleString()} <span className="text-xs text-white/40 font-sans">/yr</span>
                       </div>
                     </div>
                   </div>
@@ -582,69 +514,42 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
                 {/* 3. Rebalancing */}
                 <section>
                   <h4 className="text-xs font-bold text-white/30 uppercase tracking-widest mb-3">3. Rebalancing</h4>
-                  
-                  {/* Trigger Selector */}
                   <div className="p-1 bg-white/5 rounded-xl flex mb-4">
                     <button
-                      onClick={() => { triggerHaptic(); setConfig({...config, rebalanceTrigger: 'THRESHOLD'}); }}
-                      className={`flex-1 py-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
-                        config.rebalanceTrigger === 'THRESHOLD' ? 'bg-white text-black shadow-lg' : 'text-white/40 hover:text-white'
-                      }`}
+                      onClick={() => setConfig({...config, rebalanceTrigger: 'THRESHOLD'})}
+                      className={`flex-1 py-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${config.rebalanceTrigger === 'THRESHOLD' ? 'bg-white text-black' : 'text-white/40'}`}
                     >
-                      <Zap size={14} /> Threshold (Recommended)
+                      <Zap size={14} /> Threshold
                     </button>
                     <button
-                      onClick={() => { triggerHaptic(); setConfig({...config, rebalanceTrigger: 'PERIODIC'}); }}
-                      className={`flex-1 py-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
-                        config.rebalanceTrigger === 'PERIODIC' ? 'bg-white text-black shadow-lg' : 'text-white/40 hover:text-white'
-                      }`}
+                      onClick={() => setConfig({...config, rebalanceTrigger: 'PERIODIC'})}
+                      className={`flex-1 py-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${config.rebalanceTrigger === 'PERIODIC' ? 'bg-white text-black' : 'text-white/40'}`}
                     >
                       <RefreshCw size={14} /> Periodic
                     </button>
                   </div>
 
                   <div className="p-4 bg-white/5 rounded-xl border border-white/5">
-                    {config.rebalanceTrigger === 'THRESHOLD' ? (
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-bold">Deviation Threshold</label>
-                          <span className="font-bold text-orange-400" style={numberStyle}>{config.rebalanceValue}%</span>
-                        </div>
-                        <input 
-                          type="range" min="1" max="10" step="0.5"
-                          value={config.rebalanceValue}
-                          onChange={e => setConfig({...config, rebalanceValue: parseFloat(e.target.value)})}
-                          className="w-full accent-orange-500 h-1.5 bg-white/10 rounded-full cursor-pointer"
-                        />
-                        <p className="text-[10px] text-white/40 leading-relaxed">
-                          Rebalance triggers when allocation drifts by <span style={numberStyle}>{config.rebalanceValue}%</span>. 
-                          <br/><span className="text-emerald-400">✨ MEV profits are returned to the pool to boost investor APY.</span>
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-bold">Frequency</label>
-                          <span className="font-bold text-orange-400" style={numberStyle}>{config.rebalanceValue} Days</span>
-                        </div>
-                        <input 
-                          type="range" min="1" max="30" step="1"
-                          value={config.rebalanceValue}
-                          onChange={e => setConfig({...config, rebalanceValue: parseInt(e.target.value)})}
-                          className="w-full accent-orange-500 h-1.5 bg-white/10 rounded-full cursor-pointer"
-                        />
-                        <p className="text-[10px] text-white/40 leading-relaxed">
-                          Strategy rebalances every <span style={numberStyle}>{config.rebalanceValue}</span> days.
-                          <br/><span className="text-orange-400">Note: Less efficient than threshold rebalancing.</span>
-                        </p>
-                      </div>
-                    )}
+                    <div className="flex justify-between items-center mb-4">
+                      <label className="text-sm font-bold">{config.rebalanceTrigger === 'THRESHOLD' ? 'Deviation Threshold' : 'Frequency'}</label>
+                      <span className="font-bold text-orange-400" style={numberStyle}>
+                        {config.rebalanceValue}{config.rebalanceTrigger === 'THRESHOLD' ? '%' : ' Days'}
+                      </span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max={config.rebalanceTrigger === 'THRESHOLD' ? 10 : 30} 
+                      step={config.rebalanceTrigger === 'THRESHOLD' ? 0.5 : 1}
+                      value={config.rebalanceValue}
+                      onChange={e => setConfig({...config, rebalanceValue: parseFloat(e.target.value)})}
+                      className="w-full accent-orange-500 h-1.5 bg-white/10 rounded-full cursor-pointer"
+                    />
                   </div>
                 </section>
-
               </div>
 
-              {/* Footer: Deploy */}
+              {/* Deploy Button */}
               <div className="p-5 border-t border-white/10 bg-[#111]">
                 <button 
                   disabled={!config.name || !config.ticker}
