@@ -25,12 +25,19 @@ import type { Strategy } from '../../types/index';
 
 type CreateStep = 'DIRECTIVE' | 'SIMULATION' | 'CUSTOMIZE' | 'SETTINGS' | 'DEPOSIT' | 'DASHBOARD' | 'REBALANCE';
 
+interface FlowToken {
+  symbol: string;
+  weight: number;
+  mint?: string;
+  logoURI?: string;
+}
+
 interface DeployedStrategy {
   address: string;
   name: string;
   type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
   // --- Change 2: Allow mint address (Manual mode provides this) ---
-  tokens: { symbol: string; weight: number; mint?: string }[];
+  tokens: FlowToken[];
 }
 
 export const KagemushaFlow = () => {
@@ -44,7 +51,12 @@ export const KagemushaFlow = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
-  const [customTokens, setCustomTokens] = useState<{ symbol: string; weight: number }[]>([]);
+  const [customTokens, setCustomTokens] = useState<{ 
+    symbol: string; 
+    weight: number; 
+    mint?: string; 
+    logoURI?: string; 
+  }[]>([]);
   const [pizzaName, setPizzaName] = useState('');
   const [customToppings, setCustomToppings] = useState<Topping[]>([]);
   
@@ -135,7 +147,7 @@ export const KagemushaFlow = () => {
       return;
     }
 
-    const finalTokens = manualData?.tokens || customTokens;
+    const finalTokens: FlowToken[] = (manualData?.tokens || customTokens) as FlowToken[];
     const finalName = manualData?.config?.name || pizzaName;
     const finalTicker = manualData?.config?.ticker || "UNKNOWN";
     const finalDesc = manualData?.config?.description || "";
