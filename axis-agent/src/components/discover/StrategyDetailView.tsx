@@ -254,7 +254,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                    <span className="text-7xl font-serif font-bold text-white tracking-tighter">
                      {amount}
                    </span>
-                   <span className={`text-3xl font-bold ${asset === 'SOL' ? 'text-[#9945FF]' : 'text-[#2775CA]'}`}>
+                   <span className="text-3xl font-bold text-white">
                      {asset}
                    </span>
                  </div>
@@ -464,96 +464,144 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
   };
 
   return (
-    <div className="min-h-screen bg-black text-[#E7E5E4] pb-32 font-sans selection:bg-[#D97706]/30">
+    <div className="min-h-screen bg-black text-[#E7E5E4] pb-40 font-sans selection:bg-[#D97706]/30 max-w-2xl mx-auto">
       
-      {/* Navbar */}
-      <motion.div className="fixed top-0 inset-x-0 h-14 bg-black/80 backdrop-blur-xl z-60 flex items-center justify-between px-4 border-b border-white/5 safe-area-top">
-        <button onClick={onBack} className="p-2 -ml-2 text-white/70 hover:text-white"><ArrowLeft className="w-6 h-6" /></button>
-        <motion.div style={{ opacity: headerOpacity }} className="font-bold font-serif text-sm tracking-wider text-center">
+      {/* 1. Navbar: 左右の余白を px-6 に拡大 */}
+      <motion.div className="fixed top-0 inset-x-0 h-16 bg-black/80 backdrop-blur-xl z-60 flex items-center justify-between px-6 border-b border-white/5 safe-area-top max-w-2xl mx-auto">
+        <button onClick={onBack} className="p-3 -ml-3 text-white/70 hover:text-white active:scale-90 transition-transform">
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        
+        <motion.div style={{ opacity: headerOpacity }} className="font-bold font-serif text-sm tracking-wider text-center pointer-events-none">
           {strategy.ticker || 'STRATEGY'}
           <div className={`text-[10px] ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>${latestValue.toFixed(2)}</div>
         </motion.div>
-        <div className="flex gap-1">
+
+        <div className="flex gap-2">
           <button onClick={handleToggleWatchlist} className="p-2 text-white/70 hover:text-yellow-400">
-          <motion.div animate={controls}>
+            <motion.div animate={controls}>
               <Star className={`w-5 h-5 ${isWatchlisted ? 'fill-yellow-400 text-yellow-400' : ''}`} />
             </motion.div>
           </button>
           <button onClick={handleShareToX} className="p-2 text-white/70 hover:text-white">
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="w-5 h-5 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="w-5 h-5 fill-current">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+            </svg>
           </button>
         </div>
       </motion.div>
 
-      <div className="pt-20 px-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-        {/* Header Info */}
-        <div className="mb-6">
-           <h1 className="text-3xl font-bold tracking-tight font-serif mb-1">{strategy.name}</h1>
-           <div className="flex items-baseline gap-3">
-             <span className="text-4xl font-serif font-bold tracking-tighter text-white">${latestValue.toFixed(2)}</span>
-             <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-sm font-bold ${isPositive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-               {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+      {/* メインコンテンツエリア: 全体の左右余白を px-6 に統一 */}
+      <div className="pt-32 md:pt-44 px-8 md:px-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        
+        {/* 2. Header Info: mb-10 で下のチャートと離す */}
+        <div className="mb-10">
+        <h1 className="text-3xl md:text-5xl font-bold tracking-tight font-serif mb-2 md:mb-4">
+            {strategy.name}
+          </h1>
+           <div className="flex items-baseline gap-4">
+           <span className="text-4xl md:text-7xl font-serif font-bold tracking-tighter text-white">
+              ${latestValue.toFixed(2)}
+            </span>
+            <div className={`flex items-center gap-1.5 px-3 py-1 md:px-4 md:py-2 rounded-full text-sm md:text-base font-bold ${isPositive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+               {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                {Math.abs(changePct).toFixed(2)}%
              </div>
            </div>
-           <button onClick={handleCopyCA} className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-[#1C1917] hover:bg-[#292524] rounded-full border border-white/10 active:scale-95 transition-all w-fit group">
-             <span className="text-[10px] text-[#78716C] font-serif group-hover:text-white">CA:</span>
-             <span className="text-xs font-serif text-[#A8A29E] group-hover:text-white">{strategy.id.slice(0, 4)}...{strategy.id.slice(-4)}</span>
-             <Copy className="w-3 h-3 text-[#57534E] group-hover:text-white" />
+           
+           <button onClick={handleCopyCA} className="mt-5 flex items-center gap-2.5 px-4 py-2 bg-[#1C1917] hover:bg-[#292524] rounded-full border border-white/10 active:scale-95 transition-all w-fit group">
+             <span className="text-xs text-[#78716C] font-serif group-hover:text-white">Address:</span>
+             <span className="text-sm font-mono text-[#A8A29E] group-hover:text-white">{strategy.id.slice(0, 6)}...{strategy.id.slice(-6)}</span>
+             <Copy className="w-4 h-4 text-[#57534E] group-hover:text-white" />
            </button>
         </div>
 
-        {/* Chart */}
-        <div className="mb-8 -mx-4 relative">
-          <RichChart data={chartData} type={chartType} isPositive={isPositive} />
-          <div className="flex justify-between px-6 mt-4 border-b border-white/5 pb-4">
+        {/* 3. Chart: -mx-4 を削除して、コンテナの余白に従うように変更 */}
+        <div className="mb-12 relative bg-[#1C1917]/30 rounded-3xl p-4 border border-white/5">
+          <RichChart data={chartData} isPositive={isPositive} />
+          <div className="flex justify-between px-4 mt-6 border-t border-white/5 pt-4">
             {['1D', '1W', '1M', 'ALL'].map(tf => (
-              <button key={tf} onClick={() => setTimeframe(tf === '1W' ? '7d' : tf === 'ALL' ? '30d' : tf.toLowerCase())} className={`text-[10px] font-bold py-1 px-4 rounded-full transition-all border ${ (timeframe === '7d' && tf === '1W') || timeframe === tf.toLowerCase() ? 'bg-[#E7E5E4] text-black border-[#E7E5E4]' : 'text-[#78716C] border-transparent hover:text-white'}`}>{tf}</button>
+              <button 
+                key={tf} 
+                onClick={() => setTimeframe(tf === '1W' ? '7d' : tf === 'ALL' ? '30d' : tf.toLowerCase())} 
+                className={`text-xs font-bold py-1.5 px-5 rounded-full transition-all border ${ (timeframe === '7d' && tf === '1W') || timeframe === tf.toLowerCase() ? 'bg-[#E7E5E4] text-black border-[#E7E5E4]' : 'text-[#78716C] border-transparent hover:text-white'}`}
+              >
+                {tf}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 mb-8">
-           <div className="p-4 bg-[#1C1917] rounded-2xl border border-white/5 flex flex-col justify-between h-24">
-             <div className="flex items-center gap-2 text-[#78716C]"><Layers className="w-3 h-3" /><span className="text-[10px] uppercase font-bold tracking-wider">TVL</span></div>
-             <p className="text-xl font-serif font-bold text-white">{typeof strategy.tvl === 'number' ? strategy.tvl.toFixed(2) : '0.00'} <span className="text-sm text-[#57534E]">SOL</span></p>
+        {/* 4. Stats Grid: gap-4 で広めに */}
+        <div className="grid grid-cols-2 gap-4 mb-12">
+        <div className="p-6 md:p-8 bg-[#1C1917] rounded-3xl border border-white/5 flex flex-col justify-between h-32 md:h-40 hover:border-[#D97706]/30 transition-colors">
+          <div className="flex items-center gap-2 text-[#78716C]">
+            <Layers className="w-4 h-4 md:w-5 md:h-5" />
+            <span className="text-[10px] md:text-xs uppercase font-bold tracking-widest">TVL</span>
+          </div>
+          <p className="text-2xl md:text-4xl font-serif font-bold text-white">
+                {typeof strategy.tvl === 'number' ? strategy.tvl.toLocaleString() : '0'} <span className="text-sm text-[#57534E]">SOL</span>
+             </p>
            </div>
-           <div className="p-4 bg-[#1C1917] rounded-2xl border border-white/5 flex flex-col justify-between h-24">
-             <div className="flex items-center gap-2 text-[#78716C]"><Activity className="w-3 h-3" /><span className="text-[10px] uppercase font-bold tracking-wider">ROI</span></div>
-             <p className={`text-xl font-serif font-bold ${changePct >= 0 ? 'text-[#D97706]' : 'text-red-500'}`}>{changePct > 0 ? '+' : ''}{changePct.toFixed(2)}%</p>
+           <div className="p-5 bg-[#1C1917] rounded-3xl border border-white/5 flex flex-col justify-between h-28 hover:border-[#D97706]/30 transition-colors">
+             <div className="flex items-center gap-2 text-[#78716C]">
+               <Activity className="w-4 h-4" />
+               <span className="text-xs uppercase font-bold tracking-widest">ROI</span>
+             </div>
+             <p className={`text-2xl font-serif font-bold ${changePct >= 0 ? 'text-[#D97706]' : 'text-red-500'}`}>
+                {changePct > 0 ? '+' : ''}{changePct.toFixed(2)}%
+             </p>
            </div>
         </div>
 
-        {/* Holdings */}
-        <div className="mb-32">
-          <h3 className="text-lg font-bold font-serif mb-4 flex items-center gap-2 text-[#E7E5E4]"><PieChart className="w-5 h-5 text-[#D97706]" /> Composition</h3>
-          <div className="space-y-3">
+        {/* 5. Holdings List: space-y-4 で間隔を広げる */}
+        <div className="mb-20">
+          <h3 className="text-xl font-bold font-serif mb-6 flex items-center gap-3 text-[#E7E5E4]">
+            <PieChart className="w-6 h-6 text-[#D97706]" /> Composition
+          </h3>
+          <div className="space-y-4">
             {tokensInfo.length > 0 ? tokensInfo.map((token, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="flex items-center justify-between p-4 bg-[#1C1917] hover:bg-[#292524] rounded-2xl border border-white/5 transition-colors">
-                <div className="flex items-center gap-4">
+              <motion.div 
+                key={i} 
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                transition={{ delay: i * 0.05 }} 
+                className="flex items-center justify-between p-5 bg-[#1C1917] hover:bg-[#292524] rounded-3xl border border-white/5 transition-all hover:translate-x-1"
+              >
+                <div className="flex items-center gap-5">
                   <div className="relative">
-                    {token.logoURI ? <img src={token.logoURI} alt={token.symbol} className="w-10 h-10 rounded-full bg-black object-cover" /> : <div className="w-10 h-10 rounded-full bg-[#292524] flex items-center justify-center font-bold text-xs text-[#D97706] border border-[#D97706]/20">{token.symbol[0]}</div>}
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black flex items-center justify-center border border-white/10"><img src="https://assets.coingecko.com/coins/images/4128/small/solana.png" className="w-3 h-3" alt="SOL" /></div>
+                    {token.logoURI ? <img src={token.logoURI} alt={token.symbol} className="w-12 h-12 rounded-full bg-black object-cover shadow-lg" /> : <div className="w-12 h-12 rounded-full bg-[#292524] flex items-center justify-center font-bold text-sm text-[#D97706] border border-[#D97706]/20">{token.symbol[0]}</div>}
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-black flex items-center justify-center border border-white/10 shadow-md">
+                       <img src="https://assets.coingecko.com/coins/images/4128/small/solana.png" className="w-3.5 h-3.5" alt="SOL" />
+                    </div>
                   </div>
-                  <div><h4 className="font-bold text-white">{token.symbol}</h4><p className="text-xs text-[#78716C] max-w-[120px] truncate">{token.name || 'Unknown'}</p></div>
+                  <div>
+                    <h4 className="font-bold text-lg text-white">{token.symbol}</h4>
+                    <p className="text-xs text-[#78716C]">{token.name || 'Unknown'}</p>
+                  </div>
                 </div>
-                <div className="text-right"><p className="font-serif font-bold text-[#D97706] text-lg">{token.weight}%</p><p className="text-[10px] text-[#57534E] uppercase tracking-wide">Allocation</p></div>
+                <div className="text-right">
+                  <p className="font-serif font-bold text-[#D97706] text-xl">{token.weight}%</p>
+                  <p className="text-[10px] text-[#57534E] uppercase tracking-widest">Allocation</p>
+                </div>
               </motion.div>
-            )) : <div className="text-center py-12 text-[#57534E]"><Sparkles className="w-8 h-8 mx-auto mb-2 opacity-20" /><p>Loading composition...</p></div>}
+            )) : <div className="text-center py-20 text-[#57534E]"><Sparkles className="w-10 h-10 mx-auto mb-3 opacity-20" /><p className="font-serif">Loading composition...</p></div>}
           </div>
         </div>
       </div>
 
-      {/* Fixed Bottom Action */}
-      <div className="fixed bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black via-black/95 to-transparent z-40 safe-area-bottom">
-        <div className="max-w-md mx-auto flex gap-3">
-             <div className="flex-1 bg-[#1C1917] rounded-xl p-3 border border-white/5 flex flex-col justify-center">
-                <span className="text-[9px] text-[#78716C] uppercase tracking-wide">My Position</span>
-                <span className="font-serif font-bold text-[#E7E5E4] text-sm">$0.00</span>
+      {/* 6. Fixed Bottom Action: 左右の padding を px-6 に */}
+      <div className="fixed bottom-0 inset-x-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent z-40 safe-area-bottom max-w-2xl mx-auto">
+        <div className="flex gap-4">
+             <div className="flex-1 bg-[#1C1917] rounded-2xl p-4 border border-white/5 flex flex-col justify-center">
+                <span className="text-[10px] text-[#78716C] uppercase tracking-widest mb-1">My Position</span>
+                <span className="font-serif font-bold text-[#E7E5E4] text-lg">$0.00</span>
              </div>
-            <button onClick={() => setIsInvestOpen(true)} className="flex-[2] py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] text-black font-bold text-lg rounded-xl shadow-[0_0_20px_rgba(217,119,6,0.2)] active:scale-95 transition-all flex items-center justify-center gap-2 hover:brightness-110">
-              Invest <ChevronRight className="w-5 h-5 opacity-70" />
+            <button 
+              onClick={() => setIsInvestOpen(true)} 
+              className="flex-[2] py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] text-black font-bold text-xl rounded-2xl shadow-[0_0_30px_rgba(217,119,6,0.3)] active:scale-95 transition-all flex items-center justify-center gap-2 hover:brightness-110"
+            >
+              Invest <ChevronRight className="w-6 h-6 opacity-70" />
             </button>
         </div>
       </div>

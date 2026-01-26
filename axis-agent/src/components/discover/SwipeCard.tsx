@@ -38,6 +38,7 @@ interface SwipeCardProps {
 const SWIPE_THRESHOLD = 100;
 const ROTATION_RANGE = 15;
 
+
 // --- Helpers ---
 
 // Memeコイン対応価格フォーマッター
@@ -132,6 +133,7 @@ export const SwipeCard = ({
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-ROTATION_RANGE, ROTATION_RANGE]);
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
+  const isPositive = strategy.roi >= 0;
   
   const nopeOpacity = useTransform(x, [-100, -20], [1, 0]);
   const likeOpacity = useTransform(x, [20, 100], [0, 1]);
@@ -187,7 +189,11 @@ export const SwipeCard = ({
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
     >
       <div className="w-full h-full bg-[#121212] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col relative select-none">
-        
+      <div className={`absolute inset-0 pointer-events-none opacity-60 ${
+          isPositive
+            ? 'bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.08),transparent_60%)]'
+            : 'bg-[radial-gradient(ellipse_at_top_left,rgba(239,68,68,0.08),transparent_60%)]'
+        }`} />
         {/* Swipe Indicators */}
         {isTop && (
           <>
