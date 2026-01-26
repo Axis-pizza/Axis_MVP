@@ -338,6 +338,35 @@ export async function deposit(
     throw new Error('Wallet not connected');
   }
 
+  // 🚨 緊急回避: ダミーアドレス(So111...)の場合は、スマートコントラクトを通さず
+  // 単純なSOL送金として処理する (デモ用)
+  const MOCK_ADDRESS = "So11111111111111111111111111111111111111112";
+  if (strategyPubkey.toString() === MOCK_ADDRESS) {
+    console.log("⚠️ Mock Deposit Detected: Switching to simple transfer mode.");
+    try {
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: wallet.publicKey,
+          toPubkey: strategyPubkey, 
+          lamports: Math.floor(amount * LAMPORTS_PER_SOL),
+        })
+      );
+      
+      transaction.feePayer = wallet.publicKey;
+      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+      const signed = await wallet.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signed.serialize());
+      await connection.confirmTransaction(signature, 'confirmed');
+      
+      console.log(`✅ Mock Deposit Success: ${signature}`);
+      return signature;
+    } catch (e) {
+      console.error("Mock Transfer Failed:", e);
+      throw e;
+    }
+  }
+
   try {
     const amountLamports = new BN(amount * LAMPORTS_PER_SOL);
 

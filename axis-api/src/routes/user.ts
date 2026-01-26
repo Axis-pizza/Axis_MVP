@@ -198,10 +198,7 @@ app.get('/my-invites', async (c) => {
     return c.json(invites);
 });
 
-
-
-
-app.get('/leaderboard', async (c) => {
+app.get('/user/leaderboard', async (c) => {
   try {
     // pnl_percent の高い順に上位50人を取得
     const query = `
@@ -220,7 +217,7 @@ app.get('/leaderboard', async (c) => {
         avatar_url: u.avatar_url,
         rank_tier: u.rank_tier,
         total_xp: u.total_xp,
-        pnl_percent: u.pnl_percent || 0 // 追加: PnL
+        pnl_percent: u.pnl_percent || 0 
       }))
     });
   } catch (e: any) {

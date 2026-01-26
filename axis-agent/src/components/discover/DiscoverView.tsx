@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { User, Layers } from 'lucide-react'; 
 import { SwipeDiscoverView } from './SwipeDiscoverView';
 import { ListDiscoverView } from './ListDiscoverView';
-import { ProfileDrawer } from '../common/ProfileDrawer'; // ★これがインポートされているか確認
+import { ProfileDrawer } from '../common/ProfileDrawer'; 
 import type { Strategy } from '../../types';
 
 type ViewMode = 'swipe' | 'list';
@@ -14,13 +14,11 @@ interface DiscoverViewProps {
 }
 
 export const DiscoverView = ({ onStrategySelect }: DiscoverViewProps) => {
-  // 1. 表示モードの管理
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return (saved === 'list' ? 'list' : 'swipe') as ViewMode;
   });
 
-  // 2. ★ドロワーの開閉状態を管理するState (これがないと動きません)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -34,18 +32,19 @@ export const DiscoverView = ({ onStrategySelect }: DiscoverViewProps) => {
   return (
     <div className="relative min-h-screen bg-black">
       
-      {/* --- ヘッダー部分 --- */}
-      <div className="sticky top-0 z-40 bg-black/80 backdrop-blur-md border-b border-white/5 px-4 h-16 flex items-center justify-between safe-area-top">
-        {/* ロゴ */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#D97706] rounded-lg flex items-center justify-center font-bold text-black font-serif">
-            A
-          </div>
-          <h1 className="text-xl font-bold font-serif tracking-tight text-[#E7E5E4]">Axis</h1>
-        </div>
+      {/* --- ヘッダー部分 (修正) --- */}
+      <div className="flex items-center justify-between w-full px-4 py-3 z-50 relative">
+        
+        {/* 左側：ロゴ */}
+        <img
+          src="/AxisLogoo.png"
+          alt="Axis"
+          // w-85はTailwind標準にないので、もし効いていない場合は w-auto などに調整してください
+          className="h-15 w-auto object-contain" 
+        />
 
-        {/* 右側のボタン群 */}
-        <div className="flex gap-2">
+        {/* 右側：ボタン群 */}
+        <div className="flex items-center gap-3">
           {/* 表示切り替えボタン */}
           <button 
             onClick={toggleView}
@@ -54,10 +53,10 @@ export const DiscoverView = ({ onStrategySelect }: DiscoverViewProps) => {
             <Layers className="w-5 h-5" />
           </button>
 
-          {/* ★プロフィールボタン (クリックで setIsDrawerOpen(true) が発動) */}
+          {/* プロフィールボタン */}
           <button 
             onClick={() => {
-              console.log("Drawer Button Clicked!"); // デバッグ用ログ
+              console.log("Drawer Button Clicked!");
               setIsDrawerOpen(true);
             }}
             className="p-2 rounded-full bg-white/5 hover:bg-white/10 active:scale-95 transition-all relative"
@@ -83,7 +82,7 @@ export const DiscoverView = ({ onStrategySelect }: DiscoverViewProps) => {
         )}
       </div>
 
-      {/* --- ★ドロワー本体 (ここに配置されていないと表示されません) --- */}
+      {/* --- ドロワー本体 --- */}
       <ProfileDrawer 
         isOpen={isDrawerOpen} 
         onClose={() => setIsDrawerOpen(false)} 

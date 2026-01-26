@@ -162,7 +162,7 @@ export const StrategyDetailModal = ({ strategy, isOpen, onClose, onSuccess }: St
                   
                   <div className="grid grid-cols-2 gap-px bg-[#D97706]/20 rounded-xl overflow-hidden border border-[#D97706]/10">
                     <div className="bg-[#0C0A09] p-5 text-center">
-                      <p className="text-[10px] text-[#78716C] uppercase tracking-widest mb-1">Total Assets</p>
+                      <p className="text-[10px] text-[#78716C] uppercase tracking-widest mb-1">Total；； Assets</p>
                       <p className="text-2xl font-serif font-bold text-[#E7E5E4]">{strategy.tvl.toFixed(2)} <span className="text-sm text-[#78716C]">SOL</span></p>
                     </div>
                     <div className="bg-[#0C0A09] p-5 text-center">
