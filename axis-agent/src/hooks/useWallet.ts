@@ -1,39 +1,46 @@
-/**
- * Wallet Hook - Enhanced wallet utilities for Kagemusha
- */
+// src/hooks/useWallet.ts
+import { useMemo } from "react";
+import { Connection, PublicKey } from "@solana/web3.js";
+import { useWallets } from "@privy-io/react-auth/solana";
 
-import { useWallet as useSolanaWallet, useConnection } from '@solana/wallet-adapter-react';
-import { useCallback, useMemo } from 'react';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+const RPC_URL =
+  import.meta.env.VITE_SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
 
-export const useWallet = () => {
-  const { connection } = useConnection();
-  const wallet = useSolanaWallet();
+export function useConnection() {
+  const connection = useMemo(() => {
+    return new Connection(RPC_URL, "confirmed");
+  }, []);
 
-  const shortAddress = useMemo(() => {
-    if (!wallet.publicKey) return null;
-    const addr = wallet.publicKey.toBase58();
-    return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
-  }, [wallet.publicKey]);
+  return { connection };
+}
 
-  const getBalance = useCallback(async (): Promise<number | null> => {
-    if (!wallet.publicKey) return null;
+export function useWallet() {
+  const { ready, wallets } = useWallets();
+
+  const wallet = wallets?.[0];
+  const address = wallet?.address;
+
+  const publicKey = useMemo(() => {
+    if (!address) return null;
     try {
-      const balance = await connection.getBalance(wallet.publicKey);
-      return balance / LAMPORTS_PER_SOL;
-    } catch (e) {
-      console.error('Failed to fetch balance:', e);
+      return new PublicKey(address);
+    } catch {
       return null;
     }
-  }, [connection, wallet.publicKey]);
+  }, [address]);
 
-  const isConnected = wallet.connected && wallet.publicKey !== null;
+  const disconnect = async () => {
+    try {
+      await wallet?.features?.["standard:disconnect"]?.disconnect();
+    } catch (e) {
+      console.warn("disconnect failed", e);
+    }
+  };
 
   return {
-    ...wallet,
-    shortAddress,
-    getBalance,
-    isConnected,
-    publicKeyString: wallet.publicKey?.toBase58() || null,
+    ready,
+    publicKey,
+    disconnect,
+    wallet,
   };
-};
+}

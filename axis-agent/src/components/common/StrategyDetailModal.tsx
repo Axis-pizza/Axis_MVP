@@ -7,7 +7,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Users, Copy, ArrowDownLeft, Shuffle, Save } from 'lucide-react';
 import { useWallet } from '../../hooks/useWallet';
-import { useConnection, type WalletContextState } from '@solana/wallet-adapter-react';
+import { useConnection, type WalletContextState } from '../../hooks/useWallet';
 import { PublicKey } from '@solana/web3.js';
 import { deposit, rebalance } from '../../services/kagemusha';
 import { PizzaChart } from './PizzaChart';

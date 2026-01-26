@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { RefreshCw, Loader2, Sparkles } from 'lucide-react';
 import { SwipeCard } from './SwipeCard';
 import { api } from '../../services/api';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet } from '../../hooks/useWallet';
 
 interface TokenData {
   price: number;

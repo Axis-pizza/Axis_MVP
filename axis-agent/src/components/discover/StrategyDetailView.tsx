@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, Layers, Info, Check, X, 
   Activity, Sparkles, ChevronRight, PieChart
 } from 'lucide-react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet } from '../../hooks/useWallet';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { RichChart } from '../common/RichChart'; // ★作成したRichChartをインポート
 import { api } from '../../services/api';

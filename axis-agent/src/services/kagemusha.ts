@@ -14,7 +14,7 @@ import {
 } from '@solana/web3.js';
 import type { GetProgramAccountsFilter } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
-import type { WalletContextState } from '@solana/wallet-adapter-react';
+import type { WalletContextState } from '..//hooks/useWallet';
 
 // Program ID deployed to devnet
 const PROGRAM_ID = new PublicKey('2kdDnjHHLmHex8v5pk8XgB7ddFeiuBW4Yp5Ykx8JmBLd');

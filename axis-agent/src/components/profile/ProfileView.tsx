@@ -5,7 +5,7 @@ import {
   ArrowUpRight, ArrowDownRight, Wallet, ArrowLeft, TrendingUp, TrendingDown,
   Crown, Sparkles, CheckCircle, Copy, Users, Zap
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '../../hooks/useWallet';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import html2canvas from 'html2canvas';

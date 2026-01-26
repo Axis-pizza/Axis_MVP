@@ -2,19 +2,22 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Trophy, LogOut, CheckCircle, Sparkles, Edit, User, Droplets, Wallet } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'; // 追加
+import { usePrivy } from '@privy-io/react-auth';
+import { useWallet } from '../../hooks/useWallet';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { useConnectWallet } from "@privy-io/react-auth";
+
 import { ProfileEditModal } from './ProfileEditModal';
 
 export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const { showToast } = useToast();
-  const { publicKey, disconnect } = useWallet();
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [faucetLoading, setFaucetLoading] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const { connectWallet } = useConnectWallet();
+  const { publicKey, disconnect, ready } = useWallet();
 
   const fetchUser = async () => {
     if (!publicKey) return;
@@ -70,8 +73,17 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     showToast("Invite Link Copied!", "success");
   };
 
-  // ★修正: ウォレット未接続時でもnullを返さず、ドロワーを描画する
-  // if (!publicKey) return null; 
+  const handleConnect = async () => {
+    try {
+      await connectWallet({
+        walletList: ["wallet_connect_qr", "wallet_connect"],
+        walletChainType: "solana",
+      });
+      // publicKeyが入ったらuseEffectでfetchUserが走る
+    } catch (e: any) {
+      showToast(e?.message ?? "Failed to connect wallet", "error");
+    }
+  };
 
   return createPortal(
     <>
@@ -100,19 +112,24 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 pt-2 custom-scrollbar">
-                {/* ★修正: ウォレット未接続時の表示 */}
-                {!publicKey ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center py-10">
-                        <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
-                            <Wallet className="w-10 h-10 text-white/30" />
-                        </div>
-                        <p className="text-white/60 mb-8">
-                            Please connect your wallet to access your profile, check your rankings, and manage your settings.
-                        </p>
-                        <div className="wallet-adapter-button-trigger w-full">
-                            <WalletMultiButton style={{ width: '100%', justifyContent: 'center' }} />
-                        </div>
+              {!ready || !publicKey ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-10">
+                    <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+                      <Wallet className="w-10 h-10 text-white/30" />
                     </div>
+
+                    <p className="text-white/60 mb-8 px-4">
+                      Connect via WalletConnect to claim your XP and manage your
+                      portfolio.
+                    </p>
+
+                    <button
+                      onClick={handleConnect}
+                      className="w-full py-4 bg-[#D97706] hover:bg-[#b45309] text-black font-bold rounded-xl active:scale-95 transition-all"
+                    >
+                      Connect Wallet
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <div className="flex flex-col items-center mb-8">
@@ -194,18 +211,16 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 )}
               </div>
 
-              {/* Footer: Disconnect Button (only if connected) */}
-              {publicKey && (
-                  <div className="p-6 pt-0 mt-auto shrink-0">
-                    <button 
-                    onClick={disconnect} 
+              {!!publicKey && (
+                <div className="p-6 pt-0 mt-auto shrink-0">
+                  <button
+                    onClick={disconnect}
                     className="w-full flex items-center justify-center gap-2 text-red-500/80 hover:text-red-500 font-bold text-sm py-2 hover:bg-red-500/5 rounded-lg transition-colors"
-                    >
+                  >
                     <LogOut className="w-4 h-4" /> Disconnect Wallet
-                    </button>
-                  </div>
+                  </button>
+                </div>
               )}
-
             </motion.div>
           </>
         )}

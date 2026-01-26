@@ -10,7 +10,7 @@ import {
   Wallet, Clock, Shield, Zap, Target, Activity,
   Plus, Loader2
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '../../hooks/useWallet';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { PizzaChart } from '../common/PizzaChart';
 

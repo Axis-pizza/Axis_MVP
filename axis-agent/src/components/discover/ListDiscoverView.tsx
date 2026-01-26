@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useWallet } from '@solana/wallet-adapter-react'; // ★追加: 自分のウォレット取得用
+ // ★追加: 自分のウォレット取得用
 import { 
   Search, TrendingUp, Users, Crown, ChevronRight, Flame, Loader2, Plus, 
   Zap, Shield, Target, Layers, GitFork 

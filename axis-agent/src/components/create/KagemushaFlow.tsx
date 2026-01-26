@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '../../hooks/useWallet';
 
 import { TacticalTerminal, type Topping } from './TacticalTerminal';
 import { StrategyCards } from './StrategyCards';

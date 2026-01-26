@@ -1,34 +1,32 @@
+import type { FC, ReactNode } from "react";
+import { PrivyProvider } from "@privy-io/react-auth";
+import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 
-import { useMemo } from 'react';
-import type { FC, ReactNode } from 'react';
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
-import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { clusterApiUrl } from '@solana/web3.js';
-import '@solana/wallet-adapter-react-ui/styles.css';
+const solanaConnectors = toSolanaWalletConnectors({
+  shouldAutoConnect: false,
+});
 
 export const Providers: FC<{ children: ReactNode }> = ({ children }) => {
-    const network = WalletAdapterNetwork.Devnet;
+  const appId = "cmk3fq74f03ugif0c83tghcr7";
 
-    // You can also provide a custom RPC endpoint.
-    const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  return (
+    <PrivyProvider
+  appId={appId}
+  config={{
+    appearance: {
+      theme: "dark",
+      accentColor: "#ff5f00",
+      showWalletLoginFirst: false,
 
-    const wallets = useMemo(
-        () => [
-            new PhantomWalletAdapter(),
-        ],
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [network]
-    );
-
-    return (
-        <ConnectionProvider endpoint={endpoint}>
-            <WalletProvider wallets={wallets} autoConnect>
-                <WalletModalProvider>
-                    {children}
-                </WalletModalProvider>
-            </WalletProvider>
-        </ConnectionProvider>
-    );
+      walletChainType: "solana-only",
+      walletList: ["detected_solana_wallets", "wallet_connect_qr"],
+    },
+    externalWallets: {
+      solana: { connectors: solanaConnectors },
+    },
+  }}
+>
+  {children}
+</PrivyProvider>
+  );
 };

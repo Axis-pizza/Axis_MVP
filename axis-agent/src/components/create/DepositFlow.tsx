@@ -5,7 +5,7 @@ import {
   Loader2, CheckCircle2, AlertCircle, ExternalLink, ArrowRight, 
   Sparkles, Lock
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '../../hooks/useWallet';
 import { 
   PublicKey, 
   Transaction, 
