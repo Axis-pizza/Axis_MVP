@@ -293,11 +293,13 @@ export const api = {
 
   async requestFaucet(wallet: string) {
     try {
-      // エンドポイントは仮定。必要に応じてバックエンドに合わせてください
-      const res = await fetch(`${API_BASE}/faucet`, {
+      // ★修正: バックエンドの定義に合わせてエンドポイントとパラメータ名を変更
+      // Endpoint: /claim
+      // Body: { wallet_address: ... }
+      const res = await fetch(`${API_BASE}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wallet }),
+        body: JSON.stringify({ wallet_address: wallet }),
       });
       return await res.json();
     } catch (e) {

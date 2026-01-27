@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform, useMotionValue, useSpring,useAnimation, useTransform as useMotionTransform } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform, useMotionValue, useAnimation, useTransform as useMotionTransform } from 'framer-motion';
 import { 
   ArrowLeft, Copy, Star, 
   TrendingUp, TrendingDown, Layers, Activity, Sparkles, ChevronRight, PieChart, Wallet, ArrowRight, X, Check
@@ -9,10 +9,9 @@ import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 import { RichChart } from '../common/RichChart';
 import { api } from '../../services/api';
-import { deposit } from '../../services/kagemusha';
+// ★修正: 新しい KagemushaService を使用
+import { KagemushaService } from '../../services/kagemusha';
 import type { Strategy } from '../../types';
-
-// ✅ 既存のToastを使う
 import { useToast } from '../../context/ToastContext'; 
 
 // --- Types ---
@@ -44,7 +43,7 @@ const ResponsiveConfirmAction = ({ onConfirm, isLoading, label }: { onConfirm: (
   );
 };
 
-// ✅ 2. Swipe To Confirm (UI改善版)
+// 2. Swipe To Confirm
 const SwipeToConfirm = ({
   onConfirm,
   isLoading,
@@ -55,48 +54,34 @@ const SwipeToConfirm = ({
   label: string;
 }) => {
   const constraintsRef = useRef<HTMLDivElement>(null);
-
   const x = useMotionValue(0);
-
-  // ✅ コンテナの実幅を使う
   const [containerWidth, setContainerWidth] = useState(280);
 
-  // UI定数
-  const HANDLE_SIZE = 56; // w-14 h-14
-  const PADDING = 4; // p-1
+  const HANDLE_SIZE = 56; 
+  const PADDING = 4;
   const maxDrag = Math.max(0, containerWidth - HANDLE_SIZE - PADDING * 2);
 
-  // テキスト/進行バー（xから派生させる）
   const textOpacity = useMotionTransform(x, [0, maxDrag * 0.25], [1, 0]);
   const progressWidth = useMotionTransform(x, [0, maxDrag], [HANDLE_SIZE + PADDING * 2, containerWidth]);
   const progressOpacity = useMotionTransform(x, [0, maxDrag * 0.08], [0, 1]);
 
-  // ✅ リサイズ追従
   useEffect(() => {
     if (!constraintsRef.current) return;
-
     const el = constraintsRef.current;
-    const ro = new ResizeObserver(() => {
-      setContainerWidth(el.clientWidth);
-    });
+    const ro = new ResizeObserver(() => setContainerWidth(el.clientWidth));
     ro.observe(el);
-
-    // 初回
     setContainerWidth(el.clientWidth);
-
     return () => ro.disconnect();
   }, []);
 
   useEffect(() => {
-    // ローディング中は右端固定
     if (isLoading) x.set(maxDrag);
     else x.set(0);
   }, [isLoading, maxDrag, x]);
 
   const handleDragEnd = () => {
     const current = x.get();
-    const threshold = maxDrag * 0.58; // ✅ 0.7 → 0.58（スライドしやすく）
-
+    const threshold = maxDrag * 0.58; 
     if (current > threshold) {
       x.set(maxDrag);
       if (!isLoading) onConfirm();
@@ -110,49 +95,32 @@ const SwipeToConfirm = ({
       ref={constraintsRef}
       className="relative h-16 w-full bg-[#1C1917] rounded-full overflow-hidden border border-white/5 select-none shadow-[inset_0_4px_8px_rgba(0,0,0,0.5)] p-1 box-border"
     >
-      {/* 進行バー */}
       <motion.div
         className="absolute inset-y-0 left-0 bg-[#D97706] rounded-full z-0"
         style={{ width: progressWidth, opacity: isLoading ? 1 : progressOpacity }}
       />
-
-      {/* ラベル */}
       <motion.div
         className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
         style={{ opacity: textOpacity }}
       >
-        <span
-          className={`font-serif font-bold text-sm tracking-[0.2em] transition-colors duration-300 ${
-            isLoading ? "text-white" : "text-white/40"
-          }`}
-        >
+        <span className={`font-serif font-bold text-sm tracking-[0.2em] transition-colors duration-300 ${isLoading ? "text-white" : "text-white/40"}`}>
           {isLoading ? "PROCESSING..." : `SLIDE TO ${label}`}
         </span>
       </motion.div>
-
-      {/* ✅ ハンドル */}
       <motion.div
         drag={isLoading ? false : "x"}
         dragConstraints={{ left: 0, right: maxDrag }}
-        dragElastic={0.02} // ✅ ちょい硬め
+        dragElastic={0.02}
         dragMomentum={false}
         onDragEnd={handleDragEnd}
-        style={{
-          x, // ✅ ここが重要：判定も描画も同じxにする
-          touchAction: "pan-x", // ✅ モバイルで効きやすくする
-        }}
+        style={{ x, touchAction: "pan-x" }}
         className="relative w-14 h-14 bg-white rounded-full shadow-[0_2px_12px_rgba(0,0,0,0.4)] flex items-center justify-center cursor-grab active:cursor-grabbing z-20 group"
       >
-        {isLoading ? (
-          <Check className="w-6 h-6 text-[#D97706]" />
-        ) : (
-          <ChevronRight className="w-6 h-6 text-[#D97706] ml-0.5" />
-        )}
+        {isLoading ? <Check className="w-6 h-6 text-[#D97706]" /> : <ChevronRight className="w-6 h-6 text-[#D97706] ml-0.5" />}
       </motion.div>
     </div>
   );
 };
-
 
 // 3. InvestSheet
 interface InvestSheetProps {
@@ -166,7 +134,7 @@ interface InvestSheetProps {
 const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestSheetProps) => {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
-  const { showToast } = useToast(); // ✅ 既存のToastを使用
+  const { showToast } = useToast();
   
   const [amount, setAmount] = useState('0');
   const [asset, setAsset] = useState<AssetType>('SOL');
@@ -203,7 +171,6 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
 
   const handleExecute = () => {
      if (parseFloat(amount) <= 0) {
-       // ✅ Toastでエラー表示
        showToast("Please enter a valid amount", "error");
        return;
      }
@@ -309,7 +276,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
   const { connection } = useConnection();
   const wallet = useWallet();
   const { scrollY } = useScroll();
-  const { showToast } = useToast(); // ✅ 既存のToastを使用
+  const { showToast } = useToast(); 
   const headerOpacity = useTransform(scrollY, [0, 100], [0, 1]);
   const controls = useAnimation();
 
@@ -378,43 +345,42 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
     }
     
     setInvestStatus('SIGNING');
-    // const toastId = toast.loading("Waiting for approval..."); // 既存Toastにloadingがない場合はコメントアウト
     
     try {
       if (asset === 'USDC') {
-        // toast.dismiss(toastId);
         showToast("USDC Coming Soon (Switched to SOL)", "info");
       }
       
       const parsedAmount = parseFloat(amountStr);
-      // ID検証とフォールバック
       let targetPubkey: PublicKey;
       try {
         targetPubkey = new PublicKey(strategy.id);
       } catch (e) {
-        // Fallback to Wrapped SOL for demo
-        targetPubkey = new PublicKey("So11111111111111111111111111111111111111112");
+        // Fallback or Error Handling
+        throw new Error("Invalid Strategy Address");
       }
       
-      // トランザクション
-      await deposit(connection, wallet, targetPubkey, parsedAmount);
+      // ★修正: KagemushaService.depositSol を呼び出し
+      await KagemushaService.depositSol(connection, wallet, targetPubkey, parsedAmount);
       
-      // toast.dismiss(toastId);
-      // ✅ 成功時のToast
       showToast(`Successfully deposited ${parsedAmount} SOL`, "success");
-      
       setInvestStatus('SUCCESS');
       
+      // 成功後のデータ更新 (オプション)
+      await api.syncUserStats(wallet.publicKey.toBase58(), 0, parsedAmount);
+
       setTimeout(() => { 
         setIsInvestOpen(false); 
         setInvestStatus('IDLE'); 
       }, 1500);
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      // toast.dismiss(toastId);
-      // ✅ エラー時のToast
-      showToast("Transaction Failed", "error");
+      let msg = "Transaction Failed";
+      if (e.message.includes("User rejected")) msg = "Cancelled by user";
+      if (e.message.includes("0x1")) msg = "Insufficient funds";
+      
+      showToast(msg, "error");
       setInvestStatus('ERROR');
       setTimeout(() => setInvestStatus('IDLE'), 2000);
     }
@@ -426,21 +392,13 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         return;
     }
     
-    
     controls.set({ rotate: 0, scale: 1 }); 
     controls.start({
       rotate: 360,
-      scale: [1, 1.5, 1], // クルッと回りながら「ポヨッ」と大きくなる
-      transition: { 
-        type: "spring", 
-        // stiffness(硬さ)を上げ、damping(揺れ)を抑えると「シュパッ」と回ります
-        stiffness: 300, 
-        damping: 12, 
-        mass: 0.5 // 質量を軽くするとさらにキビキビ動きます
-      }
+      scale: [1, 1.5, 1], 
+      transition: { type: "spring", stiffness: 300, damping: 12, mass: 0.5 }
     });
 
-    // 内部状態の切り替え
     const nextState = !isWatchlisted;
     setIsWatchlisted(nextState);
 
@@ -449,7 +407,6 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       showToast(nextState ? "Added to watchlist" : "Removed from watchlist", "success");
     } catch {
       setIsWatchlisted(!nextState);
-      // エラーの時は赤く光らせたり、少し震わせるのもアリですね
     }
   };
 
@@ -466,8 +423,8 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
   return (
     <div className="min-h-screen bg-black text-[#E7E5E4] pb-40 font-sans selection:bg-[#D97706]/30 max-w-2xl mx-auto">
       
-      {/* 1. Navbar: 左右の余白を px-6 に拡大 */}
-      <motion.div className="fixed top-0 inset-x-0 h-16 bg-black/80 backdrop-blur-xl z-60 flex items-center justify-between px-6 border-b border-white/5 safe-area-top max-w-2xl mx-auto">
+      {/* 1. Navbar */}
+      <motion.div className="fixed top-0 inset-x-0 h-16 bg-black/80 backdrop-blur-xl z-40 flex items-center justify-between px-6 border-b border-white/5 safe-area-top max-w-2xl mx-auto">
         <button onClick={onBack} className="p-3 -ml-3 text-white/70 hover:text-white active:scale-90 transition-transform">
           <ArrowLeft className="w-6 h-6" />
         </button>
@@ -491,10 +448,10 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         </div>
       </motion.div>
 
-      {/* メインコンテンツエリア: 全体の左右余白を px-6 に統一 */}
+      {/* Main Content */}
       <div className="pt-32 md:pt-44 px-8 md:px-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* 2. Header Info: mb-10 で下のチャートと離す */}
+        {/* Header Info */}
         <div className="mb-10">
         <h1 className="text-3xl md:text-5xl font-bold tracking-tight font-serif mb-2 md:mb-4">
             {strategy.name}
@@ -516,7 +473,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
            </button>
         </div>
 
-        {/* 3. Chart: -mx-4 を削除して、コンテナの余白に従うように変更 */}
+        {/* Chart */}
         <div className="mb-12 relative bg-[#1C1917]/30 rounded-3xl p-4 border border-white/5">
           <RichChart data={chartData} isPositive={isPositive} />
           <div className="flex justify-between px-4 mt-6 border-t border-white/5 pt-4">
@@ -532,7 +489,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
           </div>
         </div>
 
-        {/* 4. Stats Grid: gap-4 で広めに */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4 mb-12">
         <div className="p-6 md:p-8 bg-[#1C1917] rounded-3xl border border-white/5 flex flex-col justify-between h-32 md:h-40 hover:border-[#D97706]/30 transition-colors">
           <div className="flex items-center gap-2 text-[#78716C]">
@@ -554,7 +511,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
            </div>
         </div>
 
-        {/* 5. Holdings List: space-y-4 で間隔を広げる */}
+        {/* Holdings List */}
         <div className="mb-20">
           <h3 className="text-xl font-bold font-serif mb-6 flex items-center gap-3 text-[#E7E5E4]">
             <PieChart className="w-6 h-6 text-[#D97706]" /> Composition
@@ -590,7 +547,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         </div>
       </div>
 
-      {/* 6. Fixed Bottom Action: 左右の padding を px-6 に */}
+      {/* Fixed Bottom Action */}
       <div className="fixed bottom-0 inset-x-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent z-40 safe-area-bottom max-w-2xl mx-auto">
         <div className="flex gap-4">
              <div className="flex-1 bg-[#1C1917] rounded-2xl p-4 border border-white/5 flex flex-col justify-center">

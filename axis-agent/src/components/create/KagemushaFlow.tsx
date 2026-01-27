@@ -36,8 +36,11 @@ interface DeployedStrategy {
   address: string;
   name: string;
   type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
-  // --- Change 2: Allow mint address (Manual mode provides this) ---
   tokens: FlowToken[];
+  // ★追加
+  ticker?: string;
+  description?: string;
+  config?: any;
 }
 
 export const KagemushaFlow = () => {
@@ -139,66 +142,39 @@ export const KagemushaFlow = () => {
 
   // --- Common Handlers ---
   const handleDeploySuccess = async (
-    strategyAddress: string, // マニュアルモードではダミーが入る前提
+    strategyAddress: string,
     manualData?: ManualData 
   ) => {
     if (!publicKey) {
       alert("Please connect your wallet first.");
       return;
     }
-
+  
     const finalTokens: FlowToken[] = (manualData?.tokens || customTokens) as FlowToken[];
     const finalName = manualData?.config?.name || pizzaName;
     const finalTicker = manualData?.config?.ticker || "UNKNOWN";
     const finalDesc = manualData?.config?.description || "";
     
-    // configが存在しない場合（AIフローなど）のフォールバック
     const finalConfig = manualData?.config || {
       curatorFee: 0.5,
       protocolFee: 0.2,
       rebalanceTrigger: 'THRESHOLD',
       rebalanceValue: 2.5
     };
-
-    setIsLoading(true); // 全体ローディング開始
-
-    try {
-      // 1. バックエンドへデータを送信 (DB保存)
-      const result = await api.createStrategy({
-        owner_pubkey: publicKey.toBase58(),
-        name: finalName,
-        ticker: finalTicker,
-        description: finalDesc,
-        type: 'MANUAL',
-        tokens: finalTokens.map(t => ({
-          symbol: t.symbol,
-          mint: t.mint || "So11111111111111111111111111111111111111112",
-          weight: t.weight,
-          logoURI: t.logoURI // ★追加: 画像URLも保存対象にする
-        })),
-        config: finalConfig
-      });
-
-      if (result.success) {
-        // 2. 成功したらローカルステートを更新してデポジット画面へ
-        setDeployedStrategy({
-          address: result.strategy_id || strategyAddress, // DBのIDがあればそれを使う
-          name: finalName,
-          type: 'BALANCED',
-          tokens: finalTokens,
-        });
-        
-        setInitialDepositAmount(0);
-        setStep('DEPOSIT');
-      } else {
-        console.error("Save failed:", result.error);
-        alert("Failed to save strategy. Please try again.");
-      }
-    } catch (e) {
-      console.error("Error:", e);
-    } finally {
-      setIsLoading(false);
-    }
+  
+    // ★DB保存はDepositFlowで行うため、ここではステート更新のみ
+    setDeployedStrategy({
+      address: strategyAddress,
+      name: finalName,
+      type: 'BALANCED',
+      tokens: finalTokens,
+      ticker: finalTicker,
+      description: finalDesc,
+      config: finalConfig,
+    });
+    
+    setInitialDepositAmount(0);
+    setStep('DEPOSIT');
   };
 
   const handleDepositComplete = () => {

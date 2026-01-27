@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, ShieldCheck, Wallet, ArrowRight, Info, X } from 'lucide-react';
+import { FileText, ShieldCheck, Wallet, ArrowRight, Info, X, Loader2 } from 'lucide-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useWallet } from '../../hooks/useWallet';
+import { KagemushaService } from '../../services/kagemusha'; // ★作成したServiceをインポート
+import { useToast } from '../../context/ToastContext';
+import { api } from '../../services/api';
 
 interface DeploymentBlueprintProps {
   strategyName: string;
@@ -8,7 +13,6 @@ interface DeploymentBlueprintProps {
   tokens: { symbol: string; weight: number; logoURI?: string }[];
   description: string;
   
-  // 詳細設定
   settings?: {
     swapFee: number;
     automationEnabled: boolean;
@@ -23,7 +27,6 @@ interface DeploymentBlueprintProps {
 
   onBack: () => void;
   onComplete: () => void;
-  // 修正: 金額と通貨を渡せるように変更
   onDeploySuccess?: (address: string, amount: number, asset: 'SOL' | 'USDC') => void;
 }
 
@@ -37,27 +40,87 @@ export const DeploymentBlueprint = ({
   onComplete,
   onDeploySuccess 
 }: DeploymentBlueprintProps) => {
-  // 初期投資モーダル管理
+  const { connection } = useConnection();
+  const wallet = useWallet();
+  const { showToast } = useToast();
+
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
   const [depositAsset, setDepositAsset] = useState<'SOL' | 'USDC'>('SOL');
+  const [isDeploying, setIsDeploying] = useState(false); // ローディング状態
 
-  // 1. Deployボタンクリック -> モーダルオープン
   const handleInitialDeployClick = () => {
     setIsDepositModalOpen(true);
   };
 
-  // 2. モーダルでConfirm -> 親へ通知して遷移
-  const handleConfirmDeploy = () => {
+  // ★ここを修正: 本物のデプロイ＆入金処理
+  const handleConfirmDeploy = async () => {
     if (!depositAmount) return;
-    setIsDepositModalOpen(false);
+    if (!wallet.publicKey) {
+        showToast("Wallet not connected", "error");
+        return;
+    }
 
-    if (onDeploySuccess) {
-      // 署名フロー(DepositFlow)に任せるため、プレースホルダーのアドレスと入力金額を渡す
-      const mockNewAddress = "So11111111111111111111111111111111111111112"; 
-      onDeploySuccess(mockNewAddress, parseFloat(depositAmount), depositAsset);
-    } else {
-      onComplete();
+    setIsDeploying(true);
+
+    try {
+        // 1. デプロイ (Strategy作成)
+        showToast("🚀 Creating Strategy on-chain...", "info");
+        
+        const { signature: deploySig, strategyPubkey } = await KagemushaService.initializeStrategy(
+            connection,
+            wallet,
+            {
+                name: strategyName,
+                strategyType: 2, // ひとまず Balanced (Wave) 固定
+                tokens: tokens.map(t => ({ symbol: t.symbol, weight: t.weight }))
+            }
+        );
+
+        console.log("Deployed:", strategyPubkey.toString());
+
+        // 2. 入金 (Deposit SOL)
+        // 金額が0より大きければ実行
+        const amount = parseFloat(depositAmount);
+        if (amount > 0 && depositAsset === 'SOL') {
+             showToast(`💰 Depositing ${amount} SOL...`, "info");
+             await KagemushaService.depositSol(
+                 connection,
+                 wallet,
+                 strategyPubkey,
+                 amount
+             );
+        }
+
+        // 3. バックエンドへ登録 (DB保存)
+        await api.createStrategy({
+            owner_pubkey: wallet.publicKey.toBase58(),
+            name: strategyName,
+            ticker: info?.symbol || 'ETF',
+            description: description,
+            type: 'BALANCED',
+            tokens: tokens,
+            config: {
+                strategyPubkey: strategyPubkey.toString(),
+                txSignature: deploySig
+            }
+        });
+
+        // 4. 完了通知
+        showToast("✅ Strategy Deployed & Funded!", "success");
+        setIsDepositModalOpen(false);
+
+        if (onDeploySuccess) {
+            onDeploySuccess(strategyPubkey.toString(), amount, depositAsset);
+        } else {
+            onComplete();
+        }
+
+    } catch (e: any) {
+        console.error("Deploy Error:", e);
+        showToast(`Failed: ${e.message}`, "error");
+    } finally {
+        setIsDeploying(false);
     }
   };
 
@@ -77,7 +140,6 @@ export const DeploymentBlueprint = ({
         {/* Header Section */}
         <div className="relative border-b-2 border-[#0C0A09] pb-6 mb-6 flex justify-between items-start">
           <div className="flex items-center gap-4">
-             {/* Logo */}
              <div className="w-16 h-16 border-2 border-[#0C0A09] flex items-center justify-center bg-white overflow-hidden">
                {info?.imagePreview ? (
                  <img src={info.imagePreview} alt="Logo" className="w-full h-full object-cover" />
@@ -132,16 +194,6 @@ export const DeploymentBlueprint = ({
                  <span className="text-[#0C0A09]/70">Auto-Rebalance</span>
                  <span className="font-bold">{settings?.automationEnabled ? 'Active' : 'Disabled'}</span>
                </li>
-               {settings?.automationEnabled && (
-                 <li className="flex justify-between">
-                   <span className="text-[#0C0A09]/70">Trigger</span>
-                   <span className="font-bold">
-                     {settings.triggerType === 'DEVIATION' 
-                       ? `> ${settings.deviationThreshold}% Drift` 
-                       : `Every ${settings.timeInterval}h`}
-                   </span>
-                 </li>
-               )}
              </ul>
            </div>
         </div>
@@ -161,13 +213,15 @@ export const DeploymentBlueprint = ({
       <div className="flex gap-4">
         <button
           onClick={onBack}
-          className="px-8 py-4 bg-[#1C1917] rounded-xl font-bold text-[#78716C] hover:text-[#E7E5E4] transition-colors"
+          disabled={isDeploying}
+          className="px-8 py-4 bg-[#1C1917] rounded-xl font-bold text-[#78716C] hover:text-[#E7E5E4] transition-colors disabled:opacity-50"
         >
           Modify
         </button>
         <button
           onClick={handleInitialDeployClick}
-          className="flex-1 py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] text-[#0C0A09] font-bold rounded-xl shadow-[0_0_30px_rgba(217,119,6,0.2)] hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          disabled={isDeploying}
+          className="flex-1 py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] text-[#0C0A09] font-bold rounded-xl shadow-[0_0_30px_rgba(217,119,6,0.2)] hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Wallet className="w-5 h-5" />
           Set Liquidity & Deploy
@@ -180,7 +234,7 @@ export const DeploymentBlueprint = ({
           <>
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setIsDepositModalOpen(false)}
+              onClick={() => !isDeploying && setIsDepositModalOpen(false)}
               className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
             />
             <motion.div
@@ -191,7 +245,7 @@ export const DeploymentBlueprint = ({
             >
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-serif font-bold text-[#E7E5E4]">Initial Liquidity</h3>
-                <button onClick={() => setIsDepositModalOpen(false)}><X className="w-5 h-5 text-[#78716C]" /></button>
+                <button onClick={() => setIsDepositModalOpen(false)} disabled={isDeploying}><X className="w-5 h-5 text-[#78716C]" /></button>
               </div>
 
               <div className="p-4 bg-[#D97706]/10 rounded-xl border border-[#D97706]/20 mb-6 flex items-start gap-3">
@@ -210,6 +264,7 @@ export const DeploymentBlueprint = ({
                       value={depositAmount}
                       onChange={(e) => setDepositAmount(e.target.value)}
                       placeholder="0.00"
+                      disabled={isDeploying}
                       className="w-full p-4 bg-[#0C0A09] border border-[#D97706]/20 rounded-xl text-xl font-bold text-[#E7E5E4] focus:outline-none focus:border-[#D97706]"
                       autoFocus
                     />
@@ -220,9 +275,10 @@ export const DeploymentBlueprint = ({
                       >
                         SOL
                       </button>
+                      {/* USDCはMVPのSOL入金機能ではサポート外のため無効化 */}
                       <button 
-                        onClick={() => setDepositAsset('USDC')}
-                        className={`px-3 rounded-md text-xs font-bold transition-colors ${depositAsset === 'USDC' ? 'bg-[#D97706] text-[#0C0A09]' : 'text-[#78716C]'}`}
+                        disabled
+                        className="px-3 rounded-md text-xs font-bold transition-colors text-[#78716C]/50 cursor-not-allowed"
                       >
                         USDC
                       </button>
@@ -233,10 +289,18 @@ export const DeploymentBlueprint = ({
 
               <button
                 onClick={handleConfirmDeploy}
-                disabled={!depositAmount || parseFloat(depositAmount) <= 0}
+                disabled={!depositAmount || parseFloat(depositAmount) <= 0 || isDeploying}
                 className="w-full py-4 bg-[#E7E5E4] text-[#0C0A09] font-bold rounded-xl disabled:opacity-50 hover:scale-[1.01] transition-transform flex items-center justify-center gap-2"
               >
-                Proceed to Signature <ArrowRight className="w-4 h-4" />
+                {isDeploying ? (
+                    <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Processing...
+                    </>
+                ) : (
+                    <>
+                        Proceed to Signature <ArrowRight className="w-4 h-4" />
+                    </>
+                )}
               </button>
             </motion.div>
           </>

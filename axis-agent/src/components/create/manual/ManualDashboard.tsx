@@ -222,6 +222,7 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
   };
 
   const handleDeploy = () => {
+    console.log('=== ManualDashboard handleDeploy called ===', new Date().toISOString());
     triggerHaptic();
     if (!config.name || !config.ticker) return;
     
@@ -229,10 +230,14 @@ export const ManualDashboard = ({ onDeploySuccess }: ManualDashboardProps) => {
       tokens: portfolio.map(p => ({
         symbol: p.token.symbol,
         weight: p.weight,
-        mint: p.token.address,
-        logoURI: p.token.logoURI // ★追加: ここで画像URLを含める
+        mint: p.token.address,      // ★必須: Mintアドレス
+        logoURI: p.token.logoURI    // ★必須: 画像がないと確認画面でアイコンが出ない
       })),
-      config: config
+      config: {
+          ...config,
+          // ★必須: UIに選択肢がなくても、デフォルト値として渡す必要がある
+          strategyType: config.strategyType || 'BALANCED' 
+      }
     });
   };
 

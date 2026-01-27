@@ -28,7 +28,7 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
       {children}
       
       {/* ✅ 最前面(z-[9999])で AnimatePresence を発火させる */}
-      <div className="fixed top-0 left-0 right-0 z-[9999] pointer-events-none flex justify-center pt-6">
+      <div className="fixed top-0 left-0 right-0 z-[10000] pointer-events-none flex justify-center pt-6">
         <AnimatePresence mode="wait">
           {toast && (
             <Toast 

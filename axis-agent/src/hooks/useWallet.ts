@@ -1,46 +1,27 @@
 // src/hooks/useWallet.ts
-import { useMemo } from "react";
-import { Connection, PublicKey } from "@solana/web3.js";
-import { useWallets } from "@privy-io/react-auth/solana";
-
-const RPC_URL =
-  import.meta.env.VITE_SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
+import { useConnection as useSolanaConnection, useWallet as useSolanaWallet } from '@solana/wallet-adapter-react';
 
 export function useConnection() {
-  const connection = useMemo(() => {
-    return new Connection(RPC_URL, "confirmed");
-  }, []);
-
+  const { connection } = useSolanaConnection();
   return { connection };
 }
 
 export function useWallet() {
-  const { ready, wallets } = useWallets();
-
-  const wallet = wallets?.[0];
-  const address = wallet?.address;
-
-  const publicKey = useMemo(() => {
-    if (!address) return null;
-    try {
-      return new PublicKey(address);
-    } catch {
-      return null;
-    }
-  }, [address]);
-
-  const disconnect = async () => {
-    try {
-      await wallet?.features?.["standard:disconnect"]?.disconnect();
-    } catch (e) {
-      console.warn("disconnect failed", e);
-    }
-  };
-
+  const wallet = useSolanaWallet();
+  
   return {
-    ready,
-    publicKey,
-    disconnect,
-    wallet,
+    // 基本プロパティ
+    ready: !wallet.connecting,
+    authenticated: wallet.connected,
+    connected: wallet.connected,
+    publicKey: wallet.publicKey,
+    disconnect: wallet.disconnect,
+    wallet: wallet.wallet,
+    
+    // ★追加: トランザクション署名に必要なメソッド
+    signTransaction: wallet.signTransaction,
+    signAllTransactions: wallet.signAllTransactions,
+    sendTransaction: wallet.sendTransaction,
+    signMessage: wallet.signMessage,
   };
 }
