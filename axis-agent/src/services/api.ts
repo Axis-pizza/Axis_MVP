@@ -205,11 +205,15 @@ export const api = {
   },
 
   // ★修正: リーダーボード取得
-  async getLeaderboard() {
-    const res = await fetch(`${API_BASE}/user/leaderboard`);
-    return await res.json();
+  async getLeaderboard(sort: 'points' | 'volume' | 'created' = 'points') {
+    try {
+      const res = await fetch(`${API_BASE}/leaderboard?sort=${sort}`);
+      return await res.json();
+    } catch (e) {
+      console.error("Leaderboard fetch error:", e);
+      return { success: false, leaderboard: [] };
+    }
   },
-
   async getSolPrice() {
     try {
       const res = await fetch(`${API_BASE}/price/sol`); 

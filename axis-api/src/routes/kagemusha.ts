@@ -99,6 +99,7 @@ app.get('/tokens/:address/history', async (c) => {
 
 /**
  * POST /strategies - Manual Creation (Draft / DB Only)
+ * ★注意: このエンドポイントはDraftのみ。最終保存は/deployで行う
  */
 app.post('/strategies', async (c) => {
   try {
@@ -109,15 +110,27 @@ app.post('/strategies', async (c) => {
       return c.json({ success: false, error: 'Missing required fields' }, 400);
     }
 
-    const id = crypto.randomUUID();
     const now = Math.floor(Date.now() / 1000);
+
+    // ★修正: 重複チェック - 同じowner + name + 60秒以内のものがあればスキップ
+    const recentCheck = await c.env.axis_db.prepare(`
+      SELECT id FROM strategies 
+      WHERE owner_pubkey = ? AND name = ? AND created_at > ?
+    `).bind(owner_pubkey, name, now - 60).first();
+    
+    if (recentCheck) {
+      console.log('[Strategies] Duplicate detected, returning existing');
+      return c.json({ success: true, strategy_id: recentCheck.id, duplicate: true });
+    }
+
+    const id = crypto.randomUUID();
 
     // DB Insert
     const result = await c.env.axis_db.prepare(`
       INSERT INTO strategies (
         id, owner_pubkey, name, ticker, description, type, 
-        composition, config, status, created_at, tvl, roi
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, 0, 0)
+        composition, config, status, created_at, tvl, roi, total_deposited
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, 0, 0, 0)
     `).bind(
       id,
       owner_pubkey,
@@ -125,8 +138,8 @@ app.post('/strategies', async (c) => {
       ticker || '',
       description || '',
       type || 'MANUAL',
-      JSON.stringify(tokens),      // compositionカラムにトークンリスト
-      JSON.stringify(config || {}), // configカラムに設定
+      JSON.stringify(tokens),
+      JSON.stringify(config || {}),
       now
     ).run();
 
@@ -144,6 +157,7 @@ app.post('/strategies', async (c) => {
 
 /**
  * POST /deploy - Deploy via Jito (On-chain Transaction)
+ * ★修正: TVL保存 + 重複防止ロジック追加
  */
 app.post('/deploy', async (c) => {
   try {
@@ -153,6 +167,7 @@ app.post('/deploy', async (c) => {
 
     if (!signedTransaction) return c.json({ success: false, error: 'Signature required' }, 400);
 
+    // Jito送信（失敗しても続行）
     const jitoService = createJitoService(c.env);
     let bundleId = null;
     try {
@@ -162,35 +177,97 @@ app.post('/deploy', async (c) => {
         console.warn("Jito bundle skipped/failed:", e);
     }
 
-    const id = body.strategyId || crypto.randomUUID();
+    // メタデータ抽出
+    const owner = metadata.ownerPubkey || metadata.creator || 'unknown';
+    const name = metadata.name || 'Untitled';
+    const strategyType = metadata.type || 'BALANCED';
+    const tokens = metadata.tokens || metadata.composition || [];
+    const config = metadata.config || {};
+    const description = metadata.description || '';
+    
+    // ★重要: TVL/initialInvestmentを取得
+    const depositAmount = metadata.tvl || metadata.initialInvestment || 0;
+    
+    console.log(`[Deploy] Owner: ${owner}, Name: ${name}, TVL: ${depositAmount}`);
     
     if (c.env.axis_db) {
-      const owner = metadata.ownerPubkey || metadata.creator || 'unknown';
-      const tokens = metadata.tokens || metadata.composition || [];
-      const config = metadata.config || {};
+      const now = Math.floor(Date.now() / 1000);
+      
+      // ★修正: 重複チェック - 同じowner + name + tokens構成 + 60秒以内
+      const tokensKey = JSON.stringify(tokens.map((t: any) => ({ s: t.symbol, w: t.weight })).sort((a: any, b: any) => a.s.localeCompare(b.s)));
+      
+      const recentCheck = await c.env.axis_db.prepare(`
+        SELECT id, total_deposited, tvl FROM strategies 
+        WHERE owner_pubkey = ? AND name = ? AND created_at > ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).bind(owner, name, now - 120).first();
+      
+      if (recentCheck) {
+        console.log(`[Deploy] Found recent strategy ${recentCheck.id}, updating TVL`);
+        
+        // 既存レコードを更新（TVLを設定）
+        const newTvl = depositAmount;
+        const newTotalDeposited = (recentCheck.total_deposited as number || 0) + depositAmount;
+        
+        await c.env.axis_db.prepare(`
+          UPDATE strategies 
+          SET tvl = ?, 
+              total_deposited = ?, 
+              jito_bundle_id = ?,
+              status = 'active'
+          WHERE id = ?
+        `).bind(newTvl, newTotalDeposited, bundleId || 'simulated', recentCheck.id).run();
+        
+        // デプロイXP（更新時も付与）
+        await addXP(c.env.axis_db, owner, 500, 'STRATEGY_DEPLOY', 'Deployed on-chain strategy');
+        
+        return c.json({ 
+          success: true, 
+          bundleId, 
+          strategyId: recentCheck.id, 
+          updated: true,
+          tvl: newTvl
+        });
+      }
+      
+      // 新規INSERT
+      const id = body.strategyId || crypto.randomUUID();
       
       await c.env.axis_db.prepare(`
         INSERT INTO strategies (
           id, owner_pubkey, name, type, composition, config, description, 
-          jito_bundle_id, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
+          jito_bundle_id, status, created_at, tvl, total_deposited, roi
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, 0)
       `).bind(
         id,
         owner,
-        metadata.name || 'Untitled',
-        metadata.type || 'BALANCED',
+        name,
+        strategyType,
         JSON.stringify(tokens),
         JSON.stringify(config),
-        metadata.description || '',
+        description,
         bundleId || 'simulated',
-        Math.floor(Date.now() / 1000)
+        now,
+        depositAmount,      // ★ tvl
+        depositAmount       // ★ total_deposited
       ).run();
 
       await addXP(c.env.axis_db, owner, 500, 'STRATEGY_DEPLOY', 'Deployed on-chain strategy');
+      
+      console.log(`[Deploy] Created new strategy ${id} with TVL ${depositAmount}`);
+      
+      return c.json({ 
+        success: true, 
+        bundleId, 
+        strategyId: id,
+        tvl: depositAmount
+      });
     }
 
-    return c.json({ success: true, bundleId, strategyId: id });
+    return c.json({ success: true, bundleId });
   } catch (error: any) {
+    console.error('[Deploy] Error:', error);
     return c.json({ success: false, error: error.message }, 500);
   }
 });
@@ -211,11 +288,12 @@ app.get('/strategies/:pubkey', async (c) => {
       name: s.name,
       ticker: s.ticker,
       type: s.type,
-      // compositionカラムからトークンを読み取る (後方互換でconfigもチェック)
       tokens: s.composition ? JSON.parse(s.composition) : (s.config ? JSON.parse(s.config) : []),
       config: s.config ? JSON.parse(s.config) : {},
       description: s.description || '',
-      tvl: s.total_deposited || 0,
+      // ★修正: tvl と total_deposited の両方を返す
+      tvl: s.tvl || s.total_deposited || 0,
+      totalDeposited: s.total_deposited || 0,
       status: s.status,
       createdAt: s.created_at,
     }));
@@ -237,7 +315,7 @@ app.get('/discover', async (c) => {
     const { results } = await c.env.axis_db.prepare(
       `SELECT * FROM strategies 
        WHERE status = 'active' 
-       ORDER BY total_deposited DESC, created_at DESC 
+       ORDER BY tvl DESC, total_deposited DESC, created_at DESC 
        LIMIT ? OFFSET ?`
     ).bind(limit, offset).all();
     
@@ -248,7 +326,7 @@ app.get('/discover', async (c) => {
       ticker: s.ticker,
       tokens: s.composition ? JSON.parse(s.composition) : (s.config ? JSON.parse(s.config) : []),
       config: s.config ? JSON.parse(s.config) : {},
-      tvl: s.total_deposited || 0,
+      tvl: s.tvl || s.total_deposited || 0,
       createdAt: s.created_at,
     }));
     

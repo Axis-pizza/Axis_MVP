@@ -16,3 +16,8 @@ index_name = "axis-vector-index"
 
 [triggers]
 crons = ["0 * * * *"]
+
+[[send_email]]
+binding = "EMAIL"
+
+compatibility_flags = ["nodejs_compat"]

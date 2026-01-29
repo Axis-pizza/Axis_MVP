@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Trophy, Shield, Eye, EyeOff, Download, 
-  ArrowUpRight, ArrowDownRight, Wallet, ArrowLeft, TrendingUp, TrendingDown,
-  Crown, Sparkles, CheckCircle, Copy, Users, Zap
+  Eye, EyeOff, Download, Wallet, ArrowUpRight, ArrowDownRight, 
+  Trophy, TrendingUp, Sparkles, Copy, Share2, Star, Users, Gift,
+  LayoutGrid
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
@@ -12,30 +11,36 @@ import html2canvas from 'html2canvas';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
-// --- Assets (Fixed Background) ---
+// --- Types ---
 const FIXED_BG_STYLE = {
   background: 'radial-gradient(circle at top right, #451a03 0%, #000000 80%)'
 };
 
+interface Strategy {
+  id: string;
+  name: string;
+  ticker: string | null;
+  type: string;
+  tokens: any[];
+  tvl: number;
+  status: string;
+  createdAt: number;
+}
+
+interface UserProfile {
+  username: string;
+  referralCode: string;
+  totalPoints: number;
+  totalVolume: number;
+  rankTier: string;
+  pnlPercent: number;
+  referralCount: number;
+}
+
 // --- Helper Functions ---
 const formatCurrency = (val: number, currency: 'USD' | 'SOL') => {
-  if (currency === 'SOL') {
-      return `${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL`;
-  }
+  if (currency === 'SOL') return `${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL`;
   return `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-const formatPnL = (percent: number) => {
-  const isPositive = percent >= 0;
-  return {
-    valueStr: `${isPositive ? '+' : ''}${percent.toFixed(2)}%`,
-    colorHex: isPositive ? '#4ADE80' : '#F87171',
-    bgHex: isPositive ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)',
-    color: isPositive ? 'text-[#4ADE80]' : 'text-[#F87171]', 
-    bg: isPositive ? 'bg-[#4ADE80]/10' : 'bg-[#F87171]/10',
-    label: isPositive ? 'PROFIT' : 'LOSS',
-    icon: isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />
-  };
 };
 
 const formatAddress = (address: string) => `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -45,150 +50,194 @@ export const ProfileView = () => {
   const { connection } = useConnection();
   const { showToast } = useToast();
   
-  const cardRef = useRef<HTMLDivElement>(null); 
-  const captureRef = useRef<HTMLDivElement>(null); 
+  // --- UI State ---
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'referral' | 'leaderboard'>('portfolio');
+  const [portfolioSubTab, setPortfolioSubTab] = useState<'created' | 'invested' | 'watchlist'>('created');
+  const [leaderboardTab, setLeaderboardTab] = useState<'points' | 'volume' | 'created'>('points');
   
-  // State
-  const [viewMode, setViewMode] = useState<'portfolio' | 'leaderboard'>('portfolio');
-  const [activeTab, setActiveTab] = useState<'positions' | 'activity'>('positions');
-  const [positionSubTab, setPositionSubTab] = useState<'created' | 'invested'>('created');
   const [currencyMode, setCurrencyMode] = useState<'USD' | 'SOL'>('USD');
   const [isHidden, setIsHidden] = useState(false);
   const [solPrice, setSolPrice] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [solBalance, setSolBalance] = useState<number>(0);
 
-  // Balance
-  const [solBalance, setSolBalance] = useState<number>(0); 
-  const [investedAmountUSD, setInvestedAmountUSD] = useState<number>(0); 
+  // --- Data State ---
+  const [isLoading, setIsLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [myStrategies, setMyStrategies] = useState<Strategy[]>([]);
+  const [investedStrategies, setInvestedStrategies] = useState<Strategy[]>([]); // Future implementation
+  const [watchlist, setWatchlist] = useState<Strategy[]>([]); // Future implementation
+  const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
 
-  // Data
-  const [userData, setUserData] = useState<any>(null);
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
-  const [myStrategies, setMyStrategies] = useState<any[]>([]);
-  const [investedStrategies, setInvestedStrategies] = useState<any[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
-  const [myRank, setMyRank] = useState<{ total_xp?: number; rank_tier?: string; username?: string } | null>(null);
-  const [loading, setLoading] = useState(true);
-  // PnL (Mock Logic for Demo)
-  const [pnlPercent, setPnlPercent] = useState<number>(12.49);
+  const cardRef = useRef<HTMLDivElement>(null); 
+  const captureRef = useRef<HTMLDivElement>(null);
 
-  // Fetch Data
+  // --- 1. Init (Price & Balance) ---
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+    const fetchPrice = async () => {
       try {
-        const [lbRes, userRes] = await Promise.all([
-          api.getLeaderboard(),
-          publicKey ? api.getUser(publicKey.toBase58()) : Promise.resolve({ user: null })
-        ]);
-
-        if (lbRes.success) {
-          setLeaderboard(lbRes.leaderboard);
+        const price = await api.getSolPrice();
+        if (price) setSolPrice(price);
+        else {
+           const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+           const data = await res.json();
+           setSolPrice(data.solana?.usd || 150);
         }
-        
-        // 修正箇所: 'success' in userRes を使ってプロパティの存在を確認する
-        if (userRes && 'success' in userRes && userRes.success && userRes.user) {
-          setMyRank(prev => ({
-            ...(prev || {}),
-            ...userRes.user,
-            username: userRes.user.username || 'Anonymous'
-          }));
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
+      } catch { setSolPrice(150); }
     };
-    fetchData();
-  }, [publicKey]);
-
-  // Balance
-  useEffect(() => {
-      if (!publicKey || !connection) return;
-      const getBalance = async () => {
-          try {
-              const lamports = await connection.getBalance(publicKey);
-              setSolBalance(lamports / LAMPORTS_PER_SOL);
-          } catch (e) { console.error(e); }
-      };
-      getBalance();
-      const id = setInterval(getBalance, 20000);
-      return () => clearInterval(id);
+    fetchPrice();
+    
+    // Balance Polling
+    if (!publicKey || !connection) return;
+    const getBalance = async () => {
+      try {
+        const lamports = await connection.getBalance(publicKey);
+        setSolBalance(lamports / LAMPORTS_PER_SOL);
+      } catch (e) { console.error(e); }
+    };
+    getBalance();
+    
+    const interval = setInterval(() => { fetchPrice(); getBalance(); }, 60000);
+    return () => clearInterval(interval);
   }, [publicKey, connection]);
 
-  // Calculations
-  const walletBalanceUSD = solBalance * (solPrice || 0);
-  const totalNetWorthUSD = walletBalanceUSD + investedAmountUSD;
-  const totalNetWorthSOL = (solPrice > 0) ? totalNetWorthUSD / solPrice : 0;
-  const displayValue = currencyMode === 'USD' ? totalNetWorthUSD : totalNetWorthSOL;
-  const isPositive = pnlPercent >= 0; 
-  const pnlInfo = formatPnL(pnlPercent);
-  
+  // --- 2. Load User Profile & Portfolio ---
+  useEffect(() => {
+    if (!publicKey) return;
+    
+    const loadProfile = async () => {
+      setIsLoading(true);
+      try {
+        const [userRes, stratsRes] = await Promise.all([
+          api.getUser(publicKey.toBase58()),
+          api.getUserStrategies(publicKey.toBase58())
+        ]);
 
-  // Actions
+        if (userRes.success && userRes.user) {
+          const u = userRes.user;
+          setUserProfile({
+            username: u.username || 'Anonymous',
+            referralCode: u.referralCode || `AXIS-${publicKey.toBase58().slice(0,4).toUpperCase()}`,
+            totalPoints: u.total_xp || 0,
+            totalVolume: u.total_invested || 0,
+            rankTier: u.rank_tier || 'Novice',
+            pnlPercent: u.pnl_percent || 0,
+            referralCount: u.referralCount || 0
+          });
+        }
+
+        if (stratsRes.success && stratsRes.strategies) {
+          // 重複除外 & ソート
+          const seen = new Map();
+          const unique = stratsRes.strategies.filter((s: any) => {
+             const key = s.id; 
+             return seen.has(key) ? false : seen.set(key, true);
+          }).sort((a: any, b: any) => b.createdAt - a.createdAt);
+          setMyStrategies(unique);
+        }
+      } catch (e) {
+        console.error("Profile load error", e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadProfile();
+  }, [publicKey]);
+
+  // --- 3. Load Leaderboard (Dynamic) ---
+  useEffect(() => {
+    if (activeTab !== 'leaderboard') return;
+
+    const loadLeaderboard = async () => {
+      try {
+        const res = await api.getLeaderboard(leaderboardTab);
+        if (res.success && res.leaderboard) {
+          setLeaderboardData(res.leaderboard.map((u: any, i: number) => ({
+            ...u,
+            rank: i + 1,
+            isMe: u.pubkey === publicKey?.toBase58()
+          })));
+        }
+      } catch (e) {
+        console.error("Leaderboard load error", e);
+      }
+    };
+    loadLeaderboard();
+  }, [activeTab, leaderboardTab, publicKey]);
+
+
+  // --- Logic & Display Values ---
+  const investedAmountUSD = myStrategies.reduce((sum, s) => sum + ((s.tvl || 0) * solPrice), 0);
+  const totalNetWorthUSD = (solBalance * solPrice) + investedAmountUSD;
+  const displayValue = currencyMode === 'USD' ? totalNetWorthUSD : (solPrice > 0 ? totalNetWorthUSD / solPrice : 0);
+  
+  const pnlVal = userProfile?.pnlPercent || 0;
+  const isPos = pnlVal >= 0;
+
+  // --- Handlers ---
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    showToast("Copied to clipboard!", "success");
+  };
+
   const handleDownloadCard = async () => {
     if (!captureRef.current) return;
-    showToast("Generating PnL card...", "info");
-    
-    // 一時的に表示 (画面外)
+    showToast("Generating card...", "info");
     captureRef.current.style.display = 'block';
-
     try {
-        const canvas = await html2canvas(captureRef.current, {
-            backgroundColor: '#000000', 
-            scale: 2, 
-            useCORS: true, 
-            logging: false,
-        });
+        const canvas = await html2canvas(captureRef.current, { backgroundColor: '#000000', scale: 2, useCORS: true });
         const image = canvas.toDataURL("image/png");
         const link = document.createElement("a");
         link.href = image;
-        link.download = `axis-pnl.png`;
+        link.download = `axis-portfolio.png`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
         showToast("Saved!", "success");
-    } catch (e) {
-        console.error("Capture failed", e);
-        showToast("Capture failed", "error");
-    } finally {
-        captureRef.current.style.display = 'none';
-    }
+    } catch { showToast("Failed to save", "error"); } 
+    finally { captureRef.current.style.display = 'none'; }
   };
 
-  if (!publicKey) return <div className="p-10 text-center text-white">Connect Wallet</div>;
-  if (viewMode === 'leaderboard') return <LeaderboardScreen leaderboard={leaderboard} userData={userData} onBack={() => setViewMode('portfolio')} publicKey={publicKey} />;
+  // --- View: Not Connected ---
+  if (!publicKey) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-6 text-center min-h-[70vh]">
+        <div className="w-20 h-20 bg-[#1C1917] rounded-full flex items-center justify-center border border-white/10 mb-6 animate-pulse">
+          <Wallet className="w-8 h-8 text-white/50" />
+        </div>
+        <h2 className="text-2xl font-serif font-bold text-white mb-2">Connect Wallet</h2>
+        <p className="text-white/40 text-sm max-w-xs mx-auto mb-8">
+          Access your portfolio, track referrals, and climb the leaderboard.
+        </p>
+        <div className="w-full max-w-xs">
+           <WalletMultiButton style={{ width: '100%', justifyContent: 'center', background: '#D97706', borderRadius: '12px', fontWeight: 'bold' }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-md mx-auto h-full flex flex-col pt-4 px-4 pb-24 safe-area-top relative">
+    <div className="max-w-md mx-auto h-full flex flex-col pt-4 px-4 pb-32 safe-area-top relative">
       
       {/* Header */}
       <div className="flex items-center justify-between mb-6 relative z-10">
-        <h1 className="text-2xl font-serif font-bold text-white">Portfolio</h1>
-        <button 
-            onClick={() => setViewMode('leaderboard')}
-            className="flex items-center gap-2 px-3 py-1.5 bg-[#1C1917] border border-[#D97706]/30 rounded-full text-[#D97706] text-xs font-bold"
-        >
-            <Trophy className="w-4 h-4" /> Rank
-        </button>
+        <h1 className="text-2xl font-serif font-bold text-white">Profile</h1>
+        <div className="px-3 py-1 bg-[#1C1917] rounded-full border border-white/10 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-[10px] font-bold text-white/60">Live</span>
+        </div>
       </div>
 
-      {/* --- Main Card (Display UI: Rich Info) --- */}
+      {/* --- Net Worth Card --- */}
       <div className="mb-8 relative group perspective-1000">
         <div ref={cardRef} className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#0C0A09] shadow-2xl" style={{ aspectRatio: '1.58/1' }}>
-            {/* Background */}
             <div className="absolute inset-0 z-0" style={FIXED_BG_STYLE} />
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
             
-            {/* Content Layer */}
             <div className="relative z-10 h-full p-6 flex flex-col justify-between bg-black/10 backdrop-blur-[1px]">
-                 {/* Top: Address & Controls */}
                  <div className="flex justify-between">
                     <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/5">
                         <Wallet className="w-3 h-3 text-[#D97706]" />
-                        {/* Address: Times New Roman */}
-                        <span className="font-bold text-white text-sm" style={{ fontFamily: '"Times New Roman", serif' }}>
-                            {formatAddress(publicKey.toBase58())}
-                        </span>
+                        <span className="font-bold text-white text-sm font-serif">{formatAddress(publicKey.toBase58())}</span>
                     </div>
                     <div className="flex gap-2">
                          <button onClick={() => setCurrencyMode(m => m === 'USD' ? 'SOL' : 'USD')} className="text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white/70 border border-white/10">{currencyMode}</button>
@@ -196,447 +245,239 @@ export const ProfileView = () => {
                     </div>
                  </div>
 
-                 {/* Center: Net Worth (Rich) */}
                  <div className="py-2">
                     <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest mb-1">Total Net Worth</p>
-                    <h2 className="text-4xl sm:text-5xl font-bold text-white tracking-tight" style={{ fontFamily: '"Times New Roman", serif' }}>
+                    <h2 className="text-4xl sm:text-5xl font-bold text-white tracking-tight font-serif">
                         {isHidden ? '••••••' : formatCurrency(displayValue, currencyMode)}
                     </h2>
-                    <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-2 border border-white/10 ${pnlInfo.bg} ${pnlInfo.color}`}>
-                        {!isHidden && pnlInfo.icon}
-                        <span className="font-mono">{isHidden ? '••••' : pnlInfo.valueStr}</span>
-                    </div>
+                    {pnlVal !== 0 && (
+                      <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-2 border border-white/10 ${isPos ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                          {isPos ? <ArrowUpRight className="w-3 h-3"/> : <ArrowDownRight className="w-3 h-3"/>}
+                          <span className="font-mono">{isHidden ? '••••' : `${isPos ? '+' : ''}${pnlVal.toFixed(2)}%`}</span>
+                      </div>
+                    )}
                  </div>
 
-                 {/* Bottom: Rank & XP */}
                  <div className="flex justify-between items-end">
-                    <div className="flex gap-4">
-                        <div><p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Rank</p><p className="text-sm text-white font-bold flex gap-1"><Shield className="w-3 h-3 text-[#D97706]" />{userData?.rank_tier || 'Novice'}</p></div>
-                        <div><p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">XP</p><p className="text-sm text-[#D97706] font-bold font-mono">{userData?.total_xp?.toLocaleString() || 0}</p></div>
+                    <div>
+                        <p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Points</p>
+                        <p className="text-sm text-[#D97706] font-bold font-mono">{userProfile?.totalPoints.toLocaleString() || 0}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Rank</p>
+                      <p className="text-sm text-white font-bold">{userProfile?.rankTier || 'Novice'}</p>
                     </div>
                  </div>
             </div>
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-end mt-3">
-            <button onClick={handleDownloadCard} className="flex items-center gap-2 px-6 py-2 bg-[#D97706] text-black border border-[#D97706]/50 rounded-xl text-sm font-bold transition-all active:scale-95 hover:bg-[#b46305]">
-                <Download className="w-4 h-4" /> Save PnL
+        <div className="flex justify-end mt-2">
+            <button onClick={handleDownloadCard} className="text-[10px] font-bold text-white/30 flex items-center gap-1 hover:text-white transition-colors">
+                <Download className="w-3 h-3" /> Save Card
             </button>
         </div>
       </div>
 
-      {/* --- HIDDEN CAPTURE CARD (Simple PnL Only) --- */}
-      {/* --- HIDDEN CAPTURE CARD (Formula-like vertical breakdown + Right PnL, X 1200x630) --- */}
-<div
-  ref={captureRef}
-  style={{
-    position: 'fixed',
-    left: '-9999px',
-    top: 0,
-    width: '1200px',
-    height: '630px',
-    display: 'none',
-    background: '#000000',
-    fontFamily: '"Times New Roman", serif',
-  }}
->
-  {/* Background */}
-  <div
-    style={{
-      position: 'absolute',
-      inset: 0,
-      ...FIXED_BG_STYLE,
-      zIndex: 0,
-    }}
-  />
-
-  {/* Soft orange glows */}
-  <div
-    style={{
-      position: 'absolute',
-      inset: 0,
-      background:
-        'radial-gradient(circle at 18% 25%, rgba(217,119,6,0.18) 0%, rgba(0,0,0,0) 45%), radial-gradient(circle at 78% 78%, rgba(217,119,6,0.12) 0%, rgba(0,0,0,0) 55%)',
-      zIndex: 1,
-    }}
-  />
-
-  {/* Noise */}
-  <div
-    style={{
-      position: 'absolute',
-      inset: 0,
-      backgroundImage: "url('/noise.png')",
-      opacity: 0.08,
-      mixBlendMode: 'overlay',
-      zIndex: 2,
-    }}
-  />
-
-  {/* Content */}
-  <div
-    style={{
-      position: 'relative',
-      zIndex: 3,
-      width: '100%',
-      height: '100%',
-      padding: '54px',
-      color: 'white',
-      fontFamily: '"Times New Roman", serif',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-    }}
-  >
-    {/* Header */}
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-      <div>
-        <div
-          style={{
-            fontSize: 38,
-            fontWeight: 900,
-            fontStyle: 'italic',
-            letterSpacing: '-0.02em',
-            color: 'rgba(255,255,255,0.92)',
-          }}
-        >
-          Axis
-        </div>
-        <div
-          style={{
-            marginTop: 6,
-            fontSize: 16,
-            fontWeight: 700,
-            letterSpacing: '0.12em',
-            color: 'rgba(255,255,255,0.45)',
-          }}
-        >
-          PORTFOLIO SNAPSHOT
-        </div>
+      {/* --- Hidden Capture Element (Simplified) --- */}
+      <div ref={captureRef} style={{ display: 'none', position: 'fixed', left: '-9999px', width: '1200px', height: '630px', background: '#000' }}>
+          <div style={{ padding: 60, height: '100%', display: 'flex', flexDirection: 'column', ...FIXED_BG_STYLE }}>
+              <div style={{ fontSize: 40, color: 'white', fontWeight: 'bold' }}>Axis Portfolio</div>
+              <div style={{ fontSize: 80, color: 'white', fontWeight: 'bold', marginTop: 40 }}>{formatCurrency(totalNetWorthUSD, 'USD')}</div>
+          </div>
       </div>
 
-      {/* 右上は空（Wallet/Dateなど消す） */}
-      <div />
-    </div>
+      {/* --- Tabs --- */}
+      <div className="flex border-b border-white/10 mb-6 sticky top-0 bg-[#0C0A09] z-20 pt-2">
+         {['portfolio', 'referral', 'leaderboard'].map(t => (
+             <button 
+                key={t}
+                onClick={() => setActiveTab(t as any)}
+                className={`flex-1 pb-3 font-bold text-sm capitalize transition-colors ${activeTab === t ? 'text-white border-b-2 border-[#D97706]' : 'text-white/40 hover:text-white/60'}`}
+             >
+                {t}
+             </button>
+         ))}
+      </div>
 
-    {/* Middle Area */}
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 40,
-        marginTop: 10,
-      }}
-    >
-      {/* LEFT: Formula-like Breakdown */}
-      <div style={{ width: '520px' }}>
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 800,
-            letterSpacing: '0.14em',
-            color: 'rgba(255,255,255,0.55)',
-            marginBottom: 18,
-          }}
-        >
-          BREAKDOWN
-        </div>
-
-        <div
-          style={{
-            borderRadius: 22,
-            background: 'rgba(0,0,0,0.30)',
-            border: '1px solid rgba(255,255,255,0.10)',
-            padding: '22px 22px',
-          }}
-        >
-          {/* Row: Invested */}
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <div
-              style={{
-                fontSize: 16,
-                fontWeight: 800,
-                letterSpacing: '0.10em',
-                color: 'rgba(255,255,255,0.48)',
-              }}
-            >
-              INVESTED
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: 'rgba(255,255,255,0.92)' }}>
-              {isHidden ? '••••' : formatCurrency(investedAmountUSD, 'USD')}
-            </div>
+      {/* ================================================================================= */}
+      {/* 1. PORTFOLIO TAB */}
+      {/* ================================================================================= */}
+      {activeTab === 'portfolio' && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <FilterChip label={`Created (${myStrategies.length})`} active={portfolioSubTab === 'created'} onClick={() => setPortfolioSubTab('created')} />
+            <FilterChip label={`Invested (${investedStrategies.length})`} active={portfolioSubTab === 'invested'} onClick={() => setPortfolioSubTab('invested')} />
+            <FilterChip label={`Watchlist (${watchlist.length})`} active={portfolioSubTab === 'watchlist'} onClick={() => setPortfolioSubTab('watchlist')} icon={<Star className="w-3 h-3" />} />
           </div>
 
-          {/* + */}
-          <div
-            style={{
-              margin: '12px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              color: 'rgba(255,255,255,0.30)',
-              fontWeight: 900,
-              fontSize: 18,
-            }}
-          >
-            <div style={{ width: 28, textAlign: 'center' }}>+</div>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-          </div>
-
-          {/* Row: Wallet Balance */}
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <div
-              style={{
-                fontSize: 16,
-                fontWeight: 800,
-                letterSpacing: '0.10em',
-                color: 'rgba(255,255,255,0.48)',
-              }}
-            >
-              WALLET BAL
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: 'rgba(255,255,255,0.92)' }}>
-              {isHidden ? '••••' : formatCurrency(walletBalanceUSD, 'USD')}
-            </div>
-          </div>
-
-          {/* = */}
-          <div
-            style={{
-              margin: '16px 0 14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              color: 'rgba(255,255,255,0.30)',
-              fontWeight: 900,
-              fontSize: 18,
-            }}
-          >
-            <div style={{ width: 28, textAlign: 'center' }}>=</div>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.10)' }} />
-          </div>
-
-          {/* Row: Position */}
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <div
-              style={{
-                fontSize: 16,
-                fontWeight: 800,
-                letterSpacing: '0.10em',
-                color: 'rgba(255,255,255,0.58)',
-              }}
-            >
-              POSITION
-            </div>
-
-            <div
-              style={{
-                fontSize: 32,
-                fontWeight: 900,
-                color: 'rgba(255,255,255,0.98)',
-                letterSpacing: '-0.01em',
-              }}
-            >
-              {isHidden ? '••••' : formatCurrency(totalNetWorthUSD, 'USD')}
-            </div>
-          </div>
-
-          {/* small note */}
-          <div
-            style={{
-              marginTop: 10,
-              fontSize: 14,
-              color: 'rgba(255,255,255,0.40)',
-              fontWeight: 700,
-            }}
-          >
-            Total Net Worth = Invested + Wallet Balance
+          <div className="space-y-3 pb-20">
+            {portfolioSubTab === 'created' && (
+               myStrategies.length > 0 ? myStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} />)
+               : <EmptyState icon={LayoutGrid} title="No strategies yet" sub="Create your first index fund." />
+            )}
+            {portfolioSubTab === 'invested' && <EmptyState icon={TrendingUp} title="No investments" sub="Explore strategies to grow wealth." />}
+            {portfolioSubTab === 'watchlist' && <EmptyState icon={Star} title="Watchlist empty" sub="Star strategies to track them." />}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* RIGHT: PnL Big, Right aligned */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          textAlign: 'right',
-        }}
-      >
-        <div style={{ width: '100%' }}>
-          <div
-            style={{
-              fontSize: 26,
-              fontWeight: 800,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.55)',
-              marginBottom: 10,
-            }}
-          >
-            {pnlInfo.label}
-          </div>
+      {/* ================================================================================= */}
+      {/* 2. REFERRAL TAB */}
+      {/* ================================================================================= */}
+      {activeTab === 'referral' && userProfile && (
+        <div className="space-y-6 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
+           
+           <div className="bg-[#1C1917] rounded-2xl p-6 border border-white/5 flex items-center gap-5">
+               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-amber-700 flex items-center justify-center text-3xl font-black text-white shadow-xl">
+                   {userProfile.username.charAt(0).toUpperCase()}
+               </div>
+               <div>
+                   <h3 className="text-xl font-bold text-white">{userProfile.username}</h3>
+                   <p className="text-xs text-white/40 font-mono mt-1">{publicKey.toBase58()}</p>
+               </div>
+           </div>
 
-          <div
-            style={{
-              fontSize: 150,
-              fontWeight: 900,
-              letterSpacing: '-0.03em',
-              lineHeight: 1,
-              color: pnlInfo.colorHex,
-              textShadow: '0 18px 60px rgba(0,0,0,0.55)',
-            }}
-          >
-            {isHidden ? '••••' : pnlInfo.valueStr}
-          </div>
+           <div className="grid grid-cols-2 gap-3">
+              <div className="bg-black/30 p-4 rounded-xl border border-white/5">
+                 <p className="text-[10px] text-white/40 uppercase font-bold flex items-center gap-1"><Users className="w-3 h-3" /> Referrals</p>
+                 <p className="text-2xl font-mono font-bold text-white mt-1">{userProfile.referralCount}</p>
+              </div>
+              <div className="bg-black/30 p-4 rounded-xl border border-white/5">
+                 <p className="text-[10px] text-white/40 uppercase font-bold flex items-center gap-1"><Gift className="w-3 h-3" /> Bonus Rate</p>
+                 <p className="text-2xl font-mono font-bold text-[#D97706] mt-1">10%</p>
+              </div>
+           </div>
 
+           <div className="bg-gradient-to-br from-[#1C1917] to-orange-950/20 rounded-2xl p-5 border border-[#D97706]/20 relative overflow-hidden">
+               <h3 className="text-lg font-bold text-white mb-1 relative z-10">Invite & Earn</h3>
+               <p className="text-xs text-white/50 mb-6 relative z-10 max-w-[90%]">
+                   Share your code and earn 10% of trading fees/points from your invites.
+               </p>
+
+               <div className="space-y-3 relative z-10">
+                   <div>
+                       <label className="text-[10px] text-white/30 uppercase font-bold ml-1">Your Code</label>
+                       <div className="flex gap-2 mt-1">
+                          <div className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 font-mono font-bold text-lg text-white tracking-widest text-center">
+                             {userProfile.referralCode}
+                          </div>
+                          <button onClick={() => handleCopy(userProfile.referralCode)} className="px-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 text-white transition-colors">
+                             <Copy className="w-5 h-5" />
+                          </button>
+                       </div>
+                   </div>
+                   
+                   <button 
+                       onClick={() => handleCopy(`https://axis.fi/register?ref=${userProfile.referralCode}`)}
+                       className="w-full py-3 bg-[#D97706] text-black font-bold rounded-xl shadow-lg hover:bg-[#b46305] flex items-center justify-center gap-2"
+                   >
+                       <Share2 className="w-4 h-4" /> Share Invite Link
+                   </button>
+               </div>
+           </div>
         </div>
-      </div>
-    </div>
+      )}
 
-    {/* Footer line (subtle) */}
-    <div
-      style={{
-        height: 1,
-        background: 'rgba(255,255,255,0.08)',
-        marginTop: 10,
-      }}
-    />
-  </div>
-</div>
+      {/* ================================================================================= */}
+      {/* 3. LEADERBOARD TAB */}
+      {/* ================================================================================= */}
+      {activeTab === 'leaderboard' && (
+        <div className="space-y-4 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Metric Selector */}
+            <div className="flex p-1 bg-[#1C1917] rounded-xl">
+                {['points', 'volume', 'created'].map(t => (
+                    <button 
+                        key={t}
+                        onClick={() => setLeaderboardTab(t as any)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${leaderboardTab === t ? 'bg-[#D97706] text-black shadow-md' : 'text-white/40 hover:text-white'}`}
+                    >
+                        {t === 'points' ? 'XP' : t === 'volume' ? 'Volume' : 'Creator'}
+                    </button>
+                ))}
+            </div>
 
+            {/* Header */}
+            <div className="flex items-center px-4 pb-2 text-[10px] text-white/30 font-bold uppercase tracking-wider">
+                <div className="w-8 text-center">#</div>
+                <div className="flex-1 pl-2">User</div>
+                <div className="w-24 text-right">
+                    {leaderboardTab === 'points' ? 'XP' : leaderboardTab === 'volume' ? 'Vol ($)' : 'Count'}
+                </div>
+            </div>
 
-      {/* Tabs Placeholder */}
-      <div className="flex border-b border-white/10 mb-4 sticky top-0 bg-[#0C0A09] z-20 pt-2">
-         <button className="flex-1 pb-3 text-white font-bold border-b-2 border-[#D97706]">Positions</button>
-         <button className="flex-1 pb-3 text-white/40 font-bold">Activity</button>
-      </div>
-      <div className="space-y-4 pb-20">
-          <div className="bg-[#1C1917] p-4 rounded-xl border border-white/5"><p className="text-white">Solana High Yield</p><p className="text-white/50 text-xs">$1,500.00</p></div>
-      </div>
+            {/* List */}
+            <div className="space-y-2">
+                {leaderboardData.length === 0 ? (
+                    <div className="py-20 text-center text-white/30 text-xs">
+                        {isLoading ? "Loading..." : "No data available."}
+                    </div>
+                ) : (
+                    leaderboardData.map((user, i) => (
+                        <div key={i} className={`flex items-center p-3 rounded-xl border transition-colors ${user.isMe ? 'bg-[#D97706]/10 border-[#D97706]/50' : 'bg-[#1C1917] border-white/5'}`}>
+                            <div className={`w-8 text-center font-mono font-bold text-lg ${user.rank <= 3 ? 'text-[#FFD700]' : 'text-[#78716C]'}`}>{user.rank}</div>
+                            <div className="flex-1 flex items-center gap-3 pl-2 min-w-0">
+                                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold text-white/50 border border-white/5 overflow-hidden">
+                                    {user.avatar_url ? <img src={api.getProxyUrl(user.avatar_url)} className="w-full h-full object-cover"/> : user.username.charAt(0)}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className={`font-bold text-sm truncate ${user.isMe ? 'text-[#D97706]' : 'text-white'}`}>{user.username}</p>
+                                    <p className="text-[10px] text-white/30 font-mono">{formatAddress(user.pubkey)}</p>
+                                </div>
+                            </div>
+                            <div className="w-24 text-right font-mono font-bold text-white">
+                                {leaderboardTab === 'volume' ? '$' : ''}{user.value.toLocaleString()}
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
-// --- Leaderboard Sub-Screen (Refined) ---
-// --- Leaderboard Sub-Screen (Fix: Empty State Handling) ---
-const LeaderboardScreen = ({ leaderboard, userData, onBack, publicKey }: any) => {
-  // データが配列かどうかのチェックと、空の場合のデフォルト値
-  const safeLeaderboard = Array.isArray(leaderboard) ? leaderboard : [];
-  
-  // 自分のランクを探す
-  const myRankIndex = safeLeaderboard.findIndex((u: any) => u.pubkey === publicKey?.toBase58());
-  const myRankNumber = myRankIndex !== -1 ? myRankIndex + 1 : '-';
-  
-  // 自分のPnL (DBになければ0)
-  const myPnL = userData?.pnl_percent || 0;
-  const isMyPnLPos = myPnL >= 0;
+// --- Sub Components ---
 
-  // Helper
-  const shortAddr = (addr: string) => addr ? `${addr.slice(0, 4)}...${addr.slice(-4)}` : 'Unknown';
+const FilterChip = ({ label, active, onClick, icon }: any) => (
+  <button 
+    onClick={onClick}
+    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${active ? 'bg-[#D97706] text-black' : 'bg-[#1C1917] border border-white/5 text-white/50 hover:bg-white/5'}`}
+  >
+    {icon} {label}
+  </button>
+);
 
+const EmptyState = ({ icon: Icon, title, sub }: any) => (
+  <div className="flex flex-col items-center justify-center py-12 text-white/20 border border-dashed border-white/5 rounded-2xl">
+    <Icon className="w-10 h-10 mb-3 opacity-20" />
+    <p className="text-sm font-bold text-white/40">{title}</p>
+    <p className="text-xs">{sub}</p>
+  </div>
+);
+
+const StrategyCard = ({ strategy, solPrice }: { strategy: Strategy; solPrice: number }) => {
+  const tvlUSD = (strategy.tvl || 0) * solPrice;
   return (
-      <div className="h-full flex flex-col pt-4 px-4 bg-black safe-area-top">
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-6">
-              <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full text-white transition-colors">
-                  <ArrowLeft className="w-5 h-5"/>
-              </button>
-              <div>
-                  <h1 className="text-2xl font-serif font-bold text-white">Leaderboard</h1>
-                  <p className="text-xs text-white/40">Top Performers</p>
-              </div>
-          </div>
-
-          {/* My Rank (Sticky) */}
-          <div className="bg-[#1C1917] rounded-xl p-4 mb-4 border border-[#D97706]/30 flex items-center justify-between shadow-lg shadow-orange-900/10 sticky top-0 z-20">
-              <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#D97706]/20 flex items-center justify-center text-[#D97706] border border-[#D97706]/30 shrink-0">
-                      <Trophy className="w-5 h-5" />
-                  </div>
-                  <div>
-                      <p className="text-[#D97706] text-[10px] font-bold uppercase">My Rank</p>
-                      <p className="text-xl font-bold text-white font-mono">#{myRankNumber}</p>
-                  </div>
-              </div>
-              <div className="text-right">
-                  <p className={`text-lg font-bold font-mono ${isMyPnLPos ? 'text-[#4ADE80]' : 'text-[#F87171]'}`} style={{ fontFamily: '"Times New Roman", serif' }}>
-                      {isMyPnLPos ? '+' : ''}{Number(myPnL).toFixed(2)}%
-                  </p>
-                  <p className="text-xs text-white/40">My PnL</p>
-              </div>
-          </div>
-
-          {/* Header Row */}
-          <div className="flex items-center px-4 pb-2 text-[10px] text-white/30 font-bold uppercase tracking-wider">
-              <div className="w-8 text-center">#</div>
-              <div className="flex-1 pl-2">Trader</div>
-              <div className="w-20 text-right">PnL</div>
-              <div className="w-16 text-right">XP</div>
-          </div>
-
-          {/* List Content */}
-          <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pb-20">
-               {safeLeaderboard.length === 0 ? (
-                   // Empty State
-                   <div className="flex flex-col items-center justify-center py-20 text-white/30">
-                       <Trophy className="w-12 h-12 mb-4 opacity-20" />
-                       <p className="text-sm">No ranking data yet.</p>
-                       <p className="text-xs mt-1">Be the first to trade!</p>
-                   </div>
-               ) : (
-                   safeLeaderboard.map((user: any, i: number) => {
-                      const rank = i + 1;
-                      const isMe = user.pubkey === publicKey?.toBase58();
-                      const pnl = user.pnl_percent || 0;
-                      const isPos = pnl >= 0;
-
-                      // Rank Styling
-                      let rankColor = "text-[#78716C]";
-                      let borderStyle = "border-white/5";
-                      if (rank === 1) { rankColor = "text-[#FFD700]"; borderStyle = "border-[#FFD700]/30 bg-gradient-to-r from-[#FFD700]/5 to-[#1C1917]"; }
-                      else if (rank === 2) { rankColor = "text-[#C0C0C0]"; borderStyle = "border-[#C0C0C0]/30"; }
-                      else if (rank === 3) { rankColor = "text-[#CD7F32]"; borderStyle = "border-[#CD7F32]/30"; }
-                      if (isMe) borderStyle = "border-[#D97706] bg-[#D97706]/5";
-
-                      return (
-                          <div key={i} className={`flex items-center p-3 rounded-xl bg-[#1C1917] border ${borderStyle} transition-colors`}>
-                              <div className={`w-8 text-center font-mono font-bold text-lg ${rankColor}`} style={{ fontFamily: '"Times New Roman", serif' }}>{rank}</div>
-                              
-                              <div className="flex-1 flex items-center gap-3 pl-2 min-w-0">
-                                  <div className="w-10 h-10 rounded-full bg-black/50 overflow-hidden border border-white/10 shrink-0">
-                                       {user.avatar_url ? <img src={api.getProxyUrl(user.avatar_url)} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-white/5 flex items-center justify-center text-xs text-white/20">?</div>}
-                                  </div>
-                                  <div className="min-w-0">
-                                      <p className={`font-bold text-sm truncate ${isMe ? 'text-[#D97706]' : 'text-white'}`}>{user.username || 'User'}</p>
-                                      <div className="flex items-center gap-1 text-white/30">
-                                          <p className="text-[10px] font-mono" style={{ fontFamily: '"Times New Roman", serif' }}>{shortAddr(user.pubkey)}</p>
-                                      </div>
-                                  </div>
-                              </div>
-
-                              <div className="w-20 text-right">
-                                  <p className={`font-bold text-sm font-mono ${isPos ? 'text-[#4ADE80]' : 'text-[#F87171]'}`} style={{ fontFamily: '"Times New Roman", serif' }}>
-                                      {isPos ? '+' : ''}{Number(pnl).toFixed(2)}%
-                                  </p>
-                              </div>
-
-                              <div className="w-16 text-right">
-                                  <div className="inline-flex items-center gap-1 justify-end text-white/50">
-                                      <Sparkles className="w-3 h-3" />
-                                      <p className="font-bold text-xs font-mono">{(user.total_xp / 1000).toFixed(1)}k</p>
-                                  </div>
-                              </div>
-                          </div>
-                      );
-                   })
-               )}
-          </div>
+    <div className="bg-[#1C1917] p-4 rounded-xl border border-white/5 hover:border-[#D97706]/30 transition-colors">
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <p className="text-white font-bold">{strategy.name}</p>
+          <p className="text-white/40 text-xs">{strategy.ticker || 'INDEX'}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-white font-mono text-sm">{tvlUSD > 0 ? `$${tvlUSD.toFixed(2)}` : '-'}</p>
+          <p className="text-white/40 text-[10px]">TVL</p>
+        </div>
       </div>
+      {/* Mock Tokens Display (since full token list might be large) */}
+      <div className="flex gap-1 mb-3">
+         {[1,2,3].map(i => <div key={i} className="w-4 h-4 rounded-full bg-white/10" />)}
+      </div>
+      <div className="flex justify-between items-center pt-3 border-t border-white/5">
+        <span className="text-[10px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 font-bold">ACTIVE</span>
+        <span className="text-[10px] text-white/30">{new Date(strategy.createdAt * 1000).toLocaleDateString()}</span>
+      </div>
+    </div>
   );
 };

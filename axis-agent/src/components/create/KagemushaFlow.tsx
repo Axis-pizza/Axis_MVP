@@ -1,29 +1,20 @@
-/**
- * Kagemusha Create Flow - Integrated with Manual Dashboard
- */
-
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
 
-import { TacticalTerminal, type Topping } from './TacticalTerminal';
-import { StrategyCards } from './StrategyCards';
-import { PizzaBuilder } from './PizzaBuilder';
+// --- Components ---
+import { CreateLanding } from './CreateLanding'; // ★ New Landing Page
+import { ManualDashboard, type ManualData } from './manual/ManualDashboard';
 import { DepositFlow } from './DepositFlow';
 import { StrategyDashboard } from './StrategyDashboard';
 import { RebalanceFlow } from './RebalanceFlow';
-import { CreateModeSelector } from './CreateModeSelector';
 
-// --- Change 1: Import new Dashboard & Type ---
-import { ManualDashboard, type ManualData } from './manual/ManualDashboard'; 
-import { StrategySettings } from './manual/StrategySettings'; // AI Flow用 (もしManualDashboard内に統合されていれば不要だが、AI側で使うため残す)
-
-import { api } from '../../services/api';
+// --- Services ---
 import { getUserStrategies, type OnChainStrategy } from '../../services/kagemusha';
-import type { Strategy } from '../../types/index';
 
-type CreateStep = 'DIRECTIVE' | 'SIMULATION' | 'CUSTOMIZE' | 'SETTINGS' | 'DEPOSIT' | 'DASHBOARD' | 'REBALANCE';
+// --- Types ---
+// 'LANDING' を追加
+type CreateStep = 'LANDING' | 'BUILDER' | 'DEPOSIT' | 'DASHBOARD' | 'REBALANCE';
 
 interface FlowToken {
   symbol: string;
@@ -35,9 +26,8 @@ interface FlowToken {
 interface DeployedStrategy {
   address: string;
   name: string;
-  type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
+  type: string;
   tokens: FlowToken[];
-  // ★追加
   ticker?: string;
   description?: string;
   config?: any;
@@ -47,32 +37,16 @@ export const KagemushaFlow = () => {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   
-  const [step, setStep] = useState<CreateStep>('DIRECTIVE');
-  const [createMode, setCreateMode] = useState<'AI' | 'MANUAL'>('MANUAL');
-
-  // AI Flow State
-  const [isLoading, setIsLoading] = useState(false);
-  const [strategies, setStrategies] = useState<Strategy[]>([]);
-  const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
-  const [customTokens, setCustomTokens] = useState<{ 
-    symbol: string; 
-    weight: number; 
-    mint?: string; 
-    logoURI?: string; 
-  }[]>([]);
-  const [pizzaName, setPizzaName] = useState('');
-  const [customToppings, setCustomToppings] = useState<Topping[]>([]);
+  // ★ Default to LANDING
+  const [step, setStep] = useState<CreateStep>('LANDING'); 
   
-  // Settings & Deposit State
-  const [strategySettings, setStrategySettings] = useState<any>({});
-  const [initialDepositAmount, setInitialDepositAmount] = useState<number>(0);
-  
-  // Dashboard State
+  // Post-Deployment State
   const [deployedStrategy, setDeployedStrategy] = useState<DeployedStrategy | null>(null);
   const [userStrategies, setUserStrategies] = useState<OnChainStrategy[]>([]);
   const [selectedDashboardStrategy, setSelectedDashboardStrategy] = useState<OnChainStrategy | null>(null);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
+  // Effects
   const loadUserStrategies = useCallback(async () => {
     if (!publicKey) return;
     setIsDashboardLoading(true);
@@ -87,93 +61,32 @@ export const KagemushaFlow = () => {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    if (step === 'DASHBOARD' && publicKey) {
-      loadUserStrategies();
-    }
+    if (step === 'DASHBOARD' && publicKey) loadUserStrategies();
   }, [step, publicKey, loadUserStrategies]);
 
-  // AI Handlers
-  const handleAnalyze = async (directive: string, tags: string[]) => {
-    setIsLoading(true);
-    setStep('SIMULATION');
-    try {
-      const response = await api.analyze(directive, tags);
-      if (response.success && response.strategies) {
-        setStrategies(response.strategies);
-      } else {
-        setStrategies([]);
-      }
-    } catch (e) {
-      setStrategies([]);
-    } finally {
-      setIsLoading(false);
-    }
+  // --- Handlers ---
+
+  // 1. Landing -> Builder
+  const handleStartCreate = () => {
+    setStep('BUILDER');
   };
 
-  const handleSelectStrategy = (strategy: Strategy) => {
-    setSelectedStrategy(strategy);
+  // 2. Builder -> Landing (Back)
+  const handleBuilderBack = () => {
+    setStep('LANDING');
   };
 
-  const handleConfirmStrategy = () => {
-    if (selectedStrategy) {
-      setCustomTokens(selectedStrategy.tokens);
-      if (publicKey) {
-        const addr = publicKey.toBase58();
-        setPizzaName(`${addr.slice(0, 4)}...${addr.slice(-4)} Pizza`);
-      } else {
-        setPizzaName('My Alpha Pizza');
-      }
-      setStep('CUSTOMIZE');
-    }
-  };
-
-  const handleCustomizeConfirm = (tokens: { symbol: string; weight: number }[], name: string) => {
-    setCustomTokens(tokens);
-    setPizzaName(name);
-    setStep('SETTINGS');
-  };
-
-  const handleSettingsConfirm = (params: any, info: any) => {
-    setStrategySettings(params);
-    setPizzaName(info.name);
-    // AIの場合、データは既にState(customTokens)にあるのでアドレスのみ渡す
-    handleDeploySuccess("So11111111111111111111111111111111111111112");
-  };
-
-  // --- Common Handlers ---
-  const handleDeploySuccess = async (
-    strategyAddress: string,
-    manualData?: ManualData 
-  ) => {
-    if (!publicKey) {
-      alert("Please connect your wallet first.");
-      return;
-    }
-  
-    const finalTokens: FlowToken[] = (manualData?.tokens || customTokens) as FlowToken[];
-    const finalName = manualData?.config?.name || pizzaName;
-    const finalTicker = manualData?.config?.ticker || "UNKNOWN";
-    const finalDesc = manualData?.config?.description || "";
-    
-    const finalConfig = manualData?.config || {
-      curatorFee: 0.5,
-      protocolFee: 0.2,
-      rebalanceTrigger: 'THRESHOLD',
-      rebalanceValue: 2.5
-    };
-  
-    // ★DB保存はDepositFlowで行うため、ここではステート更新のみ
+  // 3. Builder -> Deposit (Success)
+  const handleDeploySuccess = (data: ManualData) => {
     setDeployedStrategy({
-      address: strategyAddress,
-      name: finalName,
+      address: "So11111111111111111111111111111111111111112",
+      name: data.config.name,
+      ticker: data.config.ticker,
+      description: data.config.description,
       type: 'BALANCED',
-      tokens: finalTokens,
-      ticker: finalTicker,
-      description: finalDesc,
-      config: finalConfig,
+      tokens: data.tokens,
+      config: data.config
     });
-    
-    setInitialDepositAmount(0);
     setStep('DEPOSIT');
   };
 
@@ -182,63 +95,16 @@ export const KagemushaFlow = () => {
   };
 
   const handleCreateNew = () => {
-    resetFlow();
-    setStep('DIRECTIVE');
+    setStep('LANDING');
   };
 
-  const resetFlow = () => {
-    setStrategies([]);
-    setSelectedStrategy(null);
-    setCustomTokens([]);
-    setPizzaName('');
-    setStrategySettings({});
-    setDeployedStrategy(null);
-    setSelectedDashboardStrategy(null);
-    setInitialDepositAmount(0);
-    setStep('DIRECTIVE');
-  };
+  // --- Render ---
 
-  const getProgress = () => {
-    // ManualモードのDashboardは1画面完結なので、プログレスバーは不要または100%でも良いが、
-    // ここではステップ管理外の扱いとして非表示にする制御をRender側で行う
-    if (createMode === 'MANUAL') return '50%'; 
-    
-    switch (step) {
-      case 'DIRECTIVE': return '20%';
-      case 'SIMULATION': return '40%';
-      case 'CUSTOMIZE': return '60%';
-      case 'SETTINGS': return '80%';
-      case 'DEPOSIT': return '90%';
-      case 'DASHBOARD': case 'REBALANCE': return '100%';
-      default: return '0%';
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#030303]">
-      {/* Progress Bar (AI Mode Only) */}
-      {(createMode === 'AI' && step !== 'DASHBOARD' && step !== 'DEPOSIT') && (
-        <div className="fixed top-0 left-0 right-0 h-1 bg-white/5 z-50">
-          <motion.div
-            className="h-full bg-gradient-to-r from-orange-500 to-amber-500"
-            animate={{ width: getProgress() }}
-            transition={{ duration: 0.3 }}
-          />
-        </div>
-      )}
-
-      <div className="pt-20 px-4 pb-32 max-w-6xl mx-auto"> {/* Width increased for Dashboard */}
-        
-        {/* Step 1: Mode Selector (Only visible at start) */}
-        {step === 'DIRECTIVE' && (
-          <CreateModeSelector mode={createMode} onChange={setCreateMode} />
-        )}
-
-        {/* --- MAIN CONTENT AREA --- */}
-        
-        {/* Case 1: Post-Deployment Steps (Deposit / Dashboard / Rebalance) */}
-        {step === 'DASHBOARD' || step === 'REBALANCE' || step === 'DEPOSIT' ? (
-           <AnimatePresence mode="wait">
+  // Post-Deployment Views
+  if (['DEPOSIT', 'DASHBOARD', 'REBALANCE'].includes(step)) {
+    return (
+      <div className="min-h-screen bg-[#030303] pt-20 px-4 pb-32 max-w-6xl mx-auto">
+        <AnimatePresence mode="wait">
              {step === 'DEPOSIT' && deployedStrategy && (
                <motion.div key="deposit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                  <DepositFlow
@@ -246,7 +112,7 @@ export const KagemushaFlow = () => {
                    strategyName={deployedStrategy.name}
                    strategyType={deployedStrategy.type}
                    tokens={deployedStrategy.tokens}
-                   initialAmount={initialDepositAmount}
+                   initialAmount={0}
                    onBack={() => setStep('DASHBOARD')}
                    onComplete={handleDepositComplete}
                  />
@@ -259,7 +125,7 @@ export const KagemushaFlow = () => {
                      id: s.address, name: s.name, type: s.strategyType, tokens: s.tokens, tvl: s.tvl, pnl: s.pnl, pnlPercent: s.pnlPercent, isActive: s.isActive, lastRebalance: s.lastRebalance,
                    }))}
                    onSelectStrategy={(s) => { const os = userStrategies.find(us => us.address === s.id); if(os) setSelectedDashboardStrategy(os); }}
-                   onDeposit={(s) => { const os = userStrategies.find(us => us.address === s.id); if(os) { setDeployedStrategy({ address: os.address, name: os.name, type: os.strategyType, tokens: os.tokens }); setStep('DEPOSIT'); } }}
+                   onDeposit={(s) => { const os = userStrategies.find(us => us.address === s.id); if(os) { setDeployedStrategy({ address: os.address, name: os.name, type: os.strategyType, tokens: os.tokens, ticker: os.ticker }); setStep('DEPOSIT'); } }}
                    onRebalance={(s) => { const os = userStrategies.find(us => us.address === s.id); if(os) { setSelectedDashboardStrategy(os); setStep('REBALANCE'); } }}
                    onCreateNew={handleCreateNew}
                    isLoading={isDashboardLoading}
@@ -277,72 +143,35 @@ export const KagemushaFlow = () => {
                  />
                </motion.div>
              )}
-           </AnimatePresence>
-        
-        ) : createMode === 'MANUAL' ? (
-          
-          /* --- Case 2: New Manual Flow (Dashboard) --- */
-          /* Change 3: Use ManualDashboard */
-          <motion.div 
-            key="manual-dashboard"
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <ManualDashboard 
-              onDeploySuccess={(data) => handleDeploySuccess("So11111111111111111111111111111111111111112", data)} 
-            />
-          </motion.div>
-        
-        ) : (
-          
-          /* --- Case 3: AI Flow (Wizard Steps) --- */
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  // Creation Flow
+  return (
+    <div className="min-h-screen bg-[#030303]">
+      <div className="h-full">
           <AnimatePresence mode="wait">
-            {step === 'DIRECTIVE' && (
-              <motion.div key="directive" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                <TacticalTerminal 
-                  onAnalyze={handleAnalyze} 
-                  isLoading={isLoading}
-                  customToppings={customToppings}
-                  setCustomToppings={setCustomToppings}
-                />
-              </motion.div>
+            
+            {/* Step 1: Landing */}
+            {step === 'LANDING' && (
+                <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.9 }}>
+                    <CreateLanding onCreate={handleStartCreate} />
+                </motion.div>
             )}
-            {step === 'SIMULATION' && (
-              <motion.div key="simulation" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20">
-                    <Loader2 className="w-12 h-12 text-orange-500 animate-spin mb-4" />
-                    <p className="text-white/50">Designing strategies...</p>
-                  </div>
-                ) : (
-                  <StrategyCards
-                    strategies={strategies}
-                    selectedId={selectedStrategy?.id || null}
-                    onSelect={handleSelectStrategy}
-                    onConfirm={handleConfirmStrategy}
-                  />
-                )}
-              </motion.div>
+
+            {/* Step 2: Builder */}
+            {step === 'BUILDER' && (
+                <motion.div key="builder" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <ManualDashboard 
+                       onDeploySuccess={handleDeploySuccess}
+                       onBack={handleBuilderBack} // 戻るボタンでLandingへ
+                    />
+                </motion.div>
             )}
-            {step === 'CUSTOMIZE' && selectedStrategy && (
-              <motion.div key="customize" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <PizzaBuilder
-                  initialTokens={selectedStrategy.tokens}
-                  onBack={() => setStep('SIMULATION')}
-                  onDeploy={handleCustomizeConfirm}
-                />
-              </motion.div>
-            )}
-            {step === 'SETTINGS' && (
-              <motion.div key="settings" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <StrategySettings
-                  onBack={() => setStep('CUSTOMIZE')}
-                  onNext={handleSettingsConfirm}
-                />
-              </motion.div>
-            )}
+
           </AnimatePresence>
-        )}
       </div>
     </div>
   );
