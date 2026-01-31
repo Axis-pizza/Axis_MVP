@@ -29,6 +29,26 @@ const CRITICAL_FALLBACK: JupiterToken[] = [
   { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", chainId: 101, decimals: 6, name: "USD Coin", symbol: "USDC", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", tags: ["verified"] },
   { address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", chainId: 101, decimals: 6, name: "USDT", symbol: "USDT", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png", tags: ["verified"] },
   { address: "JUPyiwrYJFskUPiHa7hkeR8VUtqVomfEtMEKyLb6XR3", chainId: 101, decimals: 6, name: "Jupiter", symbol: "JUP", logoURI: "https://static.jup.ag/jup/icon.png", tags: ["verified"] },
+  { 
+    // Penguin Meme (前回のログから pump 付きのアドレスを推測)
+    address: "8Jx8AAHj86wbQgUTjGuj6GTTL5Ps3cqxKRTvpaJApump", 
+    chainId: 101, 
+    decimals: 6, 
+    name: "Nietzschean Penguin", 
+    symbol: "PENGUIN", // 必要に応じて変更してください
+    logoURI: "https://images.pump.fun/coin-image/8Jx8AAHj86wbQgUTjGuj6GTTL5Ps3cqxKRTvpaJApump?variant=600x600&ipfs=bafybeieukfwe5dz5m7d7pocyogm2sd3bzr6ajxefav7mcvpbf53yl3cn6u&src=https%3A%2F%2Fipfs.io%2Fipfs%2Fbafybeieukfwe5dz5m7d7pocyogm2sd3bzr6ajxefav7mcvpbf53yl3cn6u", // 適切な画像のURLがあれば差し替えてください
+    tags: ["meme", "pump"] 
+  },
+  { 
+    // White Whale
+    address: "a3W4qutoEJA4232T2gwZUfgYJTetr96pU4SJMwppump", 
+    chainId: 101, 
+    decimals: 6, 
+    name: "White Whale", 
+    symbol: "WHITEWHALE", // 必要に応じて変更してください
+    logoURI: "https://images.pump.fun/coin-image/a3W4qutoEJA4232T2gwZUfgYJTetr96pU4SJMwppump?variant=600x600&ipfs=bafkreid36cgjpa6wm7rvczq2odx4i3y45cqj3nmq5fecxzsaetjumwxaqi&src=https%3A%2F%2Fipfs.io%2Fipfs%2Fbafkreid36cgjpa6wm7rvczq2odx4i3y45cqj3nmq5fecxzsaetjumwxaqi", // 適切な画像のURLがあれば差し替えてください
+    tags: ["meme", "pump"] 
+  },
 ];
 
 const CACHE_KEY = "jup_lite_tokens_v2_strict"; 
