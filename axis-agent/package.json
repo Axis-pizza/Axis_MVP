@@ -26,7 +26,7 @@
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/wallet-adapter-wallets": "^0.19.37",
-    "@solana/web3.js": "^1.95.0",
+    "@solana/web3.js": "^1.98.4",
     "@tanstack/react-query": "^5.90.16",
     "@tanstack/react-router": "^1.147.3",
     "buffer": "^6.0.3",
@@ -58,17 +58,10 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.21.0",
-    "typescript": "~5.9.3",
+    "typescript": "^5.7.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^6.4.1",
     "vite-plugin-node-polyfills": "^0.24.0",
     "wrangler": "^4.54.0"
-  },
-  
-    "pnpm": {
-      "overrides": {
-        "@solana/web3.js": "1.95.0"
-      }
-    }
-  
+  }
 }

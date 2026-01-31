@@ -18,7 +18,7 @@ interface StrategyCardsProps {
 const TYPE_CONFIG = {
   AGGRESSIVE: {
     icon: Zap,
-    label: 'SNIPER', // 攻撃的
+    label: 'SNIPER', 
     desc: 'High risk, maximum alpha.',
     gradient: 'from-orange-500 to-red-600',
     border: 'border-orange-500/50',
@@ -28,7 +28,7 @@ const TYPE_CONFIG = {
   },
   BALANCED: {
     icon: Waves,
-    label: 'WAVE', // バランス
+    label: 'WAVE', 
     desc: 'Capture trends, manage risk.',
     gradient: 'from-blue-500 to-indigo-600',
     border: 'border-blue-500/50',
@@ -38,7 +38,7 @@ const TYPE_CONFIG = {
   },
   CONSERVATIVE: {
     icon: Shield,
-    label: 'FORTRESS', // 保守的
+    label: 'FORTRESS', 
     desc: 'Preserve capital, steady yield.',
     gradient: 'from-emerald-500 to-teal-600',
     border: 'border-emerald-500/50',
@@ -78,7 +78,7 @@ export const StrategyCards = ({ strategies, selectedId, onSelect, onConfirm, onB
                 </motion.div>
                 <h2 className="text-xl font-black text-white">Select Tactic</h2>
             </div>
-            <div className="w-11" /> {/* Spacer */}
+            <div className="w-11" /> 
         </div>
 
         {/* Cards Grid */}
@@ -89,7 +89,6 @@ export const StrategyCards = ({ strategies, selectedId, onSelect, onConfirm, onB
                 const Icon = conf.icon;
                 const isSelected = selectedId === strategy.id;
 
-                // 上位4つのトークンを取得（表示用）
                 const topTokens = strategy.tokens.slice(0, 4);
                 const otherCount = strategy.tokens.length - 4;
 
@@ -167,7 +166,6 @@ export const StrategyCards = ({ strategies, selectedId, onSelect, onConfirm, onB
                                      </div>
                                  </div>
                                  
-                                 {/* Toggle Detail Hint */}
                                  <div className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isSelected ? 'text-white/50' : 'text-white/20'}`}>
                                      {isSelected ? 'View Performance' : 'Tap to Select'}
                                  </div>
@@ -193,8 +191,12 @@ export const StrategyCards = ({ strategies, selectedId, onSelect, onConfirm, onB
                                              </div>
                                              {/* Backtest Chart Component */}
                                              <div className="h-32 w-full bg-white/[0.02] rounded-xl border border-white/5 overflow-hidden relative">
-                                                 <BacktestChart data={strategy.backtest || []} height={128} showMetrics={false} />
-                                                 {/* Overlay Gradient for Fade */}
+                                                 <BacktestChart 
+                                                   // ★修正: デフォルト値を正しい型に
+                                                   data={strategy.backtest || { timestamps: [], values: [] }} 
+                                                   height={128} 
+                                                   showMetrics={false} 
+                                                 />
                                                  <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0a0a0a]/50 pointer-events-none" />
                                              </div>
                                          </div>
@@ -207,7 +209,6 @@ export const StrategyCards = ({ strategies, selectedId, onSelect, onConfirm, onB
             })}
         </div>
         
-        {/* Floating Action Bar (Fixed Bottom) */}
         <AnimatePresence>
             {selectedStrategy && (
                 <motion.div 

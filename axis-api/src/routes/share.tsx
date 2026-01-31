@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import { Hono } from 'hono';
 import satori from 'satori';
 import { Bindings } from '../config/env';

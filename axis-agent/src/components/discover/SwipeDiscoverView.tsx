@@ -7,7 +7,6 @@ import { useWallet } from '../../hooks/useWallet';
 import { JupiterService } from '../../services/jupiter';
 import { DexScreenerService } from '../../services/dexscreener';
 
-// TokenDataはMintアドレスをキーとして管理する
 interface TokenData {
   symbol: string;
   price: number;
@@ -27,7 +26,6 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   
-  // Mint Address -> TokenData
   const [tokenDataMap, setTokenDataMap] = useState<Record<string, TokenData>>({});
   const [userMap, setUserMap] = useState<Record<string, any>>({});
   
@@ -41,14 +39,12 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
       setLoading(true);
       
       try {
-        // 1. 戦略・ユーザー・トークンマスタ取得
         const [publicRes, myRes, tokensRes] = await Promise.all([
           api.discoverStrategies(50).catch(e => ({ strategies: [] })),
           publicKey ? api.getUserStrategies(publicKey.toBase58()).catch(() => ({ strategies: [] })) : Promise.resolve({ strategies: [] }),
           api.getTokens().catch(() => ({ tokens: [] }))
         ]);
 
-        // 2. 初期マップ作成 (Backend Cache)
         const initialMap: Record<string, TokenData> = {};
         const backendTokens = tokensRes.tokens || [];
         backendTokens.forEach((t: any) => {
@@ -63,24 +59,19 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
            }
         });
 
-        // 3. 戦略リスト結合
         const myApiStrats = (myRes.strategies || myRes || []);
         const publicStrats = publicRes.strategies || [];
         const combined = [...myApiStrats, ...publicStrats];
         
         const uniqueMap = new Map();
         combined.forEach(item => {
-          // 重複排除
           if (item.id && !uniqueMap.has(item.id)) uniqueMap.set(item.id, item);
-          // もしaddressがあればそちらもチェック
           if (item.address && !uniqueMap.has(item.address)) uniqueMap.set(item.address, item);
         });
         const uniqueStrategies = Array.from(uniqueMap.values());
         setStrategies(uniqueStrategies);
 
-        // 4. アドレス抽出 (価格取得用)
         const allMints = new Set<string>();
-        // 既存トークンを追加
         Object.keys(initialMap).forEach(m => allMints.add(m));
 
         uniqueStrategies.forEach((s: any) => {
@@ -104,22 +95,20 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
             });
         });
 
-        // 5. 価格データ取得 (Jupiter & DexScreener)
         const mintArray = Array.from(allMints);
         if (mintArray.length > 0) {
+            // ★修正: 型キャストを追加してインデックスエラーを回避
             const [jupPrices, dexData] = await Promise.all([
-                JupiterService.getPrices(mintArray).catch(() => ({})),
-                DexScreenerService.getMarketData(mintArray).catch(() => ({}))
+                JupiterService.getPrices(mintArray).catch(() => ({})) as Promise<Record<string, number>>,
+                DexScreenerService.getMarketData(mintArray).catch(() => ({})) as Promise<Record<string, { price: number; change24h: number }>>
             ]);
 
-            // 6. マージ
             mintArray.forEach(mint => {
                 const current = initialMap[mint];
                 if (!current) return;
 
-                // 価格: Jupiter優先
+                // ★これでエラーが消えるはず
                 const price = jupPrices[mint] || dexData[mint]?.price || current.price;
-                // 変動: DexScreener優先
                 const change = dexData[mint]?.change24h || current.change24h;
 
                 initialMap[mint] = {
@@ -132,7 +121,6 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
         
         setTokenDataMap(initialMap);
 
-        // 7. クリエイター情報
         const creators = new Set<string>();
         uniqueStrategies.forEach((s: any) => {
           if (s.ownerPubkey) creators.add(s.ownerPubkey);
@@ -159,9 +147,8 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
     };
 
     loadData();
-  }, [publicKey]); // publicKeyが変わったら再取得しても良い
+  }, [publicKey]);
 
-  // データ結合処理
   const enrichedStrategies = useMemo(() => {
     return strategies.map(s => {
       let tokens = s.tokens || s.composition || [];
@@ -170,21 +157,18 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
       }
 
       const enrichedTokens = tokens.map((t: any) => {
-        // Mintアドレスで引く
         const tokenData = t.mint ? tokenDataMap[t.mint] : null;
         
         return {
            ...t,
            symbol: t.symbol?.toUpperCase(), 
            currentPrice: tokenData?.price || 0,
-           // 24h変動率をセット
            change24h: tokenData?.change24h || 0,
            logoURI: t.logoURI || tokenData?.logoURI || null, 
            address: t.mint || null 
         };
       });
 
-      // ROI (24h変動率) の計算
       let weightedSum = 0;
       let totalWeight = 0;
       enrichedTokens.forEach((t: any) => {
@@ -193,7 +177,6 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
          weightedSum += change * w;
          totalWeight += w;
       });
-      // 0除算対策
       const calculatedRoi = totalWeight > 0 ? (weightedSum / totalWeight) : 0;
 
       const ownerAddress = s.ownerPubkey || s.creator;
@@ -201,9 +184,6 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
 
       return {
         ...s,
-        // ✅【重要】 InvestボタンのためのID修正
-        // address(オンチェーンVaultアドレス)があればそれを優先。なければidを使う
-        // これで StrategyDetailView が正しい PublicKey を受け取れるようになります
         id: s.address || s.pubkey || s.id, 
 
         name: s.name || 'Untitled Strategy',

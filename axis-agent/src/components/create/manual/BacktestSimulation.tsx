@@ -42,7 +42,6 @@ export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
   const SOL_MINT = "So11111111111111111111111111111111111111112";
   const addLog = (msg: string) => setLogs(prev => [...prev, msg]);
 
-  // データ補間 (見た目を滑らかにするためだけに使用。アニメーション用ではない)
   const interpolateData = (data: any[], stepsPerDay: number = 4) => {
     if (data.length < 2) return data;
     const interpolated: any[] = [];
@@ -89,7 +88,7 @@ export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
       addLog("CALCULATING NAV...");
       
       const minLength = Math.min(...validHistories.map(h => h.data.length));
-      const limit = Math.min(minLength, 30); // 過去30日
+      const limit = Math.min(minLength, 30); 
       
       const slicedHistories = validHistories.map(h => ({
         ...h,
@@ -124,7 +123,6 @@ export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
         });
       }
 
-      // 統計計算
       const startVal = rawData[0].value;
       const endVal = rawData[rawData.length - 1].value;
       const totalReturn = ((endVal - startVal) / startVal) * 100;
@@ -145,7 +143,6 @@ export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
         maxDrawdown
       });
 
-      // 少し滑らかにする
       const smoothData = interpolateData(rawData, 5);
       setChartData(smoothData);
       
@@ -163,7 +160,6 @@ export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
   return (
     <div className="bg-[#0C0A09] rounded-3xl border border-white/10 overflow-hidden flex flex-col h-full shadow-2xl relative group">
       
-      {/* Overlay: Idle */}
       {!hasRun && !loading && (
         <div className="absolute inset-0 bg-[#0C0A09]/90 backdrop-blur-md z-20 flex flex-col items-center justify-center p-8 text-center">
           <div className="w-20 h-20 bg-[#D97706]/10 rounded-full flex items-center justify-center mb-6 border border-[#D97706]/30 shadow-[0_0_30px_rgba(217,119,6,0.2)]">
@@ -186,10 +182,8 @@ export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
         </div>
       )}
 
-      {/* Content */}
       <div className="flex-1 relative bg-gradient-to-b from-black to-[#141210]">
         
-        {/* Loading */}
         {loading && (
           <div className="absolute inset-0 flex flex-col justify-center items-center z-10 bg-black/80 p-6">
             <Loader2 className="w-12 h-12 text-[#D97706] animate-spin mb-6" />
@@ -199,7 +193,6 @@ export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
           </div>
         )}
 
-        {/* Chart Area */}
         <div className="absolute inset-0 p-4 pb-0 flex flex-col">
            {hasRun && !loading && (
               <div className="mb-4 pl-2 font-mono z-10">
@@ -214,21 +207,16 @@ export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
              {hasRun && !loading && (
                <RichChart 
                  data={chartData} 
-                 type="area" 
+                 // ★修正: type="area" を削除
                  height={260}
                  isPositive={stats.totalReturn >= 0}
-                 colors={{
-                   lineColor: stats.totalReturn >= 0 ? '#10B981' : '#EF4444',
-                   areaTopColor: stats.totalReturn >= 0 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)',
-                   areaBottomColor: 'rgba(0,0,0,0)'
-                 }}
+                 // ...
                />
              )}
            </div>
         </div>
       </div>
 
-      {/* Footer Stats */}
       <div className="grid grid-cols-3 gap-px bg-white/5 border-t border-white/5">
         <StatBox label="VOLATILITY" value={`${stats.volatility.toFixed(1)}%`} dim={!hasRun} />
         <StatBox label="MAX DRAWDOWN" value={`-${stats.maxDrawdown.toFixed(2)}%`} dim={!hasRun} color="text-red-400" />
