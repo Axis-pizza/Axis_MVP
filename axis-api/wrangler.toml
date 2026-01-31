@@ -1,23 +1,32 @@
 name = "axis-api"
 main = "src/app.ts"
 compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
 
+# D1 Database
 [[d1_databases]]
 binding = "axis_db"
 database_name = "axis-db"
 database_id = "30e73485-4507-447b-a4a0-6f1b7a10812b"
 
+# AI Binding
 [ai]
 binding = "AI"
 
+# Vectorize
 [[vectorize]]
 binding = "VECTOR_INDEX"
 index_name = "axis-vector-index"
 
-[triggers]
-crons = ["0 * * * *"]
+# ★ここを追加（画像保存用バケットの設定）
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "axis-images"
 
+# Email Binding
 [[send_email]]
 binding = "EMAIL"
 
-compatibility_flags = ["nodejs_compat"]
+# Crons
+[triggers]
+crons = ["0 * * * *"]
