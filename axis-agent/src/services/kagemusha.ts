@@ -78,9 +78,14 @@ export interface OnChainStrategy {
   address: string;
   owner: string;
   name: string;
-  strategyType: string;
+  strategyType: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
   tvl: number;
   isActive: boolean;
+  tokens?: TokenAllocation[];
+  ticker?: string;
+  pnl?: number;
+  pnlPercent?: number;
+  lastRebalance?: number;
 }
 
 export const KagemushaService = {

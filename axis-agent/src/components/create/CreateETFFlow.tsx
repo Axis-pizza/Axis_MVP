@@ -37,6 +37,7 @@ const STRATEGY_META: Record<string, { label: string, color: string }> = {
 export const CreateETFFlow = () => {
   const [step, setStep] = useState<FlowStep>('INPUT');
   const [loadingLog, setLoadingLog] = useState<string[]>([]);
+  const [isDeploying, setIsDeploying] = useState(false);
   
   // ETF State
   const [etfName, setEtfName] = useState('');
@@ -56,10 +57,11 @@ export const CreateETFFlow = () => {
     setEtfName(`${meta.label} ETF`);
     
     // モックデータ：実際はAPIや定数から取得するトークンリスト
+    // ★修正: percentage → weight
     const mockTokens: TokenAllocation[] = [
-      { symbol: 'SOL', address: 'So1...', percentage: 40, logoURI: '' },
-      { symbol: 'JUP', address: 'Jup...', percentage: 30, logoURI: '' },
-      { symbol: 'BONK', address: 'Bon...', percentage: 30, logoURI: '' },
+      { symbol: 'SOL', address: 'So1...', weight: 40, logoURI: '' },
+      { symbol: 'JUP', address: 'Jup...', weight: 30, logoURI: '' },
+      { symbol: 'BONK', address: 'Bon...', weight: 30, logoURI: '' },
     ];
     
     setSelectedTokens(mockTokens);
@@ -86,9 +88,9 @@ export const CreateETFFlow = () => {
     try {
       // ここにAIのAPI処理が入る (今回はモック)
       const aiGeneratedTokens: TokenAllocation[] = [
-        { symbol: 'WIF', address: '...', percentage: 40, logoURI: '' },
-        { symbol: 'POPCAT', address: '...', percentage: 30, logoURI: '' },
-        { symbol: 'MYRO', address: '...', percentage: 30, logoURI: '' },
+        { symbol: 'WIF', address: '...', weight: 40, logoURI: '' },
+        { symbol: 'POPCAT', address: '...', weight: 30, logoURI: '' },
+        { symbol: 'MYRO', address: '...', weight: 30, logoURI: '' },
       ];
       
       const suggestedName = promptText.split(' ').slice(0, 2).join(' ').toUpperCase() + " INDEX";
@@ -103,10 +105,22 @@ export const CreateETFFlow = () => {
     }
   };
 
+  // ----------------------------------------------------------------
+  // 3. マニュアル作成ハンドラー（TacticalTerminal用）
+  // ----------------------------------------------------------------
+  const handleCreateManual = () => {
+    // マニュアル作成モードへ遷移
+    setEtfName('Custom ETF');
+    setSelectedTokens([]);
+    setStep('EDIT');
+  };
+
   const handleDeploy = async () => {
+    setIsDeploying(true);
     setStep('DEPLOY');
     // Deploy logic simulation
     await new Promise(r => setTimeout(r, 2000));
+    setIsDeploying(false);
     setStep('SUCCESS');
   };
 
@@ -140,11 +154,9 @@ export const CreateETFFlow = () => {
                 exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
               >
                 <TacticalTerminal 
-                  // ↓↓↓ この行が絶対に必要です！ ↓↓↓
                   onSelectPreset={handlePresetSelect} 
-                  // ↑↑↑ これがないとエラーになります ↑↑↑
-
                   onAnalyze={handleAISubmit}
+                  onCreateManual={handleCreateManual}
                   isLoading={false}
                 />
               </motion.div>
@@ -225,8 +237,9 @@ export const CreateETFFlow = () => {
               </div>
 
               {/* Backtest Preview Chart */}
+              {/* ★修正: data={[]} → data={{ values: [] }} */}
               <div className="h-40 w-full bg-white/5 rounded-xl border border-white/10 overflow-hidden relative">
-                <BacktestChart data={[]} height={160} showMetrics={false} />
+                <BacktestChart data={{ values: [] }} height={160} showMetrics={false} />
               </div>
 
               {/* Token List Editor */}
@@ -258,14 +271,16 @@ export const CreateETFFlow = () => {
                  </div>
               </div>
 
+              {/* ★修正: step === 'DEPLOY' の比較を isDeploying に変更 */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleDeploy}
+                disabled={isDeploying}
                 className="w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2"
                 style={{ backgroundColor: themeColor, boxShadow: `0 0 20px ${themeColor}40` }}
               >
-                {step === 'DEPLOY' ? (
+                {isDeploying ? (
                   <><Loader2 className="w-5 h-5 animate-spin"/> Deploying...</>
                 ) : (
                   <><Rocket className="w-5 h-5" /> Deploy ETF On-Chain</>
@@ -275,7 +290,22 @@ export const CreateETFFlow = () => {
           )}
 
           {/* =========================================================
-              STEP 4: SUCCESS
+              STEP 4: DEPLOY (Loading state)
+             ========================================================= */}
+          {step === 'DEPLOY' && (
+            <motion.div
+              key="deploy"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center min-h-[60vh]"
+            >
+              <Loader2 className="w-16 h-16 animate-spin text-purple-500 mb-4" />
+              <p className="text-white/50">Deploying to Solana...</p>
+            </motion.div>
+          )}
+
+          {/* =========================================================
+              STEP 5: SUCCESS
              ========================================================= */}
           {step === 'SUCCESS' && (
             <motion.div

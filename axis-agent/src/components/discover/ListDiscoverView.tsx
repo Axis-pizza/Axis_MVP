@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { PizzaChart } from '../common/PizzaChart';
-import { StrategyDetailModal } from '../common/StrategyDetailModal';
+import { StrategyDetailModal } from '.././common/StrategyDetailModal';
 
 // Strategy型（必要に応じてtypes.tsからインポートするか、ここで定義）
 export interface Strategy {

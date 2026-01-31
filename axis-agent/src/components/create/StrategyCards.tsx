@@ -156,7 +156,7 @@ export const StrategyCards = ({ strategies, selectedId, onSelect, onConfirm, onB
                                      <div className="flex -space-x-3">
                                          {topTokens.map((token, idx) => (
                                              <div key={idx} className="relative w-10 h-10 rounded-full border-2 border-[#121212] bg-[#121212] z-10 hover:z-20 hover:scale-110 transition-transform">
-                                                 <TokenImage src={token.logoURI} className="w-full h-full rounded-full" />
+                                                 <TokenImage src={token.logoURI} alt={token.symbol} className="w-full h-full rounded-full" />
                                              </div>
                                          ))}
                                          {otherCount > 0 && (

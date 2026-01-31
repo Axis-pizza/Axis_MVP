@@ -13,9 +13,10 @@ export interface TokenInfo {
 
 export interface TokenAllocation {
   symbol: string;
-  weight: number;
   address?: string;
-  token?: TokenInfo;
+  mint?: string;
+  weight: number;
+  logoURI?: string;
 }
 
 // 一覧と詳細で共通して使う型

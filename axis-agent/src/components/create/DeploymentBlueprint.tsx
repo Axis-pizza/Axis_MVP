@@ -97,7 +97,7 @@ export const DeploymentBlueprint = ({
             owner_pubkey: wallet.publicKey.toBase58(),
             name: strategyName,
             ticker: info?.symbol || 'ETF',
-            description: description,
+            description: config.description,
             type: 'BALANCED',
             tokens: tokens,
             config: {

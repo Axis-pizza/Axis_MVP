@@ -63,5 +63,12 @@
     "vite": "^6.4.1",
     "vite-plugin-node-polyfills": "^0.24.0",
     "wrangler": "^4.54.0"
-  }
+  },
+  
+    "pnpm": {
+      "overrides": {
+        "@solana/web3.js": "1.95.0"
+      }
+    }
+  
 }

@@ -21,14 +21,14 @@ export default function Home() {
   
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
 
-  const { isConnected, getBalance } = useWallet();
+  const { connected, publicKey } = useWallet();
   const [balance, setBalance] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isConnected) {
+    if (connected) {
       getBalance().then(setBalance);
     }
-  }, [isConnected, getBalance]);
+  }, [connected, getBalance]);
 
   const handleStrategySelect = (strategy: Strategy) => {
     setSelectedStrategy(strategy);
