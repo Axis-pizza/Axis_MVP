@@ -36,7 +36,7 @@ const CRITICAL_FALLBACK: JupiterToken[] = [
     decimals: 6, 
     name: "Nietzschean Penguin", 
     symbol: "PENGUIN", // 必要に応じて変更してください
-    logoURI: "https://images.pump.fun/coin-image/8Jx8AAHj86wbQgUTjGuj6GTTL5Ps3cqxKRTvpaJApump?variant=600x600&ipfs=bafybeieukfwe5dz5m7d7pocyogm2sd3bzr6ajxefav7mcvpbf53yl3cn6u&src=https%3A%2F%2Fipfs.io%2Fipfs%2Fbafybeieukfwe5dz5m7d7pocyogm2sd3bzr6ajxefav7mcvpbf53yl3cn6u", // 適切な画像のURLがあれば差し替えてください
+    logoURI: "https://ipfs.io/ipfs/bafybeieukfwe5dz5m7d7pocyogm2sd3bzr6ajxefav7mcvpbf53yl3cn6u", // 適切な画像のURLがあれば差し替えてください
     tags: ["meme", "pump"] 
   },
   { 
@@ -46,7 +46,7 @@ const CRITICAL_FALLBACK: JupiterToken[] = [
     decimals: 6, 
     name: "White Whale", 
     symbol: "WHITEWHALE", // 必要に応じて変更してください
-    logoURI: "https://images.pump.fun/coin-image/a3W4qutoEJA4232T2gwZUfgYJTetr96pU4SJMwppump?variant=600x600&ipfs=bafkreid36cgjpa6wm7rvczq2odx4i3y45cqj3nmq5fecxzsaetjumwxaqi&src=https%3A%2F%2Fipfs.io%2Fipfs%2Fbafkreid36cgjpa6wm7rvczq2odx4i3y45cqj3nmq5fecxzsaetjumwxaqi", // 適切な画像のURLがあれば差し替えてください
+    logoURI: "https://ipfs.io/ipfs/bafkreid36cgjpa6wm7rvczq2odx4i3y45cqj3nmq5fecxzsaetjumwxaqi", // 適切な画像のURLがあれば差し替えてください
     tags: ["meme", "pump"] 
   },
 ];
@@ -243,4 +243,7 @@ export const JupiterService = {
       }, {} as Record<string, number>);
     }
   },
+  getFallbackTokens: (): JupiterToken[] => {
+    return CRITICAL_FALLBACK;
+  }
 };
