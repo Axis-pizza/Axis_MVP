@@ -1,5 +1,3 @@
-import { Buffer } from 'node:buffer';
-globalThis.Buffer = Buffer;
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
@@ -12,6 +10,10 @@ import miscRoutes from './routes/misc';
 import kagemushaRoutes from './routes/kagemusha';
 import uploadRoutes from './routes/upload';
 import shareRoutes from './routes/share';
+
+// @ts-ignore
+import { EmailMessage } from "cloudflare:email";
+import { createMimeMessage } from "mimetext";
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -41,27 +43,113 @@ app.route('/', kagemushaRoutes);
 app.route('/upload', uploadRoutes);
 app.route('/share', shareRoutes);
 
-// ★追加: テスト用に手動でXP配布を実行する隠しルート
-app.post('/admin/run-daily-xp', async (c) => {
-  console.log("👉 Manual Trigger: Daily Holding XP");
-  await distributeHoldingXP(c.env);
-  return c.json({ success: true, message: "Daily XP Distribution Triggered" });
+app.post('/report', async (c) => {
+  try {
+   
+    const body = await c.req.json() as { user_tg: string; message: string; image?: string };
+
+    if (!body.user_tg || !body.message) {
+      return c.json({ success: false, error: 'Missing fields' }, 400);
+    }
+
+    console.log(`📨 Received Report from ${body.user_tg} (Has Image: ${!!body.image})`);
+
+  
+    const sent = await sendBugReportEmail(c.env, body);
+
+    if (sent) {
+      return c.json({ success: true, message: 'Report transmitted.' });
+    } else {
+      return c.json({ success: false, error: 'Failed to transmit signal.' }, 500);
+    }
+  } catch (e) {
+    console.error(e);
+    return c.json({ success: false, error: 'Invalid Request' }, 400);
+  }
 });
 
-// --- Export ---
-export default {
-  fetch: app.fetch,
-
-  // ★修正: ここで2つのジョブを同時に実行するように変更
-  async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
-    console.log("⏰ Cron Job Started: Daily Tasks...");
+async function sendBugReportEmail(
+  env: Bindings, 
+  data: { user_tg: string; message: string; image?: string } // imageを追加
+) {
+  const ADMIN_EMAIL = "yusukekikuta.05@gmail.com";
+  
+  try {
+    const msg = createMimeMessage();
     
-    ctx.waitUntil(Promise.all([
-      snapshotAllStrategies(env), // 既存: チャート用の価格保存
-      distributeHoldingXP(env)    // ★新規: 資産に応じたXP配布
-    ]));
+    msg.setSender({ name: "Axis", addr: "noreply@axis-protocol.xyz" });
+    msg.setRecipient(ADMIN_EMAIL);
+    msg.setSubject(`[SIGNAL] Report from ${data.user_tg}`);
+    
+    msg.addMessage({
+      contentType: 'text/html',
+      data: `
+        <div style="font-family: 'Courier New', monospace; background-color: #050505; color: #e5e5e5; padding: 40px 20px;">
+          <div style="max-width: 600px; margin: 0 auto; border: 1px solid #333; border-radius: 4px; overflow: hidden;">
+            <div style="background-color: #111; padding: 15px 20px; border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between;">
+              <span style="color: #f97316; font-weight: bold; letter-spacing: 2px;">KAGEMUSHA // SIGNAL</span>
+              <span style="font-size: 12px; color: #666;">${new Date().toISOString()}</span>
+            </div>
+
+            <div style="padding: 30px;">
+              <div style="margin-bottom: 25px;">
+                <p style="margin: 0; color: #666; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">SOURCE ID</p>
+                <h2 style="margin: 5px 0; font-size: 24px; color: #fff;">${data.user_tg}</h2>
+              </div>
+              <hr style="border: 0; border-top: 1px dashed #333; margin: 20px 0;" />
+              <div>
+                <p style="margin: 0 0 10px 0; color: #666; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">DECODED MESSAGE</p>
+                <div style="background-color: #000; padding: 15px; border-left: 3px solid #f97316; color: #ddd; white-space: pre-wrap; line-height: 1.6;">${data.message}</div>
+              </div>
+              
+              ${data.image ? '<p style="margin-top:20px; color:#666; font-size:10px;">* SCREENSHOT ATTACHED</p>' : ''}
+            </div>
+
+            <div style="background-color: #111; padding: 15px; text-align: center; border-top: 1px solid #333;">
+              <p style="margin: 0; color: #444; font-size: 10px;">SECURE TRANSMISSION // AXIS PROTOCOL</p>
+            </div>
+          </div>
+        </div>
+      `
+    });
+
+    // ★★★ ここが重要: 画像があれば添付する ★★★
+    if (data.image) {
+      // フロントから来るデータ形式: "data:image/png;base64,iVBORw0KGgoAAA..."
+      // ここからヘッダーとデータを分離する必要があります
+      const matches = data.image.match(/^data:(.+);base64,(.+)$/);
+      
+      if (matches && matches.length === 3) {
+        const contentType = matches[1]; // 例: "image/png"
+        const base64Data = matches[2];  // 例: "iVBORw0..." (純粋なデータ)
+        const extension = contentType.split('/')[1] || 'png';
+
+        msg.addAttachment({
+          filename: `screenshot.${extension}`,
+          contentType: contentType,
+          data: base64Data,
+          transferEncoding: 'base64' // 明示的に指定
+        });
+      }
+    }
+
+    const message = new EmailMessage(
+      "noreply@axis-protocol.xyz",
+      ADMIN_EMAIL,
+      msg.asRaw()
+    );
+
+    // @ts-ignore
+    await env.EMAIL.send(message);
+    
+    console.log(`✅ Email sent to ${ADMIN_EMAIL}`);
+    return true;
+
+  } catch (error) {
+    console.error('❌ Error sending email:', error);
+    return false;
   }
-};
+}
 
 
 // --- Helper 1: 全戦略の価格を保存するロジック (既存のまま) ---
@@ -230,3 +318,18 @@ async function distributeHoldingXP(env: Bindings) {
     console.error("❌ Cron Job Failed (XP):", e);
   }
 }
+
+export default {
+  
+  fetch: app.fetch,
+
+  // Cron Job (定期実行) のハンドラー
+  async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
+    console.log("⏰ Cron Job Started: Daily Tasks...");
+    
+    ctx.waitUntil(Promise.all([
+      snapshotAllStrategies(env), // 価格保存
+      distributeHoldingXP(env)    // XP配布
+    ]));
+  }
+};

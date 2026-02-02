@@ -1,39 +1,26 @@
-/**
- * Wallet Hook - Enhanced wallet utilities for Kagemusha
- */
+// src/hooks/useWallet.ts
+import { 
+  useConnection as useSolanaConnection, 
+  useWallet as useSolanaWallet,
+} from '@solana/wallet-adapter-react';
+import type { WalletContextState as SolanaWalletContextState } from '@solana/wallet-adapter-react';  // ★ type を分離
 
-import { useWallet as useSolanaWallet, useConnection } from '@solana/wallet-adapter-react';
-import { useCallback, useMemo } from 'react';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+export type WalletContextState = SolanaWalletContextState & {
+  ready: boolean;
+  authenticated: boolean;
+};
 
-export const useWallet = () => {
-  const { connection } = useConnection();
+export function useConnection() {
+  const { connection } = useSolanaConnection();
+  return { connection };
+}
+
+export function useWallet(): WalletContextState {
   const wallet = useSolanaWallet();
-
-  const shortAddress = useMemo(() => {
-    if (!wallet.publicKey) return null;
-    const addr = wallet.publicKey.toBase58();
-    return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
-  }, [wallet.publicKey]);
-
-  const getBalance = useCallback(async (): Promise<number | null> => {
-    if (!wallet.publicKey) return null;
-    try {
-      const balance = await connection.getBalance(wallet.publicKey);
-      return balance / LAMPORTS_PER_SOL;
-    } catch (e) {
-      console.error('Failed to fetch balance:', e);
-      return null;
-    }
-  }, [connection, wallet.publicKey]);
-
-  const isConnected = wallet.connected && wallet.publicKey !== null;
-
+  
   return {
     ...wallet,
-    shortAddress,
-    getBalance,
-    isConnected,
-    publicKeyString: wallet.publicKey?.toBase58() || null,
+    ready: !wallet.connecting,
+    authenticated: wallet.connected,
   };
-};
+}

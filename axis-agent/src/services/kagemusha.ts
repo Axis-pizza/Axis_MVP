@@ -1,35 +1,86 @@
-/**
- * Kagemusha Smart Contract Services
- * Handles all blockchain interactions for strategy vault deployment
- */
-
 import { 
   Connection, 
   PublicKey, 
-  SystemProgram,
+  SystemProgram, 
   Transaction,
-  TransactionInstruction,
-  LAMPORTS_PER_SOL,
-  SendTransactionError,
+  LAMPORTS_PER_SOL 
 } from '@solana/web3.js';
-import type { GetProgramAccountsFilter } from '@solana/web3.js';
-import { BN } from '@coral-xyz/anchor';
-import type { WalletContextState } from '@solana/wallet-adapter-react';
+import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
+import type { Idl } from '@coral-xyz/anchor';
+import type { TokenAllocation } from '../types';
 
-// Program ID deployed to devnet
 const PROGRAM_ID = new PublicKey('2kdDnjHHLmHex8v5pk8XgB7ddFeiuBW4Yp5Ykx8JmBLd');
 
-// Account discriminator for StrategyVault (first 8 bytes of Anchor account)
-const STRATEGY_VAULT_DISCRIMINATOR = [159, 204, 238, 219, 38, 201, 136, 177];
-
-// Known token symbols (for displaying composition)
-const TOKEN_SYMBOLS = ['SOL', 'BTC', 'ETH', 'USDC', 'JUP', 'BONK', 'WIF', 'JTO', 'PYTH', 'RAY'];
+const IDL_JSON = {
+  version: "0.1.0",
+  name: "kagemusha",
+  instructions: [
+      {
+          name: "initializeStrategy",
+          accounts: [
+              { name: "strategy", isMut: true, isSigner: false },
+              { name: "owner", isMut: true, isSigner: true },
+              { name: "systemProgram", isMut: false, isSigner: false }
+          ],
+          args: [
+              { name: "name", type: "string" },
+              { name: "strategyType", type: "u8" },
+              { name: "targetWeights", type: { vec: "u16" } }
+          ]
+      },
+      {
+          name: "depositSol",
+          accounts: [
+              { name: "strategy", isMut: true, isSigner: false },
+              { name: "position", isMut: true, isSigner: false },
+              { name: "user", isMut: true, isSigner: true },
+              { name: "vaultSol", isMut: true, isSigner: false },
+              { name: "systemProgram", isMut: false, isSigner: false }
+          ],
+          args: [
+              { name: "amount", type: "u64" }
+          ]
+      },
+      // ★追加: withdrawの定義 (仮)
+      {
+          name: "withdrawSol",
+          accounts: [
+              { name: "strategy", isMut: true, isSigner: false },
+              { name: "position", isMut: true, isSigner: false },
+              { name: "user", isMut: true, isSigner: true },
+              { name: "vaultSol", isMut: true, isSigner: false },
+              { name: "systemProgram", isMut: false, isSigner: false }
+          ],
+          args: [
+              { name: "amount", type: "u64" }
+          ]
+      }
+  ],
+  accounts: [
+      {
+          name: "Strategy",
+          type: {
+              kind: "struct",
+              fields: [
+                  { name: "owner", type: "publicKey" },
+                  { name: "name", type: "string" },
+                  { name: "strategyType", type: "u8" },
+                  { name: "targetWeights", type: { vec: "u16" } },
+                  { name: "numTokens", type: "u8" },
+                  { name: "isActive", type: "bool" },
+                  { name: "tvl", type: "u64" },
+                  { name: "feesCollected", type: "u64" },
+                  { name: "lastRebalance", type: "i64" }
+              ]
+          }
+      }
+  ]
+};
 
 export interface StrategyParams {
   name: string;
-  strategyType: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
-  tokens: Array<{ symbol: string; weight: number; address: string }>;
-  initialInvestment: number;
+  strategyType: number; 
+  tokens: Array<{ symbol: string; weight: number }>;
 }
 
 export interface OnChainStrategy {
@@ -37,530 +88,186 @@ export interface OnChainStrategy {
   owner: string;
   name: string;
   strategyType: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
-  tokens: Array<{ symbol: string; weight: number }>;
-  numTokens: number;
+  tvl: number;
   isActive: boolean;
-  tvl: number; // in SOL
-  feesCollected: number;
-  lastRebalance: Date | null;
-  pnl: number;
-  pnlPercent: number;
+  tokens?: TokenAllocation[];
+  ticker?: string;
+  pnl?: number;
+  pnlPercent?: number;
+  lastRebalance?: number;
 }
 
-export interface UserPosition {
-  vault: string;
-  user: string;
-  lpShares: number;
-  depositTime: Date;
-  entryValue: number;
-}
+type WalletInterface = {
+    publicKey: PublicKey | null;
+    signTransaction?: (transaction: Transaction) => Promise<Transaction>;
+    [key: string]: any; 
+};
 
-/**
- * Map strategy type to on-chain enum
- */
-function getStrategyTypeIndex(type: string): number {
-  switch (type) {
-    case 'AGGRESSIVE': return 0;
-    case 'BALANCED': return 1;
-    case 'CONSERVATIVE': return 2;
-    default: return 1;
+export const KagemushaService = {
+  getProgram: (connection: Connection, wallet: any) => {
+      const provider = new AnchorProvider(connection, wallet, { preflightCommitment: 'confirmed' });
+      return new Program(IDL_JSON as any as Idl, PROGRAM_ID, provider);
+  },
+
+  initializeStrategy: async (connection: Connection, wallet: WalletInterface, params: StrategyParams) => {
+      if (!wallet.publicKey || !wallet.signTransaction) throw new Error("Wallet not connected");
+      
+      const program = KagemushaService.getProgram(connection, wallet);
+      const [strategyPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("strategy"), wallet.publicKey.toBuffer(), Buffer.from(params.name)],
+          PROGRAM_ID
+      );
+
+      const targetWeights = new Array(10).fill(0);
+      params.tokens.forEach((t, i) => { if (i < 10) targetWeights[i] = Math.floor(t.weight * 100); });
+      
+      const sum = targetWeights.reduce((a, b) => a + b, 0);
+      if (sum !== 10000 && params.tokens.length > 0) targetWeights[0] += (10000 - sum);
+
+      const tx = await program.methods
+          .initializeStrategy(params.name, params.strategyType, targetWeights)
+          .accounts({ strategy: strategyPda, owner: wallet.publicKey, systemProgram: SystemProgram.programId })
+          .transaction();
+          
+      tx.feePayer = wallet.publicKey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      const signedTx = await wallet.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      return { signature, strategyPubkey: strategyPda };
+  },
+
+  depositSol: async (connection: Connection, wallet: WalletInterface, strategyPubkey: PublicKey, amountSol: number) => {
+      if (!wallet.publicKey || !wallet.signTransaction) throw new Error("Wallet not connected");
+
+      const program = KagemushaService.getProgram(connection, wallet);
+      const amountLamports = new BN(amountSol * LAMPORTS_PER_SOL);
+      
+      const [positionPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("position"), strategyPubkey.toBuffer(), wallet.publicKey.toBuffer()],
+          PROGRAM_ID
+      );
+      const [vaultSolPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("vault_sol"), strategyPubkey.toBuffer()],
+          PROGRAM_ID
+      );
+
+      const tx = await program.methods
+          .depositSol(amountLamports)
+          .accounts({ strategy: strategyPubkey, position: positionPda, user: wallet.publicKey, vaultSol: vaultSolPda, systemProgram: SystemProgram.programId })
+          .transaction();
+
+      tx.feePayer = wallet.publicKey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      const signedTx = await wallet.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      return signature;
   }
-}
+};
 
-/**
- * Map on-chain enum to strategy type string
- */
-function getStrategyTypeName(index: number): 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE' {
-  switch (index) {
-    case 0: return 'AGGRESSIVE';
-    case 1: return 'CONSERVATIVE';
-    case 2: return 'BALANCED';
-    default: return 'BALANCED';
-  }
-}
+// ★追加: withdraw 関数
+export async function withdraw(
+  connection: Connection,
+  wallet: WalletInterface,
+  strategyPubkey: PublicKey,
+  amountShares: number 
+) {
+  if (!wallet.publicKey || !wallet.signTransaction) throw new Error("Wallet not connected");
 
-/**
- * Parse StrategyVault account data
- */
-function parseStrategyVault(address: PublicKey, data: Buffer): OnChainStrategy | null {
+  // NOTE: MVPでは単純化のため withdrawSol を呼ぶか、まだ実装されていない場合はエラーにする
+  // ここでは depositSol と同様の構成で withdrawSol を呼び出すと仮定
+  const program = KagemushaService.getProgram(connection, wallet);
+  
+  // shares -> lamports の計算ロジックが必要だが、MVPでは 1 share = 1 lamport と仮定して通すか
+  // もしくは withdrawSol があればそれを呼ぶ
+  const amountLamports = new BN(amountShares * LAMPORTS_PER_SOL); 
+
+  const [positionPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("position"), strategyPubkey.toBuffer(), wallet.publicKey.toBuffer()],
+      PROGRAM_ID
+  );
+  const [vaultSolPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault_sol"), strategyPubkey.toBuffer()],
+      PROGRAM_ID
+  );
+
+  // IDLに withdrawSol があると仮定して呼び出す
   try {
-    // Check discriminator
-    const discriminator = Array.from(data.slice(0, 8));
-    if (!discriminator.every((v, i) => v === STRATEGY_VAULT_DISCRIMINATOR[i])) {
-      return null;
-    }
+      const tx = await program.methods
+      .withdrawSol(amountLamports)
+      .accounts({ 
+          strategy: strategyPubkey, 
+          position: positionPda, 
+          user: wallet.publicKey, 
+          vaultSol: vaultSolPda, 
+          systemProgram: SystemProgram.programId 
+      })
+      .transaction();
 
-    // Parse fields according to StrategyVault struct
-    let offset = 8;
-    
-    // owner: Pubkey (32 bytes)
-    const owner = new PublicKey(data.slice(offset, offset + 32));
-    offset += 32;
-    
-    // name: [u8; 32]
-    const nameBytes = data.slice(offset, offset + 32);
-    const nameEnd = nameBytes.indexOf(0);
-    const name = nameBytes.slice(0, nameEnd > 0 ? nameEnd : 32).toString('utf8').trim();
-    offset += 32;
-    
-    // strategy_type: u8
-    const strategyType = data[offset];
-    offset += 1;
-    
-    // target_weights: [u16; 10] (20 bytes)
-    const weights: number[] = [];
-    for (let i = 0; i < 10; i++) {
-      const weight = data.readUInt16LE(offset + i * 2);
-      weights.push(weight);
-    }
-    offset += 20;
-    
-    // num_tokens: u8
-    const numTokens = data[offset];
-    offset += 1;
-    
-    // is_active: bool
-    const isActive = data[offset] === 1;
-    offset += 1;
-    
-    // tvl: u64 (8 bytes)
-    const tvlLamports = data.readBigUInt64LE(offset);
-    const tvl = Number(tvlLamports) / LAMPORTS_PER_SOL;
-    offset += 8;
-    
-    // fees_collected: u64 (8 bytes)
-    const feesLamports = data.readBigUInt64LE(offset);
-    const feesCollected = Number(feesLamports) / LAMPORTS_PER_SOL;
-    offset += 8;
-    
-    // last_rebalance: i64 (8 bytes)
-    const lastRebalanceTs = Number(data.readBigInt64LE(offset));
-    const lastRebalance = lastRebalanceTs > 0 ? new Date(lastRebalanceTs * 1000) : null;
-    offset += 8;
-
-    // Convert weights to token allocations
-    const tokens: Array<{ symbol: string; weight: number }> = [];
-    for (let i = 0; i < numTokens && i < 10; i++) {
-      if (weights[i] > 0) {
-        tokens.push({
-          symbol: TOKEN_SYMBOLS[i] || `TOKEN${i}`,
-          weight: weights[i] / 100, // Convert from basis points to percentage
-        });
-      }
-    }
-
-    // Mock P&L for now (in production, calculate from price changes)
-    const pnl = Math.random() * 2 - 1; // -1 to +1 SOL
-    const pnlPercent = tvl > 0 ? (pnl / tvl) * 100 : 0;
-
-    return {
-      address: address.toString(),
-      owner: owner.toString(),
-      name,
-      strategyType: getStrategyTypeName(strategyType),
-      tokens,
-      numTokens,
-      isActive,
-      tvl,
-      feesCollected,
-      lastRebalance,
-      pnl,
-      pnlPercent,
-    };
-  } catch (error) {
-    console.error('Failed to parse strategy vault:', error);
-    return null;
+      tx.feePayer = wallet.publicKey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      const signedTx = await wallet.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(signature, 'confirmed');
+      return signature;
+  } catch (e) {
+      console.warn("Withdraw instruction might not be implemented in IDL yet", e);
+      throw new Error("Withdraw not implemented on-chain yet");
   }
 }
 
-/**
- * Fetch all strategies owned by a specific wallet
- */
 export async function getUserStrategies(
   connection: Connection,
   ownerPubkey: PublicKey
 ): Promise<OnChainStrategy[]> {
   try {
-    // Filter by owner (owner field starts at offset 8)
-    const filters: GetProgramAccountsFilter[] = [
-      { dataSize: 120 }, // StrategyVault size
-      { memcmp: { offset: 8, bytes: ownerPubkey.toBase58() } },
-    ];
+      const provider = new AnchorProvider(connection, { publicKey: ownerPubkey } as any, {});
+      const program = new Program(IDL_JSON as any as Idl, PROGRAM_ID, provider);
 
-    const accounts = await connection.getProgramAccounts(PROGRAM_ID, { filters });
-    
-    const strategies: OnChainStrategy[] = [];
-    for (const { pubkey, account } of accounts) {
-      const parsed = parseStrategyVault(pubkey, account.data as Buffer);
-      if (parsed) {
-        strategies.push(parsed);
-      }
-    }
+      const strategies = await program.account.strategy.all([
+          {
+              memcmp: {
+                  offset: 8, 
+                  bytes: ownerPubkey.toBase58()
+              }
+          }
+      ]);
 
-    return strategies;
+      return strategies.map(({ publicKey, account }: any) => ({
+          address: publicKey.toString(),
+          owner: account.owner.toString(),
+          name: account.name.toString().replace(/\0/g, ''),
+          strategyType: account.strategyType === 0 ? 'AGGRESSIVE' : account.strategyType === 2 ? 'BALANCED' : 'CONSERVATIVE',
+          tvl: Number(account.tvl) / LAMPORTS_PER_SOL,
+          isActive: account.isActive,
+          tokens: [] 
+      }));
+
   } catch (error) {
-    console.error('Failed to fetch user strategies:', error);
-    return [];
+      console.error('Failed to fetch user strategies:', error);
+      return [];
   }
 }
 
-/**
- * Fetch all public strategies (for discover page)
- */
-export async function getAllStrategies(
-  connection: Connection,
-  limit: number = 50
-): Promise<OnChainStrategy[]> {
+export async function getStrategyInfo(connection: Connection, strategyPubkey: PublicKey) {
   try {
-    const filters: GetProgramAccountsFilter[] = [
-      { dataSize: 120 }, // StrategyVault size
-    ];
-
-    const accounts = await connection.getProgramAccounts(PROGRAM_ID, { filters });
-    
-    const strategies: OnChainStrategy[] = [];
-    for (const { pubkey, account } of accounts) {
-      if (strategies.length >= limit) break;
+      const provider = new AnchorProvider(connection, {} as any, {});
+      const program = new Program(IDL_JSON as any as Idl, PROGRAM_ID, provider);
+      const account: any = await program.account.strategy.fetch(strategyPubkey);
       
-      const parsed = parseStrategyVault(pubkey, account.data as Buffer);
-      if (parsed && parsed.isActive) {
-        strategies.push(parsed);
-      }
-    }
-
-    // Sort by TVL descending
-    strategies.sort((a, b) => b.tvl - a.tvl);
-
-    return strategies;
-  } catch (error) {
-    console.error('Failed to fetch all strategies:', error);
-    return [];
-  }
-}
-
-/**
- * Get single strategy info
- */
-export async function getStrategyInfo(
-  connection: Connection,
-  strategyPubkey: PublicKey
-): Promise<OnChainStrategy | null> {
-  try {
-    const account = await connection.getAccountInfo(strategyPubkey);
-    if (!account) {
-      return null;
-    }
-
-    return parseStrategyVault(strategyPubkey, account.data as Buffer);
-  } catch (error) {
-    console.error('Failed to get strategy info:', error);
-    return null;
-  }
-}
-
-/**
- * Initialize a new strategy vault on-chain
- */
-export async function initializeStrategy(
-  connection: Connection,
-  wallet: WalletContextState,
-  params: StrategyParams
-): Promise<{ signature: string; strategyPubkey: PublicKey }> {
-  if (!wallet.publicKey || !wallet.signTransaction) {
-    throw new Error('Wallet not connected');
-  }
-
-  try {
-    const [strategyPda] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('strategy'),
-        wallet.publicKey.toBuffer(),
-        Buffer.from(params.name.slice(0, 32))
-      ],
-      PROGRAM_ID
-    );
-
-    const targetWeights = params.tokens.map(t => t.weight * 100);
-
-    const nameBytes = Buffer.from(params.name.padEnd(32, '\0').slice(0, 32));
-    const strategyType = getStrategyTypeIndex(params.strategyType);
-    
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: strategyPda, isSigner: false, isWritable: true },
-        { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      programId: PROGRAM_ID,
-      data: Buffer.concat([
-        Buffer.from([0]),
-        nameBytes,
-        Buffer.from([strategyType]),
-        Buffer.from(new Uint16Array(targetWeights).buffer),
-      ])
-    });
-
-    const transaction = new Transaction().add(instruction);
-    transaction.feePayer = wallet.publicKey;
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-    const signed = await wallet.signTransaction(transaction);
-    const signature = await connection.sendRawTransaction(signed.serialize());
-    
-    await connection.confirmTransaction(signature, 'confirmed');
-
-    console.log(`✅ Strategy initialized: ${strategyPda.toString()}`);
-
-    return {
-      signature,
-      strategyPubkey: strategyPda
-    };
-  } catch (error) {
-    if (error instanceof SendTransactionError) {
-      console.error('Transaction failed:Stragety initialization failed');
-      console.error('Logs:', await error.getLogs(connection));
-    }
-    console.error('Failed to initialize strategy:', error);
-    throw error;
-  }
-}
-
-/**
- * Deposit SOL into an existing strategy using deposit_sol instruction
- */
-export async function deposit(
-  connection: Connection,
-  wallet: WalletContextState,
-  strategyPubkey: PublicKey,
-  amount: number
-): Promise<string> {
-  if (!wallet.publicKey || !wallet.signTransaction) {
-    throw new Error('Wallet not connected');
-  }
-
-  try {
-    const amountLamports = new BN(amount * LAMPORTS_PER_SOL);
-
-    // Derive position PDA
-    const [positionPda] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('position'),
-        strategyPubkey.toBuffer(),
-        wallet.publicKey.toBuffer()
-      ],
-      PROGRAM_ID
-    );
-
-    // Derive vault_sol PDA
-    const [vaultSolPda] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('vault_sol'),
-        strategyPubkey.toBuffer()
-      ],
-      PROGRAM_ID
-    );
-
-    // Build Anchor instruction discriminator for deposit_sol
-    // From IDL: [108, 81, 78, 117, 125, 155, 56, 200]
-    const depositSolDiscriminator = Buffer.from([
-      108, 81, 78, 117, 125, 155, 56, 200
-    ]);
-
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: strategyPubkey, isSigner: false, isWritable: true },
-        { pubkey: positionPda, isSigner: false, isWritable: true },
-        { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-        { pubkey: vaultSolPda, isSigner: false, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      programId: PROGRAM_ID,
-      data: Buffer.concat([
-        depositSolDiscriminator,
-        amountLamports.toArrayLike(Buffer, 'le', 8)
-      ])
-    });
-
-    const transaction = new Transaction().add(instruction);
-    transaction.feePayer = wallet.publicKey;
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-    const signed = await wallet.signTransaction(transaction);
-    const signature = await connection.sendRawTransaction(signed.serialize());
-    
-    await connection.confirmTransaction(signature, 'confirmed');
-
-    console.log(`✅ Deposited ${amount} SOL`);
-
-    return signature;
-  } catch (error) {
-    if (error instanceof SendTransactionError) {
-      console.error('Transaction failed: Deposit failed');
-      console.error('Logs:', await error.getLogs(connection));
-    }
-    console.error('Failed to deposit:', error);
-    throw error;
-  }
-}
-
-/**
- * Send transaction via Jito for MEV protection
- */
-export async function sendViaJito(
-  transaction: Transaction,
-  connection: Connection
-): Promise<string> {
-  const JITO_URL = 'https://mainnet.block-engine.jito.wtf/api/v1/transactions';
-  
-  try {
-    const serialized = transaction.serialize();
-    const response = await fetch(JITO_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'sendTransaction',
-        params: [serialized.toString('base64')]
-      })
-    });
-
-    const result = await response.json();
-    return result.result || result.signature;
+      return {
+          address: strategyPubkey.toString(),
+          owner: account.owner.toString(),
+          name: account.name.toString().replace(/\0/g, ''),
+          tvl: Number(account.tvl) / LAMPORTS_PER_SOL,
+          isActive: account.isActive,
+          // ★修正: トークン情報を追加（空配列で埋める）
+          tokens: [] 
+      };
   } catch {
-    console.warn('Jito send failed, falling back to regular RPC');
-    return await connection.sendRawTransaction(transaction.serialize());
+      return null;
   }
 }
-
-/**
- * Withdraw SOL from a strategy using withdraw_sol instruction
- */
-export async function withdraw(
-  connection: Connection,
-  wallet: WalletContextState,
-  strategyPubkey: PublicKey,
-  amountLamports: number
-): Promise<string> {
-  if (!wallet.publicKey || !wallet.signTransaction) {
-    throw new Error('Wallet not connected');
-  }
-
-  try {
-    const amount = new BN(amountLamports * LAMPORTS_PER_SOL);
-
-    // Derive position PDA
-    const [positionPda] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('position'),
-        strategyPubkey.toBuffer(),
-        wallet.publicKey.toBuffer()
-      ],
-      PROGRAM_ID
-    );
-
-    // Derive vault_sol PDA
-    const [vaultSolPda] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('vault_sol'),
-        strategyPubkey.toBuffer()
-      ],
-      PROGRAM_ID
-    );
-
-    // Build Anchor instruction discriminator for withdraw_sol
-    // From IDL: [145, 131, 74, 136, 65, 137, 42, 38]
-    const withdrawSolDiscriminator = Buffer.from([
-      145, 131, 74, 136, 65, 137, 42, 38
-    ]);
-
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: strategyPubkey, isSigner: false, isWritable: true },
-        { pubkey: positionPda, isSigner: false, isWritable: true },
-        { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-        { pubkey: vaultSolPda, isSigner: false, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      programId: PROGRAM_ID,
-      data: Buffer.concat([
-        withdrawSolDiscriminator,
-        amount.toArrayLike(Buffer, 'le', 8)
-      ])
-    });
-
-    const transaction = new Transaction().add(instruction);
-    transaction.feePayer = wallet.publicKey;
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-    const signed = await wallet.signTransaction(transaction);
-    const signature = await connection.sendRawTransaction(signed.serialize());
-    
-    await connection.confirmTransaction(signature, 'confirmed');
-
-    console.log(`✅ Withdrawn: ${amountLamports} SOL`);
-
-    return signature;
-  } catch (error) {
-    if (error instanceof SendTransactionError) {
-      console.error('Transaction failed: Withdraw failed');
-      console.error('Logs:', await error.getLogs(connection));
-    }
-    console.error('Failed to withdraw:', error);
-    throw error;
-  }
-}
-
-/**
- * Rebalance strategy with new weights/tokens
- * Note: Simpler implementation for MVP, in production this would involve swaps
- */
-export async function rebalance(
-  connection: Connection,
-  wallet: WalletContextState,
-  strategyPubkey: PublicKey,
-  newTokens: Array<{ symbol: string; weight: number }>
-): Promise<string> {
-  if (!wallet.publicKey || !wallet.signTransaction) {
-    throw new Error('Wallet not connected');
-  }
-
-  try {
-    const targetWeights = newTokens.map(t => t.weight * 100);
-    // Pad to 10 tokens
-    while (targetWeights.length < 10) targetWeights.push(0);
-
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: strategyPubkey, isSigner: false, isWritable: true },
-        { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-      ],
-      programId: PROGRAM_ID,
-      data: Buffer.concat([
-        Buffer.from([3]), // Instruction index 3 for Rebalance
-        Buffer.from(new Uint16Array(targetWeights).buffer),
-      ])
-    });
-
-    const transaction = new Transaction().add(instruction);
-    transaction.feePayer = wallet.publicKey;
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-    const signed = await wallet.signTransaction(transaction);
-    const signature = await connection.sendRawTransaction(signed.serialize());
-    
-    await connection.confirmTransaction(signature, 'confirmed');
-
-    console.log(`✅ Strategy rebalanced: ${strategyPubkey.toString()}`);
-
-    return signature;
-  } catch (error) {
-    if (error instanceof SendTransactionError) {
-      console.error('Transaction failed: Rebalance failed');
-      console.error('Logs:', await error.getLogs(connection));
-    }
-    console.error('Failed to rebalance:', error);
-    throw error;
-  }
-}
-

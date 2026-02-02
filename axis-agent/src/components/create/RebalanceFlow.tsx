@@ -10,7 +10,7 @@ import {
   Loader2, CheckCircle2, Sliders,
   Minus, Plus, Info, Zap
 } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet } from '../../hooks/useWallet';
 import { PizzaChart } from '../common/PizzaChart';
 
 interface TokenAllocation {

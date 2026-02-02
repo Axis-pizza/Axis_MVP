@@ -1,7 +1,7 @@
 /**
- * CoinGecko Token Service - Client-side token fetching
+ * CoinGecko Token Service
  * Fetches Solana ecosystem tokens directly from CoinGecko
- * Safe for client-side as it uses public API with generous rate limits
+ * Supports both Ranking List (Discovery) and Specific Mint Lookup (Tracking)
  */
 
 import type { TokenInfo } from '../types';
@@ -12,6 +12,13 @@ const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 let tokenCache: TokenInfo[] = [];
 let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cache for specific mint prices
+const priceCache: Record<string, { price: number; change24h: number; timestamp: number }> = {};
+const PRICE_CACHE_TTL = 60 * 1000; // 1 minute
+
+// ✅ 追加: Solanaアドレスのバリデーション用正規表現 (Base58, 32-44文字)
+const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 export interface CoinGeckoToken {
   id: string;
@@ -28,11 +35,9 @@ export interface CoinGeckoToken {
 }
 
 /**
- * Fetch top Solana ecosystem tokens from CoinGecko
- * Returns tokens sorted by market cap (only those with valid Solana addresses)
+ * 1. Fetch top Solana ecosystem tokens from CoinGecko (For Search/List)
  */
 export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInfo[]> {
-  // Return cache if fresh
   if (tokenCache.length > 0 && Date.now() - cacheTime < CACHE_TTL) {
     return tokenCache;
   }
@@ -52,13 +57,13 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
     
     const markets: CoinGeckoToken[] = await response.json();
     
-    // Map all tokens - use CoinGecko ID as address (actual contract address can be fetched on detail view)
     tokenCache = markets
-      .filter(m => m.id && m.symbol)
+      .filter(m => m.symbol) 
       .map(m => ({
         symbol: m.symbol.toUpperCase(),
         name: m.name,
-        address: m.id, // Use CoinGecko ID as identifier
+        // platforms.solanaがあればそれを優先、なければIDをフォールバックとして使う
+        address: m.platforms?.solana || m.id, 
         logoURI: m.image,
         price: m.current_price,
         priceFormatted: formatPrice(m.current_price),
@@ -66,8 +71,6 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
       }));
     
     cacheTime = Date.now();
-    console.log(`[CoinGecko] Fetched ${tokenCache.length} Solana ecosystem tokens`);
-    
     return tokenCache;
   } catch (error) {
     console.error('[CoinGecko] Failed to fetch tokens:', error);
@@ -76,7 +79,111 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
 }
 
 /**
- * Search tokens by query (symbol or name)
+ * 2. Get specific market data for Mint Addresses (For Portfolio/Strategy Tracking)
+ * Uses /simple/token_price which supports fetching by contract address
+ */
+export async function getMarketData(mints: string[]): Promise<Record<string, { price: number; change24h: number }>> {
+  if (!mints || mints.length === 0) return {};
+
+  // ✅ 修正: 厳格なバリデーション (undefined除外 + Base58チェック)
+  // これにより "USDC" や "undefined" などの不正な文字列がAPIに飛ぶのを防ぎ、400エラーを回避します。
+  const validMints = mints.filter(m => 
+    m && 
+    typeof m === 'string' && 
+    m.length >= 32 && 
+    SOLANA_ADDRESS_REGEX.test(m)
+  );
+
+  if (validMints.length === 0) return {};
+
+  const now = Date.now();
+  
+  // キャッシュチェック
+  const uncachedMints = validMints.filter(mint => {
+    const cached = priceCache[mint];
+    return !cached || (now - cached.timestamp > PRICE_CACHE_TTL);
+  });
+
+  if (uncachedMints.length === 0) {
+    const result: Record<string, { price: number; change24h: number }> = {};
+    validMints.forEach(mint => {
+      if (priceCache[mint]) {
+        result[mint] = { 
+          price: priceCache[mint].price, 
+          change24h: priceCache[mint].change24h 
+        };
+      }
+    });
+    return result;
+  }
+
+  // APIコール (チャンク分割)
+  const chunks = chunkArray(uncachedMints, 10); 
+  const fetchPromises = chunks.map(async (chunk) => {
+    try {
+      const ids = chunk.join(',');
+      // URL生成
+      const url = `${COINGECKO_API}/simple/token_price/solana?contract_addresses=${ids}&vs_currencies=usd&include_24hr_change=true`;
+      
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.warn(`CoinGecko Error (${res.status}). Skipping chunk.`);
+        return null;
+      }
+      return await res.json();
+    } catch (e) {
+      console.error("CoinGecko Batch Fetch Error:", e);
+      return null;
+    }
+  });
+
+  const results = await Promise.all(fetchPromises);
+
+  // キャッシュ更新
+  results.forEach(data => {
+    if (!data) return;
+    Object.entries(data).forEach(([mint, info]: [string, any]) => {
+      const price = info.usd;
+      const change = info.usd_24h_change;
+      
+      priceCache[mint] = {
+        price,
+        change24h: change,
+        timestamp: now
+      };
+    });
+  });
+
+  // 結果構築
+  const finalResult: Record<string, { price: number; change24h: number }> = {};
+  validMints.forEach(mint => {
+    const cached = priceCache[mint];
+    if (cached) {
+      finalResult[mint] = { price: cached.price, change24h: cached.change24h };
+    }
+  });
+
+  return finalResult;
+}
+
+// Helper: Array Chunking
+function chunkArray(array: string[], size: number) {
+  const result = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
+}
+
+// Helper: Price Formatter
+function formatPrice(price: number): string {
+  if (price >= 1) return `$${price.toFixed(2)}`;
+  if (price >= 0.01) return `$${price.toFixed(4)}`;
+  return `$${price.toFixed(6)}`;
+}
+
+/**
+ * Search tokens by query
  */
 export async function searchTokens(query: string, limit: number = 20): Promise<TokenInfo[]> {
   const tokens = await fetchSolanaTokens();
@@ -90,47 +197,24 @@ export async function searchTokens(query: string, limit: number = 20): Promise<T
     .slice(0, limit);
 }
 
-/**
- * Get token by ID (CoinGecko ID)
- */
 export async function getTokenById(id: string): Promise<TokenInfo | null> {
   const tokens = await fetchSolanaTokens();
   return tokens.find(t => t.address === id) ?? null;
 }
 
-/**
- * Get token by symbol
- */
 export async function getTokenBySymbol(symbol: string): Promise<TokenInfo | null> {
   const tokens = await fetchSolanaTokens();
   return tokens.find(t => t.symbol.toUpperCase() === symbol.toUpperCase()) ?? null;
 }
 
-/**
- * Get set of token addresses (for validation)
- */
-export async function getTokenAddressSet(): Promise<Set<string>> {
-  const tokens = await fetchSolanaTokens();
-  return new Set(tokens.map(t => t.address));
-}
-
-/**
- * Format price for display
- */
-function formatPrice(price: number): string {
-  if (price >= 1) {
-    return `$${price.toFixed(2)}`;
-  } else if (price >= 0.01) {
-    return `$${price.toFixed(4)}`;
-  } else {
-    return `$${price.toFixed(6)}`;
-  }
-}
-
-/**
- * Clear the token cache (useful for refresh)
- */
 export function clearTokenCache(): void {
   tokenCache = [];
   cacheTime = 0;
 }
+
+// Default Export
+export const CoinGeckoService = {
+  getMarketData,
+  fetchSolanaTokens,
+  searchTokens
+};

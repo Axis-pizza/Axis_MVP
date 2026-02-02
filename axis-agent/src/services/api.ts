@@ -205,11 +205,15 @@ export const api = {
   },
 
   // ★修正: リーダーボード取得
-  async getLeaderboard() {
-    const res = await fetch(`${API_BASE}/user/leaderboard`);
-    return await res.json();
+  async getLeaderboard(sort: 'points' | 'volume' | 'created' = 'points') {
+    try {
+      const res = await fetch(`${API_BASE}/leaderboard?sort=${sort}`);
+      return await res.json();
+    } catch (e) {
+      console.error("Leaderboard fetch error:", e);
+      return { success: false, leaderboard: [] };
+    }
   },
-
   async getSolPrice() {
     try {
       const res = await fetch(`${API_BASE}/price/sol`); 
@@ -293,11 +297,13 @@ export const api = {
 
   async requestFaucet(wallet: string) {
     try {
-      // エンドポイントは仮定。必要に応じてバックエンドに合わせてください
-      const res = await fetch(`${API_BASE}/faucet`, {
+      // ★修正: バックエンドの定義に合わせてエンドポイントとパラメータ名を変更
+      // Endpoint: /claim
+      // Body: { wallet_address: ... }
+      const res = await fetch(`${API_BASE}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wallet }),
+        body: JSON.stringify({ wallet_address: wallet }),
       });
       return await res.json();
     } catch (e) {

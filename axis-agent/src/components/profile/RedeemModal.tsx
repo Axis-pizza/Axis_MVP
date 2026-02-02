@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowDown, Loader2, AlertCircle } from 'lucide-react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet } from '../../hooks/useWallet';
 import { PublicKey } from '@solana/web3.js';
 import { withdraw } from '../../services/kagemusha';
 

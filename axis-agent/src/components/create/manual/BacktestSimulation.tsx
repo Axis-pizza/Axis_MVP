@@ -1,123 +1,234 @@
-// src/components/create/manual/BacktestSimulation.tsx
+import { useState } from 'react';
+import { Play, Loader2, AlertTriangle, Terminal } from 'lucide-react';
+import { RichChart } from '../../common/RichChart';
+import { GeckoTerminalService } from '../../../services/geckoterminal';
 
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { BrainCircuit, TrendingUp, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react'; // アイコン変更
-
-interface BacktestSimulationProps {
-  onBack: () => void;
-  onNext: () => void;
-  tokens: any[];
+interface TokenConfig {
+  symbol: string;
+  weight: number;
+  address?: string;
 }
 
-export const BacktestSimulation = ({ onBack, onNext, tokens }: BacktestSimulationProps) => {
-  const [phase, setPhase] = useState<'LOADING' | 'RESULT'>('LOADING');
-  const [loadingText, setLoadingText] = useState('Initializing AI Agent...');
-  
-  useEffect(() => {
-    if (phase === 'LOADING') {
-      const texts = [
-        "Analyzing historical volatility...",
-        "Simulating liquidity scenarios...",
-        "Optimizing rebalance triggers...",
-        "Stress testing portfolio...",
-        "Finalizing alpha report..."
-      ];
-      let i = 0;
-      const interval = setInterval(() => {
-        setLoadingText(texts[i]);
-        i++;
-        if (i >= texts.length) {
-          clearInterval(interval);
-          setTimeout(() => setPhase('RESULT'), 800);
-        }
-      }, 800);
-      return () => clearInterval(interval);
-    }
-  }, [phase]);
+interface BacktestSimulationProps {
+  tokens: TokenConfig[];
+}
 
-  const initialInvestment = 10000;
-  const finalValue = 24500;
-  const profit = finalValue - initialInvestment;
+const TerminalLog = ({ logs }: { logs: string[] }) => (
+  <div className="font-mono text-xs text-green-500/80 space-y-1 p-4 bg-black/50 rounded-lg border border-white/5 h-32 overflow-y-auto custom-scrollbar">
+    {logs.map((log, i) => (
+      <div key={i} className="flex items-center gap-2">
+        <span className="text-green-500/40">{'>'}</span>
+        <span>{log}</span>
+      </div>
+    ))}
+  </div>
+);
+
+export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
+  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [hasRun, setHasRun] = useState(false);
+  
+  const [stats, setStats] = useState({ 
+    totalReturn: 0, 
+    volatility: 0, 
+    sharpeRatio: 0,
+    maxDrawdown: 0 
+  });
+
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  const addLog = (msg: string) => setLogs(prev => [...prev, msg]);
+
+  const interpolateData = (data: any[], stepsPerDay: number = 4) => {
+    if (data.length < 2) return data;
+    const interpolated: any[] = [];
+    for (let i = 0; i < data.length - 1; i++) {
+      const current = data[i];
+      const next = data[i + 1];
+      const timeStep = (next.time - current.time) / stepsPerDay;
+      const valueStep = (next.value - current.value) / stepsPerDay;
+      
+      for (let j = 0; j < stepsPerDay; j++) {
+        interpolated.push({
+          time: current.time + (timeStep * j),
+          value: current.value + (valueStep * j),
+        });
+      }
+    }
+    interpolated.push(data[data.length - 1]);
+    return interpolated;
+  };
+
+  const runSimulation = async () => {
+    if (tokens.length === 0) return;
+    
+    setLoading(true);
+    setLogs(['INITIALIZING...']);
+    setError(null);
+    setHasRun(false);
+
+    try {
+      await new Promise(r => setTimeout(r, 300));
+      addLog(`FETCHING DATA FOR ${tokens.length} ASSETS...`);
+      
+      const historyPromises = tokens.map(async (token) => {
+        const address = token.address || SOL_MINT;
+        const data = await GeckoTerminalService.getOHLCV(address, 'day');
+        return { symbol: token.symbol, weight: token.weight, data };
+      });
+
+      const histories = await Promise.all(historyPromises);
+      const validHistories = histories.filter(h => h.data && h.data.length > 0);
+
+      if (validHistories.length === 0) throw new Error("NO DATA AVAILABLE");
+      
+      addLog("CALCULATING NAV...");
+      
+      const minLength = Math.min(...validHistories.map(h => h.data.length));
+      const limit = Math.min(minLength, 30); 
+      
+      const slicedHistories = validHistories.map(h => ({
+        ...h,
+        data: h.data.slice(-limit) 
+      }));
+
+      const basePrices = slicedHistories.map(h => h.data[0].close);
+      const totalWeight = tokens.reduce((sum, t) => sum + t.weight, 0);
+      const rawData: any[] = [];
+
+      let maxPeak = 0;
+      let maxDrawdown = 0;
+
+      for (let i = 0; i < limit; i++) {
+        const time = slicedHistories[0].data[i].time;
+        let portfolioValue = 0;
+
+        slicedHistories.forEach((h, idx) => {
+          const currentPrice = h.data[i].close;
+          const initialPrice = basePrices[idx];
+          const normalizedPrice = (currentPrice / initialPrice) * 100;
+          portfolioValue += (normalizedPrice * h.weight) / totalWeight;
+        });
+
+        if (portfolioValue > maxPeak) maxPeak = portfolioValue;
+        const currentDrawdown = ((maxPeak - portfolioValue) / maxPeak) * 100;
+        if (currentDrawdown > maxDrawdown) maxDrawdown = currentDrawdown;
+
+        rawData.push({
+          time,
+          value: portfolioValue,
+        });
+      }
+
+      const startVal = rawData[0].value;
+      const endVal = rawData[rawData.length - 1].value;
+      const totalReturn = ((endVal - startVal) / startVal) * 100;
+      
+      let sumVariance = 0;
+      for(let i = 1; i < rawData.length; i++) {
+          const ret = (rawData[i].value - rawData[i-1].value) / rawData[i-1].value;
+          sumVariance += Math.pow(ret, 2);
+      }
+      const dailyVol = Math.sqrt(sumVariance / (rawData.length - 1));
+      const annualizedVol = dailyVol * Math.sqrt(365) * 100;
+      const sharpe = annualizedVol !== 0 ? totalReturn / annualizedVol : 0;
+
+      setStats({
+        totalReturn,
+        volatility: annualizedVol,
+        sharpeRatio: sharpe,
+        maxDrawdown
+      });
+
+      const smoothData = interpolateData(rawData, 5);
+      setChartData(smoothData);
+      
+      addLog("COMPLETE.");
+      setHasRun(true);
+
+    } catch (e: any) {
+      console.error(e);
+      setError("SIMULATION FAILED");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-[500px] flex flex-col items-center justify-center animate-in fade-in duration-500">
+    <div className="bg-[#0C0A09] rounded-3xl border border-white/10 overflow-hidden flex flex-col h-full shadow-2xl relative group">
       
-      {phase === 'LOADING' ? (
-        <div className="text-center space-y-8 relative">
-          {/* 高級感あるローディング演出 */}
-          <div className="relative w-32 h-32 mx-auto">
-             {/* Outer Rings */}
-             <div className="absolute inset-0 border border-[#D97706]/20 rounded-full animate-[spin_10s_linear_infinite]" />
-             <div className="absolute inset-4 border border-[#D97706]/40 rounded-full animate-[spin_5s_linear_infinite_reverse]" />
-             
-             {/* Glowing Core */}
-             <div className="absolute inset-0 flex items-center justify-center">
-               <div className="relative">
-                 <div className="absolute inset-0 bg-[#D97706] blur-2xl opacity-20 animate-pulse" />
-                 <BrainCircuit className="w-12 h-12 text-[#D97706] relative z-10" />
-               </div>
-             </div>
-             
-             {/* Orbital Particles */}
-             <motion.div 
-               className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1.5 w-3 h-3 bg-[#D97706] rounded-full shadow-[0_0_10px_#D97706]"
-               animate={{ rotate: 360 }}
-               transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-               style={{ transformOrigin: "50% 64px" }}
-             />
+      {!hasRun && !loading && (
+        <div className="absolute inset-0 bg-[#0C0A09]/90 backdrop-blur-md z-20 flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-20 h-20 bg-[#D97706]/10 rounded-full flex items-center justify-center mb-6 border border-[#D97706]/30 shadow-[0_0_30px_rgba(217,119,6,0.2)]">
+            <Terminal className="w-10 h-10 text-[#D97706]" />
           </div>
-
-          <div>
-            <h3 className="text-2xl font-serif font-bold text-[#E7E5E4] mb-2 tracking-wide">AI Analysis</h3>
-            <p className="text-[#D97706] font-mono text-sm uppercase tracking-widest">{loadingText}</p>
-          </div>
-        </div>
-      ) : (
-        // RESULT VIEW (変更なし、以前のコードと同じ高品質なチャート)
-        <div className="w-full max-w-xl space-y-8">
-           {/* ... (以前のコードのResult部分と同様のため省略。BrainCircuitアイコン等は維持) ... */}
-           {/* 確認のため、ボタン部分のみ記載 */}
-           <div className="text-center">
-             <motion.div 
-               initial={{ scale: 0.8, opacity: 0 }}
-               animate={{ scale: 1, opacity: 1 }}
-               className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-[#D97706]/10 text-[#D97706] text-xs font-bold uppercase tracking-wider mb-4 border border-[#D97706]/20"
-             >
-               <Sparkles className="w-3 h-3" /> Simulation Complete
-             </motion.div>
-             <h2 className="text-3xl font-serif font-bold text-[#E7E5E4] mb-2">Excellent Potential</h2>
-           </div>
-
-           {/* ... Chart Card (省略) ... */}
-           {/* この部分は以前の回答と同じコードを使用してください。必要なら再掲します */}
-           <motion.div 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="bg-[#1C1917] rounded-3xl p-8 border border-[#D97706]/20 relative overflow-hidden"
+          <h3 className="text-2xl font-black text-white mb-2 font-mono tracking-tighter">
+            BACKTEST
+          </h3>
+          <p className="text-white/40 mb-8 max-w-xs text-sm font-mono">
+            Verify protocol performance against historical data.
+          </p>
+          <button
+            onClick={runSimulation}
+            disabled={tokens.length === 0}
+            className="px-8 py-4 bg-[#D97706] hover:bg-[#B45309] text-black font-black font-mono rounded-xl flex items-center gap-3 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-[#D97706]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="relative z-10 grid grid-cols-2 gap-8 items-end">
-              <div>
-                <p className="text-sm text-[#78716C] mb-1">Projected 1Y Value ($10k inv):</p>
-                <div className="text-5xl font-serif font-bold text-[#E7E5E4] mb-2">${finalValue.toLocaleString()}</div>
-                <div className="flex items-center gap-2 text-green-500 font-bold"><TrendingUp className="w-4 h-4" /><span>+145.0%</span></div>
-              </div>
-              <div className="h-24 flex items-end gap-1 opacity-80">
-                {[20, 35, 30, 45, 60, 55, 75, 70, 90, 85, 100].map((h, i) => (
-                  <motion.div key={i} initial={{ height: 0 }} animate={{ height: `${h}%` }} transition={{ delay: 0.4 + (i * 0.05), type: 'spring' }} className="flex-1 bg-gradient-to-t from-[#D97706]/20 to-[#D97706] rounded-t-sm" />
-                ))}
-              </div>
-            </div>
-          </motion.div>
-
-           <div className="flex gap-3 pt-4">
-             <button onClick={onBack} className="px-6 py-4 bg-[#1C1917] rounded-xl font-bold text-[#78716C] hover:text-[#E7E5E4]">Back</button>
-             <button onClick={onNext} className="flex-1 py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] text-[#0C0A09] font-bold rounded-xl shadow-lg hover:scale-[1.01] transition-all">Proceed to Blueprint</button>
-           </div>
+            <Play className="w-5 h-5 fill-current" />
+            RUN SIMULATION
+          </button>
         </div>
       )}
+
+      <div className="flex-1 relative bg-gradient-to-b from-black to-[#141210]">
+        
+        {loading && (
+          <div className="absolute inset-0 flex flex-col justify-center items-center z-10 bg-black/80 p-6">
+            <Loader2 className="w-12 h-12 text-[#D97706] animate-spin mb-6" />
+            <div className="w-full max-w-md">
+                <TerminalLog logs={logs} />
+            </div>
+          </div>
+        )}
+
+        <div className="absolute inset-0 p-4 pb-0 flex flex-col">
+           {hasRun && !loading && (
+              <div className="mb-4 pl-2 font-mono z-10">
+                 <div className="text-[10px] text-white/40 mb-1">TOTAL RETURN</div>
+                 <div className={`text-4xl font-black tracking-tighter ${stats.totalReturn >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                    {stats.totalReturn > 0 ? '+' : ''}{stats.totalReturn.toFixed(2)}%
+                 </div>
+              </div>
+           )}
+
+           <div className="flex-1 w-full relative opacity-90">
+             {hasRun && !loading && (
+               <RichChart 
+                 data={chartData} 
+                 // ★修正: type="area" を削除
+                 height={260}
+                 isPositive={stats.totalReturn >= 0}
+                 // ...
+               />
+             )}
+           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-px bg-white/5 border-t border-white/5">
+        <StatBox label="VOLATILITY" value={`${stats.volatility.toFixed(1)}%`} dim={!hasRun} />
+        <StatBox label="MAX DRAWDOWN" value={`-${stats.maxDrawdown.toFixed(2)}%`} dim={!hasRun} color="text-red-400" />
+        <StatBox label="SHARPE RATIO" value={stats.sharpeRatio.toFixed(2)} dim={!hasRun} color="text-[#D97706]" />
+      </div>
     </div>
   );
 };
+
+const StatBox = ({ label, value, dim, color = 'text-white' }: { label: string, value: string, dim?: boolean, color?: string }) => (
+  <div className={`p-3 text-center bg-[#0C0A09] transition-opacity duration-500 ${dim ? 'opacity-30' : 'opacity-100'}`}>
+    <p className="text-[8px] text-white/30 uppercase font-bold tracking-widest mb-1 font-mono">{label}</p>
+    <p className={`text-sm font-bold font-mono ${color}`}>{value}</p>
+  </div>
+);

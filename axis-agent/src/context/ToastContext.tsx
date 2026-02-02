@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion'; // ✅ 必須
 import { Toast } from '../components/common/Toast';
 
 type ToastType = 'success' | 'error' | 'info';
@@ -13,19 +14,31 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   const [toast, setToast] = useState<{ message: string; type: ToastType; id: number } | null>(null);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    setToast({ message, type, id: Date.now() });
+    const id = Date.now();
+    setToast({ message, type, id });
     
-    // 3秒後に消す
+    // ✅ IDを使って正確に3秒後に消す（上書きされた時に前のタイマーが新しいのを消さないように）
     setTimeout(() => {
-      setToast((current) => (current && current.message === message ? null : current));
+      setToast((current) => (current?.id === id ? null : current));
     }, 3000);
   }, []);
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      {/* ここにToastコンポーネントを配置 */}
-      {toast && <Toast message={toast.message} type={toast.type} key={toast.id} />}
+      
+      {/* ✅ 最前面(z-[9999])で AnimatePresence を発火させる */}
+      <div className="fixed top-0 left-0 right-0 z-[10000] pointer-events-none flex justify-center pt-6">
+        <AnimatePresence mode="wait">
+          {toast && (
+            <Toast 
+              key={toast.id} // keyが変わることでAnimatePresenceがリセットを検知
+              message={toast.message} 
+              type={toast.type} 
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </ToastContext.Provider>
   );
 };

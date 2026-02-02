@@ -22,16 +22,40 @@ app.post('/chat', async (c) => {
 // --- Faucet Claim ---
 app.post("/claim", async (c) => {
     const { wallet_address } = await c.req.json();
+    if (!wallet_address) return c.json({ error: "Wallet address required" }, 400);
+
     try {
+
+      const user = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
+      
+      if (user) {
+          const now = Math.floor(Date.now() / 1000);
+          
+          if (user.last_faucet_at && (now - user.last_faucet_at < 86400)) {
+              const nextTime = new Date((user.last_faucet_at + 86400) * 1000).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+              return c.json({ 
+                  success: false, 
+                  message: `⏳ Limit reached. Next claim: ${nextTime}` 
+              }, 429);
+          }
+      }
+
       const { signature, latestBlockhash, connection } = await SolanaService.claimFaucet(c.env.FAUCET_PRIVATE_KEY, wallet_address);
   
       c.executionCtx.waitUntil(
           SolanaService.confirmTransaction(connection, signature, latestBlockhash)
       );
       
-      return c.json({ success: true, signature, message: "Sent 1,000 USDC (Devnet)" });
+      if (user) {
+          await c.env.axis_db.prepare(
+              "UPDATE users SET last_faucet_at = ? WHERE wallet_address = ?"
+          ).bind(Math.floor(Date.now() / 1000), wallet_address).run();
+      }
+
+      return c.json({ success: true, signature, message: "💰 Sent 1,000 USDC (Devnet)" });
+
     } catch (e: any) {
-        console.error(e);
+        console.error("Faucet Error:", e);
         return c.json({ error: "Transfer failed: " + e.message }, 500);
     }
 });

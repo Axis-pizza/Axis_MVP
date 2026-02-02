@@ -103,3 +103,7 @@ CREATE TABLE watchlist (
   created_at INTEGER NOT NULL,
   PRIMARY KEY (user_pubkey, strategy_id)
 );
+-- =====================================================
+ALTER TABLE users ADD COLUMN pnl_percent REAL DEFAULT 0;       -- 損益率
+ALTER TABLE users ADD COLUMN total_invested_usd REAL DEFAULT 0; -- 総投資額 (Volume用)
+ALTER TABLE users ADD COLUMN strategies_count INTEGER DEFAULT 0; -- 作成した戦略数

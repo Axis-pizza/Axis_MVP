@@ -1,351 +1,338 @@
-/**
- * Create ETF Flow - Modern multi-step ETF creation
- */
-
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ArrowLeft, Rocket, CheckCircle2, Loader2 } from 'lucide-react';
-import { TokenSelector } from './TokenSelector';
-import { StrategyPreview } from './StrategyPreview';
-import { BacktestLoadingAnimation } from './BacktestLoadingAnimation';
+import { ArrowLeft, Rocket, CheckCircle2, Cpu, RefreshCw, Loader2 } from 'lucide-react';
+
+// コンポーネントのインポート
+import { TokenSelector } from './TokenSelector'; 
 import { BacktestChart } from '../common/BacktestChart';
-import { api } from '../../services/api';
-import type { TokenAllocation, Strategy, CreateStep } from '../../types';
-import { TacticalTerminal, TOPPINGS, type Topping } from './TacticalTerminal';
+import { TacticalTerminal } from './TacticalTerminal'; // ★ここ重要
+
+// 型定義など
+import type { TokenAllocation } from '../../types';
+
+type FlowStep = 'INPUT' | 'PROCESSING' | 'EDIT' | 'DEPLOY' | 'SUCCESS';
+
+// AI演出用ログ
+const AI_LOADING_LOGS = [
+  "Initializing quantum node connection...",
+  "Scanning Solana spl-token registry...",
+  "Filtering honey-pots and rug-pulls...",
+  "Analyzing on-chain volume velocity...",
+  "Calculating beta coefficients vs SOL...",
+  "Optimizing Sharpe ratio...",
+  "Allocating weights based on market cap...",
+  "Finalizing portfolio composition..."
+];
+
+// 戦略ごとの設定（色やラベルなど）
+const STRATEGY_META: Record<string, { label: string, color: string }> = {
+  bluechip: { label: 'Blue Chips', color: '#3B82F6' },
+  meme: { label: 'Meme Index', color: '#EC4899' },
+  defi: { label: 'DeFi 2.0', color: '#8B5CF6' },
+  infra: { label: 'L1 / Infra', color: '#10B981' },
+  gaming: { label: 'GameFi', color: '#F59E0B' },
+  aggr: { label: 'Aggressive', color: '#EF4444' },
+};
 
 export const CreateETFFlow = () => {
-  const [step, setStep] = useState<CreateStep>('SELECT');
-  const [directive, setDirective] = useState('');
-  const [selectedTokens, setSelectedTokens] = useState<TokenAllocation[]>([]);
-  const [strategies, setStrategies] = useState<Strategy[]>([]);
-  const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [deployStatus, setDeployStatus] = useState<'idle' | 'deploying' | 'success' | 'error'>('idle');
-  const [etfName, setEtfName] = useState('');
-  const [investmentAmount, setInvestmentAmount] = useState<number>(1.0);
-  const [themeColor, setThemeColor] = useState('#10B981'); // Default Emerald
+  const [step, setStep] = useState<FlowStep>('INPUT');
+  const [loadingLog, setLoadingLog] = useState<string[]>([]);
+  const [isDeploying, setIsDeploying] = useState(false);
   
-  // Persist custom toppings across steps
-  const [customToppings, setCustomToppings] = useState<Topping[]>([]);
-  const [selectedCustomTokens, setSelectedCustomTokens] = useState<Topping[]>([]);
+  // ETF State
+  const [etfName, setEtfName] = useState('');
+  const [selectedTokens, setSelectedTokens] = useState<TokenAllocation[]>([]);
+  const [investmentAmount, setInvestmentAmount] = useState<number>(1.0);
+  const [themeColor, setThemeColor] = useState('#10B981');
+  const [aiPrompt, setAiPrompt] = useState('');
 
-  // Auto-generate name from directive
-  useEffect(() => {
-    if (directive && !etfName) {
-      const words = directive.split(' ').slice(0, 2).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-      setEtfName(words.join('') + ' Index');
-    }
-  }, [directive]);
+  // ----------------------------------------------------------------
+  // 1. マニュアル（プリセットボタン）が押された時の処理
+  // ----------------------------------------------------------------
+  const handlePresetSelect = async (strategyId: string) => {
+    // IDに基づいてメタデータを取得（なければデフォルト）
+    const meta = STRATEGY_META[strategyId] || { label: 'Custom Strategy', color: '#10B981' };
 
-  const handleAnalyze = async (dir: string, tags: string[], allToppings: Topping[], customInput?: string) => {
-    setDirective(dir);
-    setLoading(true);
-    setStep('CUSTOMIZE');
-
-    // Set theme color based on first tag
-    if (tags.length > 0) {
-      const primaryTopping = TOPPINGS.find(t => t.id === tags[0]);
-      if (primaryTopping) setThemeColor(primaryTopping.color);
-    }
-
-    // Store selected custom tokens (those not in default TOPPINGS)
-    const customSelected = tags
-      .map(id => allToppings.find(t => t.id === id))
-      .filter((t): t is Topping => 
-        t !== undefined && !TOPPINGS.some(defaultT => defaultT.id === t.id)
-      );
-    setSelectedCustomTokens(customSelected);
+    setThemeColor(meta.color);
+    setEtfName(`${meta.label} ETF`);
     
+    // モックデータ：実際はAPIや定数から取得するトークンリスト
+    // ★修正: percentage → weight
+    const mockTokens: TokenAllocation[] = [
+      { symbol: 'SOL', address: 'So1...', weight: 40, logoURI: '' },
+      { symbol: 'JUP', address: 'Jup...', weight: 30, logoURI: '' },
+      { symbol: 'BONK', address: 'Bon...', weight: 30, logoURI: '' },
+    ];
+    
+    setSelectedTokens(mockTokens);
+    setStep('EDIT');
+  };
+
+  // ----------------------------------------------------------------
+  // 2. AIチャットが送信された時の処理
+  // ----------------------------------------------------------------
+  const handleAISubmit = async (promptText: string) => {
+    if (!promptText.trim()) return;
+    
+    setAiPrompt(promptText);
+    setStep('PROCESSING');
+    setThemeColor('#A855F7'); // AIカラー
+    setLoadingLog([]);
+
+    // 演出：ハッカー風ログ表示
+    for (let i = 0; i < AI_LOADING_LOGS.length; i++) {
+      await new Promise(r => setTimeout(r, 400 + Math.random() * 400));
+      setLoadingLog(prev => [...prev, AI_LOADING_LOGS[i]]);
+    }
+
     try {
-      const res = await api.analyze(dir, tags, customInput);
-      if (res.success && res.strategies) {
-        setStrategies(res.strategies);
-        // Auto-select first strategy
-        if (res.strategies.length > 0) {
-          setSelectedStrategy(res.strategies[0]);
-          setSelectedTokens(res.strategies[0].tokens);
-        }
-      }
-    } catch (e) {
-      console.error('Analysis failed:', e);
-    } finally {
-      setLoading(false);
+      // ここにAIのAPI処理が入る (今回はモック)
+      const aiGeneratedTokens: TokenAllocation[] = [
+        { symbol: 'WIF', address: '...', weight: 40, logoURI: '' },
+        { symbol: 'POPCAT', address: '...', weight: 30, logoURI: '' },
+        { symbol: 'MYRO', address: '...', weight: 30, logoURI: '' },
+      ];
+      
+      const suggestedName = promptText.split(' ').slice(0, 2).join(' ').toUpperCase() + " INDEX";
+      
+      setEtfName(suggestedName);
+      setSelectedTokens(aiGeneratedTokens);
+      setStep('EDIT');
+      
+    } catch (err) {
+      console.error(err);
+      setStep('INPUT');
     }
   };
 
-  const handleSelectStrategy = (strategy: Strategy) => {
-    setSelectedStrategy(strategy);
-    setSelectedTokens(strategy.tokens);
+  // ----------------------------------------------------------------
+  // 3. マニュアル作成ハンドラー（TacticalTerminal用）
+  // ----------------------------------------------------------------
+  const handleCreateManual = () => {
+    // マニュアル作成モードへ遷移
+    setEtfName('Custom ETF');
+    setSelectedTokens([]);
+    setStep('EDIT');
   };
 
   const handleDeploy = async () => {
-    setDeployStatus('deploying');
-    
-    try {
-      // In real implementation, this would:
-      // 1. Create transaction with wallet adapter
-      // 2. Send via Jito bundle
-      // 3. Include swap instructions for investmentAmount
-      await new Promise(r => setTimeout(r, 2000)); // Simulating
-      
-      const res = await api.deploy('placeholder_tx', {
-        name: etfName,
-        type: selectedStrategy?.type,
-        composition: selectedTokens,
-        creator: 'user_pubkey',
-        initialInvestment: investmentAmount
-      });
-
-      if (res.success) {
-        setDeployStatus('success');
-        setStep('DEPLOY');
-      } else {
-        setDeployStatus('error');
-      }
-    } catch (e) {
-      console.error('Deploy failed:', e);
-      setDeployStatus('error');
-    }
+    setIsDeploying(true);
+    setStep('DEPLOY');
+    // Deploy logic simulation
+    await new Promise(r => setTimeout(r, 2000));
+    setIsDeploying(false);
+    setStep('SUCCESS');
   };
 
+  // ----------------------------------------------------------------
+  // Render
+  // ----------------------------------------------------------------
+
   return (
-    <div className="min-h-screen bg-[#030303] text-white">
-      {/* Progress Bar */}
-      <div className="fixed top-0 left-0 right-0 h-1 bg-white/5 z-50">
-        <motion.div
-          className="h-full"
-          style={{ backgroundColor: themeColor }}
-          initial={{ width: '25%' }}
-          animate={{ 
-            width: step === 'SELECT' ? '25%' : step === 'CUSTOMIZE' ? '50%' : step === 'REVIEW' ? '75%' : '100%' 
-          }}
-        />
-      </div>
+    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-white/20">
+      
+      {/* Background Ambience */}
+      <div 
+        className="fixed inset-0 pointer-events-none opacity-20"
+        style={{
+          background: `radial-gradient(circle at 50% 10%, ${themeColor} 0%, transparent 40%)`
+        }}
+      />
 
-      <div className="max-w-lg mx-auto px-4 py-8 pb-32">
+      <div className="max-w-2xl mx-auto px-4 py-12 relative z-10">
+        
         <AnimatePresence mode="wait">
-          {/* Step 1: Tactical Terminal (Input) */}
-          {step === 'SELECT' && (
-            <motion.div
-              key="select"
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <TacticalTerminal 
-                onAnalyze={handleAnalyze} 
-                isLoading={loading}
-                customToppings={customToppings}
-                setCustomToppings={setCustomToppings}
-              />
-            </motion.div>
-          )}
+          
+          {/* =========================================================
+              STEP 1: INPUT (Tactical Terminal)
+             ========================================================= */}
+          {step === 'INPUT' && (
+              <motion.div
+                key="input"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
+              >
+                <TacticalTerminal 
+                  onSelectPreset={handlePresetSelect} 
+                  onAnalyze={handleAISubmit}
+                  onCreateManual={handleCreateManual}
+                  isLoading={false}
+                />
+              </motion.div>
+            )}
 
-          {/* Step 2: Strategy Selection & Customization */}
-          {step === 'CUSTOMIZE' && (
+          {/* =========================================================
+              STEP 2: PROCESSING (AI "Work" Animation)
+             ========================================================= */}
+          {step === 'PROCESSING' && (
             <motion.div
-              key="customize"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              key="processing"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
+              className="flex flex-col items-center justify-center min-h-[50vh] space-y-8"
             >
-              <button onClick={() => setStep('SELECT')} className="flex items-center gap-2 text-white/50 hover:text-white">
-                <ArrowLeft className="w-4 h-4" /> Back to Kitchen
-              </button>
-
-              <div>
-                <h2 className="text-xl font-bold mb-1">Choose Your Strategy</h2>
-                <p className="text-sm text-white/50">AI generated {strategies.length} strategies based on your thesis</p>
+              <div className="relative w-32 h-32">
+                <motion.div 
+                  className="absolute inset-0 border-4 border-t-purple-500 border-r-transparent border-b-transparent border-l-transparent rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                />
+                 <motion.div 
+                  className="absolute inset-2 border-4 border-t-transparent border-r-blue-500 border-b-transparent border-l-transparent rounded-full"
+                  animate={{ rotate: -180 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Cpu className="w-8 h-8 text-white/50" />
+                </div>
               </div>
 
-              {/* Display Selected Custom Tokens */}
-              {selectedCustomTokens.length > 0 && (
-                <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
-                  <p className="text-xs text-white/50 mb-3">Your Selected Tokens</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedCustomTokens.map(topping => (
-                      <div 
-                        key={topping.id}
-                        className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-lg border border-white/20"
-                      >
-                        {topping.image ? (
-                          <img src={topping.image} alt={topping.label} className="w-5 h-5 rounded-full" />
-                        ) : (
-                          <topping.Icon className="w-5 h-5 text-white/70" />
-                        )}
-                        <span className="text-sm font-medium">{topping.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Strategy Cards */}
-              {loading ? (
-                <BacktestLoadingAnimation />
-              ) : (
-                <div className="space-y-4">
-                  {strategies.map((strategy) => (
-                    <StrategyPreview
-                      key={strategy.id}
-                      strategy={strategy}
-                      selected={selectedStrategy?.id === strategy.id}
-                      onSelect={handleSelectStrategy}
-                      expanded={selectedStrategy?.id === strategy.id}
-                      themeColor={themeColor}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Continue Button */}
-              {selectedStrategy && (
-                <motion.button
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  onClick={() => setStep('REVIEW')}
-                  className="w-full py-4 text-black rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-colors"
-                  style={{ backgroundColor: themeColor }}
-                >
-                  Customize Portfolio <ArrowRight className="w-5 h-5" />
-                </motion.button>
-              )}
+              <div className="w-full max-w-md bg-black/40 border border-white/10 rounded-lg p-4 font-mono text-xs h-40 overflow-hidden flex flex-col justify-end">
+                {loadingLog.map((log, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-green-400/80 mb-1"
+                  >
+                    <span className="opacity-50 mr-2">{`>`}</span>
+                    {log}
+                  </motion.div>
+                ))}
+              </div>
             </motion.div>
           )}
 
-          {/* Step 3: Review & Fund */}
-          {step === 'REVIEW' && (
+          {/* =========================================================
+              STEP 3: EDIT (Unified Editor)
+             ========================================================= */}
+          {step === 'EDIT' && (
             <motion.div
-              key="review"
+              key="edit"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
               className="space-y-6"
             >
-              <button onClick={() => setStep('CUSTOMIZE')} className="flex items-center gap-2 text-white/50 hover:text-white">
-                <ArrowLeft className="w-4 h-4" /> Back to Strategies
-              </button>
+              <div className="flex items-center justify-between">
+                <button 
+                  onClick={() => setStep('INPUT')}
+                  className="flex items-center gap-2 text-white/50 hover:text-white transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Reset
+                </button>
+                <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-green-400">
+                  AI OPTIMIZED
+                </div>
+              </div>
 
-              {/* ETF Name */}
-              <div>
-                <label className="text-sm text-white/50 mb-2 block">ETF Name</label>
+              <div className="space-y-1">
                 <input
-                  type="text"
                   value={etfName}
                   onChange={(e) => setEtfName(e.target.value)}
-                  className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-xl font-bold focus:outline-none"
-                  style={{ borderColor: `${themeColor}40` }}
+                  className="text-3xl font-bold bg-transparent border-none focus:ring-0 p-0 w-full placeholder-white/20"
                 />
+                <p className="text-white/40 text-sm">Review composition and deploy.</p>
               </div>
 
-              {/* Investment Amount */}
-              <div className="p-5 bg-white/5 border border-white/10 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-white/70">Initial Investment</label>
-                  <span className="text-xs text-white/40">Balance: 12.5 SOL</span>
-                </div>
-                
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={investmentAmount}
-                    onChange={(e) => setInvestmentAmount(parseFloat(e.target.value) || 0)}
-                    min="0.1"
-                    step="0.1"
-                    className="w-full p-4 pr-16 bg-black/20 border border-white/10 rounded-xl text-2xl font-bold focus:outline-none focus:border-opacity-50 transition-colors"
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-                    <span className="font-bold text-sm">SOL</span>
-                    <div className="w-5 h-5 rounded-full bg-[#9945FF]" />
-                  </div>
-                </div>
-
-                <div className="text-xs text-white/40 flex justify-between px-1">
-                  <span>≈ ${(investmentAmount * 145).toFixed(2)} USD</span>
-                  <span>Min: 0.1 SOL</span>
-                </div>
+              {/* Backtest Preview Chart */}
+              {/* ★修正: data={[]} → data={{ values: [] }} */}
+              <div className="h-40 w-full bg-white/5 rounded-xl border border-white/10 overflow-hidden relative">
+                <BacktestChart data={{ values: [] }} height={160} showMetrics={false} />
               </div>
 
-              {/* Backtest Preview */}
-              {selectedStrategy?.backtest && (
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                  <BacktestChart data={selectedStrategy.backtest} height={160} showMetrics={true} />
-                </div>
-              )}
+              {/* Token List Editor */}
+              <div className="bg-[#0A0A0A] rounded-2xl border border-white/10 p-1">
+                 <div className="p-3 border-b border-white/10 flex justify-between items-center">
+                    <h3 className="font-semibold text-sm">Portfolio Composition</h3>
+                    <button className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> Rebalance
+                    </button>
+                 </div>
+                 <TokenSelector 
+                    selectedTokens={selectedTokens}
+                    onUpdate={setSelectedTokens}
+                 />
+              </div>
 
-              {/* Token Customization */}
-              <TokenSelector
-                selectedTokens={selectedTokens}
-                onUpdate={setSelectedTokens}
-              />
+              <div className="bg-white/5 rounded-2xl border border-white/10 p-4 flex items-center justify-between">
+                 <div>
+                    <label className="text-xs text-white/50 block mb-1">Initial Deposit</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" 
+                        value={investmentAmount}
+                        onChange={(e) => setInvestmentAmount(parseFloat(e.target.value))}
+                        className="bg-transparent text-xl font-bold w-24 focus:outline-none"
+                      />
+                      <span className="font-bold text-sm text-white/50">SOL</span>
+                    </div>
+                 </div>
+              </div>
 
-              {/* Deploy Button */}
-              <button
+              {/* ★修正: step === 'DEPLOY' の比較を isDeploying に変更 */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handleDeploy}
-                disabled={selectedTokens.length === 0 || deployStatus === 'deploying' || investmentAmount <= 0}
-                className="w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 disabled:opacity-50 hover:shadow-lg transition-all text-black"
-                style={{ backgroundColor: themeColor, boxShadow: `0 10px 30px -10px ${themeColor}40` }}
+                disabled={isDeploying}
+                className="w-full py-4 rounded-xl font-bold text-black flex items-center justify-center gap-2"
+                style={{ backgroundColor: themeColor, boxShadow: `0 0 20px ${themeColor}40` }}
               >
-                {deployStatus === 'deploying' ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Fund & Deploying...</>
+                {isDeploying ? (
+                  <><Loader2 className="w-5 h-5 animate-spin"/> Deploying...</>
                 ) : (
-                  <><Rocket className="w-5 h-5" /> Fund & Deploy {investmentAmount} SOL</>
+                  <><Rocket className="w-5 h-5" /> Deploy ETF On-Chain</>
                 )}
-              </button>
+              </motion.button>
             </motion.div>
           )}
 
-          {/* Step 4: Success */}
-          {step === 'DEPLOY' && deployStatus === 'success' && (
+          {/* =========================================================
+              STEP 4: DEPLOY (Loading state)
+             ========================================================= */}
+          {step === 'DEPLOY' && (
+            <motion.div
+              key="deploy"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center min-h-[60vh]"
+            >
+              <Loader2 className="w-16 h-16 animate-spin text-purple-500 mb-4" />
+              <p className="text-white/50">Deploying to Solana...</p>
+            </motion.div>
+          )}
+
+          {/* =========================================================
+              STEP 5: SUCCESS
+             ========================================================= */}
+          {step === 'SUCCESS' && (
             <motion.div
               key="success"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
               className="flex flex-col items-center justify-center min-h-[60vh] text-center"
             >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', delay: 0.2 }}
-                className="w-24 h-24 rounded-full flex items-center justify-center mb-8 shadow-lg"
-                style={{ backgroundColor: themeColor, boxShadow: `0 0 40px ${themeColor}60` }}
+              <div 
+                className="w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-lg"
+                style={{ backgroundColor: themeColor }}
               >
-                <CheckCircle2 className="w-12 h-12 text-black" />
-              </motion.div>
-
-              <h1 className="text-3xl font-bold mb-2">ETF Deployed & Funded! 🎉</h1>
-              <p className="text-white/50 mb-8">Your {etfName} is live with {investmentAmount} SOL liquidity</p>
-
-              <div className="w-full max-w-sm p-4 bg-white/5 rounded-2xl border border-white/10 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">Initial Value</span>
-                  <span className="font-medium" style={{ color: themeColor }}>{investmentAmount} SOL</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">Tokens</span>
-                  <span>{selectedTokens.length} assets</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">MEV Protection</span>
-                  <span style={{ color: themeColor }}>✓ Jito Bundle</span>
-                </div>
+                <CheckCircle2 className="w-10 h-10 text-black" />
               </div>
-
-              <button
-                onClick={() => {
-                  setStep('SELECT');
-                  setDirective('');
-                  setSelectedTokens([]);
-                  setSelectedStrategy(null);
-                  setDeployStatus('idle');
-                  setEtfName('');
-                  setInvestmentAmount(1.0);
-                }}
-                className="mt-8 px-6 py-3 bg-white/10 rounded-xl font-medium hover:bg-white/20 transition-colors"
+              <h2 className="text-2xl font-bold mb-2">{etfName} Deployed!</h2>
+              <p className="text-white/50 mb-8 max-w-xs mx-auto">
+                Your index is now live on Solana.
+              </p>
+              <button 
+                onClick={() => setStep('INPUT')}
+                className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
               >
-                Create Another ETF
+                Return to Dashboard
               </button>
             </motion.div>
           )}
+
         </AnimatePresence>
       </div>
     </div>

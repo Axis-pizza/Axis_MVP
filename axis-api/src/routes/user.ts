@@ -102,28 +102,36 @@ app.post('/request-invite', async (c) => {
   }
 });
 
-// --- Get User ---
 app.get('/user', async (c) => { 
   const wallet = c.req.query('wallet');
-  
-  if (!wallet) {
-    return c.json({ error: 'Wallet address required' }, 400);
-  }
+  if (!wallet) return c.json({ error: 'Wallet address required' }, 400);
 
   try {
     const user = await UserModel.findUserByWallet(c.env.axis_db, wallet);
-    if (!user) return c.json({}); 
+    
+    // ユーザーが存在しない場合はデフォルト値を返す（カードが壊れないように）
+    const userData = user || {
+      name: 'Anonymous',
+      bio: '',
+      avatar_url: '',
+      total_xp: 0,          // Points
+      rank_tier: 'Novice',  // Rank
+      pnl_percent: 0,       // PnL
+      total_invested_usd: 0
+    };
 
     return c.json({
-      username: user.name,
-      bio: user.bio,
-      pfpUrl: user.avatar_url,
-      badges: user.badges ? JSON.parse(user.badges) : [],
-      // ★追加
-      total_xp: user.total_xp || 500,
-      rank_tier: user.rank_tier || 'Novice',
-      pnl_percent: user.pnl_percent || 0,
-      total_invested: user.total_invested_usd || 0
+      success: true,
+      user: {
+        username: userData.name,
+        bio: userData.bio,
+        pfpUrl: userData.avatar_url,
+        // カード表示用数値
+        total_xp: userData.total_xp,
+        rank_tier: userData.rank_tier,
+        pnl_percent: userData.pnl_percent,
+        total_invested: userData.total_invested_usd
+      }
     });
 
   } catch (e: any) {
@@ -131,6 +139,7 @@ app.get('/user', async (c) => {
     return c.json({ error: e.message }, 500);
   }
 });
+
 
 // --- Update Profile ---
 app.post('/user', async (c) => { 
@@ -199,35 +208,48 @@ app.get('/my-invites', async (c) => {
 });
 
 
-
-
+// --- Get Leaderboard (ソート対応) ---
 app.get('/leaderboard', async (c) => {
   try {
-    // pnl_percent の高い順に上位50人を取得
+    // sort: points | volume | created
+    const sort = c.req.query('sort') || 'points'; 
+    const limit = 50;
+
+    let orderBy = 'total_xp DESC';
+    let valueColumn = 'total_xp';
+
+    if (sort === 'volume') {
+      orderBy = 'total_invested_usd DESC';
+      valueColumn = 'total_invested_usd';
+    } else if (sort === 'created') {
+      orderBy = 'strategies_count DESC';
+      valueColumn = 'strategies_count';
+    }
+
+    // 必要なカラムだけ取得
     const query = `
-      SELECT name, wallet_address, avatar_url, total_xp, rank_tier, pnl_percent 
+      SELECT wallet_address, name, avatar_url, rank_tier, ${valueColumn} as value
       FROM users 
-      ORDER BY pnl_percent DESC 
-      LIMIT 50
+      ORDER BY ${orderBy} 
+      LIMIT ?
     `;
-    const { results } = await c.env.axis_db.prepare(query).all();
+
+    const { results } = await c.env.axis_db.prepare(query).bind(limit).all();
 
     return c.json({ 
       success: true, 
       leaderboard: results.map((u: any) => ({
         pubkey: u.wallet_address,
-        username: u.name,
+        username: u.name || 'Anonymous',
         avatar_url: u.avatar_url,
         rank_tier: u.rank_tier,
-        total_xp: u.total_xp,
-        pnl_percent: u.pnl_percent || 0 // 追加: PnL
+        value: u.value || 0
       }))
     });
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500);
   }
 });
-
 // 2. 投資成績の同期 (Sync)
 app.post('/user/stats', async (c) => {
   try {
