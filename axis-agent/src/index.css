@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@import './mobile-styles.css';
+
 @theme {
   /* * 重要: ここでTailwindのデフォルトフォント(--font-sans)を
    * Times New Romanに強制的に書き換えます。
@@ -58,7 +60,13 @@ body {
   background: rgba(217, 119, 6, 0.3);
   border-radius: 4px;
 }
+.wallet-adapter-modal-wrapper {
+  z-index: 99999 !important;
+}
 
+.wallet-adapter-modal-overlay {
+  z-index: 99998 !important;
+}
 /* マットな磨りガラス */
 .glass {
   background: rgba(28, 25, 23, 0.7);

@@ -83,9 +83,9 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isWalletModalPending, setIsWalletModalPending] = useState(false);
   
-  // ★ Solana Wallet Adapter を使用
-  const { setVisible } = useWalletModal();
+  const { setVisible, visible: walletModalVisible } = useWalletModal();
   const { publicKey, disconnect, ready, connected } = useWallet();
 
   const resetUserData = useCallback(() => {
@@ -97,6 +97,8 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       resetUserData();
       return;
     }
+     
+    
     try {
       const res = await api.getUser(publicKey.toBase58());
       if (res.success || res.user) {
@@ -104,22 +106,35 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       }
     } catch (e) {
       console.error("Failed to fetch user", e);
+    } finally {
     }
   }, [publicKey, resetUserData]);
 
-  // ★修正: authenticated → connected
   useEffect(() => {
     if (!publicKey || !connected) {
       resetUserData();
     }
   }, [publicKey, connected, resetUserData]);
 
-  // ★修正: authenticated → connected
   useEffect(() => {
-    if (isOpen && publicKey && connected) {
+    if (publicKey && connected) {
       fetchUser();
     }
-  }, [isOpen, publicKey, connected, fetchUser]);
+  }, [publicKey, connected, fetchUser]);
+
+
+  useEffect(() => {
+    if (isOpen && publicKey && connected && !userData) {
+      fetchUser();
+    }
+  }, [isOpen, publicKey, connected, userData, fetchUser]);
+
+
+  useEffect(() => {
+    if (isWalletModalPending && !walletModalVisible) {
+      setIsWalletModalPending(false);
+    }
+  }, [walletModalVisible, isWalletModalPending]);
 
   const handleCheckIn = async () => {
     if (!publicKey) return;
@@ -172,13 +187,21 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     }
   };
 
-  // ★修正: Solana Wallet Adapter のモーダルを開く
+  // ★ 修正: Drawer を一時的に閉じてから Wallet Modal を開く
   const handleConnect = () => {
-    setVisible(true);
+    setIsWalletModalPending(true);
+    onClose(); // Drawer を閉じる
+    // 少し遅延させてから Wallet Modal を開く（アニメーション完了を待つ）
+    setTimeout(() => {
+      setVisible(true);
+    }, 150);
   };
 
-  // ★修正: connected を使用
   const showConnectView = !connected || !publicKey;
+
+  // Drawer の z-index を Wallet Modal より低くする
+  const drawerZIndex = walletModalVisible ? 'z-[100]' : 'z-[9999]';
+  const backdropZIndex = walletModalVisible ? 'z-[99]' : 'z-[9998]';
 
   return createPortal(
     <>
@@ -188,13 +211,13 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
             <motion.div 
               initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} 
               onClick={onClose} 
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998]" 
+              className={`fixed inset-0 bg-black/60 backdrop-blur-sm ${backdropZIndex}`}
             />
             
             <motion.div 
               initial={{x:'100%'}} animate={{x:0}} exit={{x:'100%'}} 
               transition={{type:'spring', damping:25, stiffness: 200}} 
-              className="fixed top-0 right-0 bottom-0 w-[90%] max-w-sm bg-[#0C0A09] border-l border-white/10 z-[9999] flex flex-col safe-area-top shadow-2xl"
+              className={`fixed top-0 right-0 bottom-0 w-[90%] max-w-sm bg-[#0C0A09] border-l border-white/10 ${drawerZIndex} flex flex-col safe-area-top shadow-2xl`}
             >
               
               <div className="flex justify-between items-center p-6 pb-2 shrink-0">
