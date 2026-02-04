@@ -2,19 +2,14 @@
  * API Service - Centralized API calls
  */
 
-// 環境変数からAPIのベースURLを取得
 const API_BASE = import.meta.env.VITE_API_URL || 'https://axis-api.yusukekikuta-05.workers.dev';
 
 export const api = {
-  /**
-   * 1. ユーザー情報取得 (GET /user?wallet=...)
-   * バックエンドの仕様に合わせてクエリパラメータ形式に統一
-   */
   getUser: async (pubkey: string) => {
     try {
-      // ローカルストレージの紹介コードがあれば付与
       const ref = localStorage.getItem('axis_referrer');
       let url = `${API_BASE}/user?wallet=${pubkey}`;
+
       if (ref && ref !== pubkey) {
         url += `&ref=${ref}`;
       }
@@ -22,25 +17,23 @@ export const api = {
       const res = await fetch(url);
       
       if (!res.ok) {
-        // 404などの場合は未登録(null)として返す
         return { success: false, user: null };
       }
       
       const data = await res.json();
       
-      // データが空の場合のチェック
       if (!data || Object.keys(data).length === 0) {
           return { success: false, user: null };
       }
 
-      // フロントエンド(username) と バックエンド(name) の違いを吸収
+     
       return {
         success: true,
         user: {
             ...data,
             pubkey: pubkey,
-            username: data.name || data.username, // nameがあればusernameとして扱う
-            avatar_url: data.pfpUrl || data.avatar_url, // 表記揺れ吸収
+            username: data.name || data.username,
+            avatar_url: data.pfpUrl || data.avatar_url,
             total_xp: data.total_xp || 0,
             rank_tier: data.rank_tier || 'Novice'
         }
@@ -51,17 +44,14 @@ export const api = {
     }
   },
 
-  /**
-   * 2. プロフィール更新 (POST /user)
-   * UI側の `username` をバックエンド側の `name` に変換して送信
-   */
+
   async updateProfile(data: { wallet_address: string; name?: string; username?: string; bio?: string; avatar_url?: string; pfpUrl?: string }) {
     try {
       const payload = {
         wallet_address: data.wallet_address,
-        name: data.username || data.name, // UIで入力された username を優先
+        name: data.username || data.name,
         bio: data.bio,
-        avatar_url: data.pfpUrl || data.avatar_url // pfpUrl を avatar_url として送信
+        avatar_url: data.pfpUrl || data.avatar_url
       };
 
       const res = await fetch(`${API_BASE}/user`, {
@@ -76,9 +66,6 @@ export const api = {
     }
   },
 
-  /**
-   * 3. 画像アップロード (ProfileEditModalで使用)
-   */
   async uploadProfileImage(file: File, walletAddress: string) {
     const formData = new FormData();
     formData.append('image', file);
@@ -97,9 +84,6 @@ export const api = {
     }
   },
 
-  /**
-   * 4. 招待コードリクエスト
-   */
   async requestInvite(email: string) {
     try {
       const res = await fetch(`${API_BASE}/request-invite`, {
@@ -113,9 +97,7 @@ export const api = {
     }
   },
 
-  /**
-   * 5. 新規登録
-   */
+
   async register(data: { email: string; wallet_address: string; invite_code_used: string; avatar_url?: string; name?: string; bio?: string }) {
     try {
       const res = await fetch(`${API_BASE}/register`, {
@@ -129,26 +111,17 @@ export const api = {
     }
   },
 
-  /**
-   * 6. 画像URLのプロキシ (R2キーをURLに変換)
-   */
+
   getProxyUrl(url: string | undefined | null) {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    if (url.startsWith('blob:')) return url; // プレビュー用
+    if (url.startsWith('blob:')) return url;
     if (url.startsWith('data:')) return url;
     
-    // R2 Keyだけの場合、API経由で表示
     return `${API_BASE}/upload/image/${url}`;
   },
 
-  // ------------------------------------------------
-  // 以下、既存機能 (変更なし)
-  // ------------------------------------------------
-
-  /**
-   * Generate AI strategies
-   */
+  
   async analyze(directive: string, tags: string[] = [], customInput?: string) {
     const res = await fetch(`${API_BASE}/analyze`, {
       method: 'POST',
@@ -173,7 +146,7 @@ export const api = {
   },
 
   async dailyCheckIn(pubkey: string) {
-    // URLをバックエンドのルート定義 (/users/:wallet/checkin) に合わせる
+   
     const url = `${API_BASE}/users/${pubkey}/checkin`; 
     try {
       const res = await fetch(url, { method: 'POST' });
@@ -204,7 +177,6 @@ export const api = {
     }
   },
 
-  // ★修正: リーダーボード取得
   async getLeaderboard(sort: 'points' | 'volume' | 'created' = 'points') {
     try {
       const res = await fetch(`${API_BASE}/leaderboard?sort=${sort}`);
@@ -231,11 +203,14 @@ export const api = {
     ticker: string;
     description?: string;
     type: string;
-    // ★修正: ここに logoURI?: string を追加してください
     tokens: { symbol: string; mint: string; weight: number; logoURI?: string }[];
+    address: string; 
     config?: any; 
   }) => {
     try {
+
+      console.log("📤 Sending Strategy Data to API:", data);
+
       const res = await fetch(`${API_BASE}/strategies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -297,9 +272,6 @@ export const api = {
 
   async requestFaucet(wallet: string) {
     try {
-      // ★修正: バックエンドの定義に合わせてエンドポイントとパラメータ名を変更
-      // Endpoint: /claim
-      // Body: { wallet_address: ... }
       const res = await fetch(`${API_BASE}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -331,7 +303,6 @@ export const api = {
     return res.json();
   },
 
-  // 汎用アップロード (Strategy作成時などに使用)
   async uploadImage(file: Blob, walletAddress: string, type: 'strategy' | 'profile' = 'strategy') {
     const formData = new FormData();
     formData.append('image', file);

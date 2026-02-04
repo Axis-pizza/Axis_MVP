@@ -6,10 +6,8 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWallet } from '../../hooks/useWallet';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-
 import { ProfileEditModal } from './ProfileEditModal';
 
-// QRコード & シェアモーダル
 const InviteModal = ({ isOpen, onClose, pubkey }: { isOpen: boolean; onClose: () => void; pubkey: string }) => {
   const { showToast } = useToast();
   const inviteLink = `${window.location.origin}/?ref=${pubkey}`;
@@ -187,19 +185,15 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     }
   };
 
-  // ★ 修正: Drawer を一時的に閉じてから Wallet Modal を開く
   const handleConnect = () => {
     setIsWalletModalPending(true);
-    onClose(); // Drawer を閉じる
-    // 少し遅延させてから Wallet Modal を開く（アニメーション完了を待つ）
+    onClose();
     setTimeout(() => {
       setVisible(true);
     }, 150);
   };
 
   const showConnectView = !connected || !publicKey;
-
-  // Drawer の z-index を Wallet Modal より低くする
   const drawerZIndex = walletModalVisible ? 'z-[100]' : 'z-[9999]';
   const backdropZIndex = walletModalVisible ? 'z-[99]' : 'z-[9998]';
 
@@ -230,7 +224,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 pt-2 custom-scrollbar">
-                {/* 未接続状態 */}
+
                 {showConnectView && (
                   <div className="flex flex-col items-center justify-center h-full text-center py-10">
                     <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
@@ -247,8 +241,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     </button>
                   </div>
                 )}
-
-                {/* 接続済み状態 */}
                 {!showConnectView && publicKey && (
                   <>
                     <div className="flex flex-col items-center mb-8">
@@ -333,7 +325,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 )}
               </div>
 
-              {/* Disconnect ボタン */}
               {!showConnectView && publicKey && (
                 <div className="mt-auto shrink-0 p-6 pt-0">
                   <button

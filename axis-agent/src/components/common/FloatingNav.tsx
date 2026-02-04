@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Compass, Plus, User, MessageSquareText } from 'lucide-react';
-import { BugDrawer } from './BugDrawer'; // 上で作ったコンポーネント
+import { BugDrawer } from './BugDrawer';
 
 export type ViewState = 'DISCOVER' | 'CREATE' | 'PROFILE';
 
@@ -11,9 +11,8 @@ interface FloatingNavProps {
 }
 
 export const FloatingNav = ({ currentView, onNavigate }: FloatingNavProps) => {
-  // Drawerの開閉状態
-  const [isBugDrawerOpen, setIsBugDrawerOpen] = useState(false);
 
+  const [isBugDrawerOpen, setIsBugDrawerOpen] = useState(false);
   const navItems = [
     { id: 'DISCOVER', icon: Compass, label: 'Discover' },
     { id: 'CREATE', icon: Plus, label: 'Create' },
@@ -23,10 +22,10 @@ export const FloatingNav = ({ currentView, onNavigate }: FloatingNavProps) => {
   return (
     <>
       <div className="fixed bottom-8 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
-        {/* Container */}
+       
         <div className="pointer-events-auto relative flex items-center justify-between gap-6 bg-[#0A0A0A]/90 backdrop-blur-2xl border border-white/10 rounded-full pl-10 pr-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)] min-w-[320px]">
           
-          {/* Main Navigation Items */}
+      
           <div className="flex items-center gap-8">
             {navItems.map((item) => {
               const isActive = currentView === item.id;
@@ -57,10 +56,10 @@ export const FloatingNav = ({ currentView, onNavigate }: FloatingNavProps) => {
             })}
           </div>
 
-          {/* Divider */}
+         
           <div className="w-px h-8 bg-white/10" />
 
-          {/* Bug Report Button (The "Magic" Button) */}
+        
           <button
             onClick={() => setIsBugDrawerOpen(true)}
             className="relative w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-orange-500/30 transition-all group"
@@ -72,7 +71,6 @@ export const FloatingNav = ({ currentView, onNavigate }: FloatingNavProps) => {
         </div>
       </div>
 
-      {/* Drawer Component Integration */}
       <BugDrawer 
         isOpen={isBugDrawerOpen} 
         onClose={() => setIsBugDrawerOpen(false)} 

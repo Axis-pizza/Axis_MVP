@@ -57,16 +57,19 @@
     };
   
     const handleConfirmDeploy = async () => {
+      // バリデーション
       if (!depositAmount) return;
       if (!wallet.publicKey) {
           showToast("Wallet not connected", "error");
           return;
       }
   
-      setIsDeploying(true);
+      setIsDeploying(true); // ローディング開始
   
       try {
-          // 1. デプロイ (Strategy作成)
+          // ---------------------------------------------------------
+          // 1. デプロイ (Strategy作成: On-Chain)
+          // ---------------------------------------------------------
           showToast("🚀 Creating Strategy on-chain...", "info");
           
           const { signature: deploySig, strategyPubkey } = await KagemushaService.initializeStrategy(
@@ -79,26 +82,52 @@
               }
           );
   
-          console.log("Deployed:", strategyPubkey.toString());
+          console.log("Deployed Strategy Address:", strategyPubkey.toString());
+          console.log("Tx Signature:", deploySig);
   
-          // 2. 入金 (Deposit SOL)
+          // ---------------------------------------------------------
+          // 2. ブロックチェーンの承認待ち (Confirmation)
+          // ★これが重要！これがないと次の入金で「アカウント無し」エラーになる
+          // ---------------------------------------------------------
+          showToast("⏳ Waiting for confirmation...", "info");
+          
+          const latestBlock = await connection.getLatestBlockhash();
+          await connection.confirmTransaction({
+              signature: deploySig,
+              blockhash: latestBlock.blockhash,
+              lastValidBlockHeight: latestBlock.lastValidBlockHeight
+          }, 'confirmed');
+  
+          // 念のため少し待機 (Nodeの伝播遅延対策)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+  
+          // ---------------------------------------------------------
+          // 3. 初期流動性の入金 (Deposit SOL)
+          // ---------------------------------------------------------
           const amount = parseFloat(depositAmount);
           if (amount > 0 && depositAsset === 'SOL') {
                showToast(`💰 Depositing ${amount} SOL...`, "info");
+               
+               // 作成したばかりの strategyPubkey へ入金
                await KagemushaService.depositSol(
                    connection,
                    wallet,
                    strategyPubkey,
                    amount
                );
+               console.log("Initial Deposit Success");
           }
   
-          // 3. バックエンドへ登録 (DB保存)
-          // ★修正: tokens の型不整合を解消 (mintプロパティを保証)
+          // ---------------------------------------------------------
+          // 4. バックエンドへ登録 (DB保存)
+          // ---------------------------------------------------------
+          showToast("💾 Saving to Database...", "info");
+  
+          // API用にトークン情報を整形（mintアドレスを保証）
           const tokensForApi = tokens.map(t => ({
             symbol: t.symbol,
             weight: t.weight,
-            mint: t.mint || t.address || '', // addressかmintを使う
+            mint: t.mint || t.address || '', 
             logoURI: t.logoURI
           }));
   
@@ -106,15 +135,20 @@
               owner_pubkey: wallet.publicKey.toBase58(),
               name: strategyName,
               ticker: info?.symbol || 'ETF',
-              description: description, // ★修正: config.description -> description
+              description: description,
               type: 'BALANCED',
               tokens: tokensForApi,
+              
+              // ★重要: 作成されたSolanaアドレスをここで保存する
+              address: strategyPubkey.toString(), 
+              
               config: {
                   strategyPubkey: strategyPubkey.toString(),
                   txSignature: deploySig
               }
           });
   
+          // 完了処理
           showToast("✅ Strategy Deployed & Funded!", "success");
           setIsDepositModalOpen(false);
   
@@ -125,10 +159,19 @@
           }
   
       } catch (e: any) {
-          console.error("Deploy Error:", e);
-          showToast(`Failed: ${e.message}`, "error");
+          console.error("Deploy/Deposit Error:", e);
+          
+          // ログがあればコンソールに出してデバッグしやすくする
+          if (e.logs) {
+              console.error("Transaction Logs:", e.logs);
+          }
+  
+          let msg = e.message;
+          if (msg.includes("User rejected")) msg = "User cancelled the transaction";
+          
+          showToast(`Failed: ${msg}`, "error");
       } finally {
-          setIsDeploying(false);
+          setIsDeploying(false); // ローディング終了
       }
     };
   

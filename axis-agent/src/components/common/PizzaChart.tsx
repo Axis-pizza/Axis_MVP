@@ -19,8 +19,7 @@ interface PizzaChartProps {
   animated?: boolean;
 }
 
-// Artisan / Luxury Palette
-// 落ち着いたゴールド、ブロンズ、深みのある食材の色を使用
+
 const SLICE_COLORS = [
   '#D97706', // Bronze (Amber 600)
   '#B45309', // Deep Bronze (Amber 700)

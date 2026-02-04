@@ -10,10 +10,7 @@ import {
 interface RichChartProps {
   data: any[];
   isPositive: boolean;
-  // ★修正: height プロパティを追加
   height?: number;
-  // エラー回避のため許容する場合は残す、なければ削除
-  // type?: string; 
   colors?: {
     lineColor?: string;
     areaTopColor?: string;
@@ -63,7 +60,6 @@ function normalizeLineData(raw: any[]) {
   return deduped;
 }
 
-// ★修正: heightのデフォルト値を設定
 export const RichChart = ({ data, isPositive, height = 300, colors }: RichChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
@@ -91,7 +87,6 @@ export const RichChart = ({ data, isPositive, height = 300, colors }: RichChartP
         horzLines: { color: "rgba(255, 255, 255, 0.06)" },
       },
       width: chartContainerRef.current.clientWidth,
-      // ★修正: プロパティのheightを使用
       height: height,
       timeScale: {
         borderColor: "rgba(255, 255, 255, 0.12)",
@@ -143,7 +138,6 @@ export const RichChart = ({ data, isPositive, height = 300, colors }: RichChartP
 
   return (
     <div className="relative">
-      {/* ★修正: スタイルでも高さを確保 */}
       <div ref={chartContainerRef} className="w-full" style={{ height: height }} />
     </div>
   );
