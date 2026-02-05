@@ -360,10 +360,11 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
     try {
       await api.toggleWatchlist(strategy.id, wallet.publicKey.toBase58());
       showToast(nextState ? "Added to watchlist" : "Removed from watchlist", "success");
-    } catch (e) {
+    } catch (e: any) {
       // 失敗したら元に戻す
       setIsWatchlisted(!nextState);
       console.error("Watchlist error:", e);
+      showToast(e.message || "Failed to update watchlist", "error");
     }
   };
 

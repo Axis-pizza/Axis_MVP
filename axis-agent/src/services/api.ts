@@ -163,7 +163,15 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userPubkey })
     });
-    return res.json();
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error('[toggleWatchlist] Error:', data);
+      throw new Error(data.error || `Error: ${res.status}`);
+    }
+
+    return data;
   },
 
   async checkWatchlist(id: string, userPubkey: string) {
