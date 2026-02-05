@@ -19,8 +19,6 @@ export const Toast = ({ message, type }: ToastProps) => {
     info: 'bg-[#0C0A09] border-blue-500/30',
   };
 
-  // ✅ 強力なシェイクパターンの定義
-  // errorの時は激しく(15px)、それ以外は控えめに(4px)
   const shakeIntensity = type === 'error' ? 15 : 4;
   const rotateIntensity = type === 'error' ? 6 : 2;
 
@@ -33,14 +31,12 @@ export const Toast = ({ message, type }: ToastProps) => {
           rotate: [0, -rotateIntensity, rotateIntensity, -rotateIntensity, rotateIntensity, 0],
           opacity: 1,
         }}
-        // ✅ 揺れの鋭さを出すための transition 設定
         transition={{ 
           x: { duration: 0.4, times: [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1] },
           rotate: { duration: 0.4, times: [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1] },
           opacity: { duration: 0.2 }
         }}
         exit={{ x: -100, opacity: 0 }}
-        // ✅ z-index を最大級に設定
         className={`fixed top-4 left-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl border ${bgColors[type]} shadow-2xl backdrop-blur-md min-w-[300px]`}
       >
         {icons[type]}

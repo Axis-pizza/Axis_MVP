@@ -17,7 +17,6 @@ interface ProfileEditModalProps {
   onUpdate: () => void;
 }
 
-// ステップ管理用の定数
 type Step = 'EMAIL' | 'OTP' | 'PROFILE';
 
 export const ProfileEditModal = ({
@@ -26,27 +25,19 @@ export const ProfileEditModal = ({
   currentProfile,
   onUpdate,
 }: ProfileEditModalProps) => {
+
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ステップ管理 (初期値の判定: ユーザー名があれば編集モード、なければ登録モード)
   const [step, setStep] = useState<Step>('EMAIL');
-
-  // 入力データのステート
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [pfpUrl, setPfpUrl] = useState('');
-  
-  // 招待コード（サーバーから返ってきたものを保持）
   const [inviteCode, setInviteCode] = useState('');
-
-  // ローディング
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // モーダルが開いたときの初期化
   useEffect(() => {
     if (isOpen) {
       if (currentProfile.username) {
@@ -58,16 +49,15 @@ export const ProfileEditModal = ({
         setStep(prev => (prev === 'OTP' || prev === 'PROFILE') ? prev : 'EMAIL');
       }
     }
-  }, [isOpen]);
+  }, [isOpen, currentProfile.username, currentProfile.bio, currentProfile.avatar_url]);
 
-  // 1. メール送信 (認証コードリクエスト)
   const handleRequestInvite = async () => {
     if (!email.includes('@')) return showToast("Invalid Email", "error");
     setLoading(true);
     try {
       const res = await api.requestInvite(email);
       if (res.success) {
-        setStep('OTP'); // 次のステップへ
+        setStep('OTP');
         showToast("Code sent to your email!", "success");
       } else {
         showToast(res.error || "Failed to send code", "error");
@@ -79,19 +69,12 @@ export const ProfileEditModal = ({
     }
   };
 
-  // 2. コード認証 (ここでは簡易的に、コードを保持して次へ進むだけにする)
-  // ※本来は verify APIを叩くが、登録時にまとめてチェックする仕様ならここで次へ
   const handleVerifyOtp = async () => {
     if (otp.length < 4) return showToast("Invalid Code", "error");
-    
-    // ここで一旦バックエンドに聞くか、あるいは単純にコードを持ってプロフィール入力へ進む
-    // 今回の仕様では登録APIに invite_code_used として渡す必要があるため、
-    // ユーザーがメールで受け取ったコード(OTP兼招待コード)を入力している想定
     setInviteCode(otp); 
-    setStep('PROFILE'); // プロフィール入力へ
+    setStep('PROFILE');
   };
 
-  // 3. 画像アップロード
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -103,10 +86,9 @@ export const ProfileEditModal = ({
 
     setUploading(true);
     try {
-      // API呼び出し
       const res = await api.uploadProfileImage(file, currentProfile.pubkey);
       if (res.success && res.key) {
-        setPfpUrl(res.key); // ★ここでステート更新しても、別ファイルならリセットされない！
+        setPfpUrl(res.key);
         showToast("Image Uploaded", "success");
       } else {
         showToast("Upload Failed", "error");
@@ -119,15 +101,14 @@ export const ProfileEditModal = ({
     }
   };
 
-  // 4. 保存または新規登録
+
   const handleSave = async () => {
     setLoading(true);
     try {
       if (currentProfile.username) {
-        // --- 既存ユーザーの更新 ---
         const res = await api.updateProfile({
           wallet_address: currentProfile.pubkey,
-          username: username, // api.tsの修正に合わせて username で送る
+          username: username,
           bio: bio,
           pfpUrl: pfpUrl,
         });
@@ -139,11 +120,11 @@ export const ProfileEditModal = ({
             showToast("Update Failed", "error");
         }
       } else {
-        // --- 新規登録 ---
+
         const res = await api.register({
           email: email,
           wallet_address: currentProfile.pubkey,
-          invite_code_used: inviteCode, // 入力されたOTPコードを使う
+          invite_code_used: inviteCode,
           name: username,
           bio: bio,
           avatar_url: pfpUrl
@@ -151,7 +132,7 @@ export const ProfileEditModal = ({
         
         if (res.success) {
           showToast("Welcome to Axis!", "success");
-          onUpdate(); // データを再取得
+          onUpdate();
           onClose();
         } else {
           showToast(res.error || "Registration Failed", "error");
@@ -176,7 +157,6 @@ export const ProfileEditModal = ({
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md bg-[#121212] border border-white/10 rounded-3xl overflow-hidden flex flex-col shadow-2xl"
         >
-          {/* Header */}
           <div className="p-6 border-b border-white/5 flex items-center justify-between">
             <h2 className="text-xl font-bold text-white">
               {currentProfile.username ? 'Edit Profile' : 'Create Account'}
@@ -188,7 +168,6 @@ export const ProfileEditModal = ({
 
           <div className="p-6 space-y-6">
             
-            {/* STEP 1: EMAIL */}
             {step === 'EMAIL' && (
               <div className="space-y-4">
                 <p className="text-white/70">Enter your email to receive an invite code.</p>
@@ -212,7 +191,6 @@ export const ProfileEditModal = ({
               </div>
             )}
 
-            {/* STEP 2: OTP */}
             {step === 'OTP' && (
               <div className="space-y-4">
                 <p className="text-white/70">Enter the code sent to {email}</p>
@@ -235,10 +213,9 @@ export const ProfileEditModal = ({
               </div>
             )}
 
-            {/* STEP 3: PROFILE FORM */}
+
             {step === 'PROFILE' && (
               <div className="space-y-6">
-                {/* Image Upload */}
                 <div className="flex flex-col items-center">
                    <div 
                     className="relative w-32 h-32 rounded-full border-4 border-white/10 overflow-hidden bg-black/50 group cursor-pointer"
@@ -263,7 +240,6 @@ export const ProfileEditModal = ({
                   <p className="text-xs text-white/30 mt-2">Tap to upload</p>
                 </div>
 
-                {/* Fields */}
                 <div>
                   <label className="text-xs text-white/50 ml-1 mb-1 block">Username</label>
                   <input

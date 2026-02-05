@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion'; // ★ Headless UIの代わりにFramer Motionを使用
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, TrendingUp, TrendingDown, Wallet, Activity, ExternalLink } from 'lucide-react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
@@ -60,7 +60,6 @@ export const StrategyDetailModal = ({ isOpen, onClose, strategy }: StrategyDetai
     <AnimatePresence>
       {isOpen && (
         <>
-            {/* Backdrop */}
             <motion.div 
                 initial={{ opacity: 0 }} 
                 animate={{ opacity: 1 }} 
@@ -69,7 +68,6 @@ export const StrategyDetailModal = ({ isOpen, onClose, strategy }: StrategyDetai
                 className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50" 
             />
 
-            {/* Modal Content */}
             <div className="fixed inset-0 z-50 overflow-y-auto pointer-events-none">
                 <div className="flex min-h-full items-center justify-center p-4 text-center">
                     <motion.div 
@@ -79,7 +77,6 @@ export const StrategyDetailModal = ({ isOpen, onClose, strategy }: StrategyDetai
                         transition={{ duration: 0.2 }}
                         className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-[#1C1917] border border-white/10 p-6 text-left align-middle shadow-xl pointer-events-auto"
                     >
-                        {/* Header */}
                         <div className="flex justify-between items-start mb-6">
                         <div>
                             <h3 className="text-2xl font-serif font-bold text-white mb-1">
@@ -105,12 +102,10 @@ export const StrategyDetailModal = ({ isOpen, onClose, strategy }: StrategyDetai
                         </button>
                         </div>
 
-                        {/* Chart Area */}
                         <div className="h-64 bg-black/20 rounded-xl mb-6 p-4 border border-white/5">
                             <RichChart data={chartData} isPositive={(strategy.pnl_percent || 0) >= 0} />
                         </div>
 
-                        {/* Stats */}
                         <div className="grid grid-cols-3 gap-4 mb-6">
                         <div className="p-4 bg-white/5 rounded-xl border border-white/5">
                             <div className="flex items-center gap-2 text-xs text-[#78716C] mb-1">
@@ -138,7 +133,6 @@ export const StrategyDetailModal = ({ isOpen, onClose, strategy }: StrategyDetai
                         </div>
                         </div>
 
-                        {/* Action */}
                         <div className="bg-[#0C0A09] p-4 rounded-xl border border-white/5">
                         <label className="text-xs text-[#78716C] font-bold uppercase mb-2 block">Deposit Amount (SOL)</label>
                         <div className="flex gap-3">

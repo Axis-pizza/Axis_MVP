@@ -2,83 +2,86 @@
  * API Service - Centralized API calls
  */
 
-// 環境変数からAPIのベースURLを取得
 const API_BASE = import.meta.env.VITE_API_URL || 'https://axis-api.yusukekikuta-05.workers.dev';
 
 export const api = {
-  /**
-   * 1. ユーザー情報取得 (GET /user?wallet=...)
-   * バックエンドの仕様に合わせてクエリパラメータ形式に統一
-   */
   getUser: async (pubkey: string) => {
     try {
-      // ローカルストレージの紹介コードがあれば付与
       const ref = localStorage.getItem('axis_referrer');
       let url = `${API_BASE}/user?wallet=${pubkey}`;
+
       if (ref && ref !== pubkey) {
         url += `&ref=${ref}`;
       }
 
       const res = await fetch(url);
-      
+
       if (!res.ok) {
-        // 404などの場合は未登録(null)として返す
+        console.log('[getUser] Response not OK:', res.status);
         return { success: false, user: null };
       }
-      
+
       const data = await res.json();
-      
-      // データが空の場合のチェック
-      if (!data || Object.keys(data).length === 0) {
-          return { success: false, user: null };
+      console.log('[getUser] Raw response:', data);
+
+      // Handle both { user: {...} } and direct {...} response formats
+      const userData = data.user || data;
+
+      if (!userData || Object.keys(userData).length === 0) {
+        return { success: false, user: null };
       }
 
-      // フロントエンド(username) と バックエンド(name) の違いを吸収
-      return {
-        success: true,
-        user: {
-            ...data,
-            pubkey: pubkey,
-            username: data.name || data.username, // nameがあればusernameとして扱う
-            avatar_url: data.pfpUrl || data.avatar_url, // 表記揺れ吸収
-            total_xp: data.total_xp || 0,
-            rank_tier: data.rank_tier || 'Novice'
-        }
+      const user = {
+        ...userData,
+        pubkey: pubkey,
+        username: userData.username || userData.name,
+        avatar_url: userData.pfpUrl || userData.avatar_url,
+        total_xp: userData.total_xp ?? userData.xp ?? 0,
+        rank_tier: userData.rank_tier || 'Novice'
       };
+
+      console.log('[getUser] Processed user:', user);
+
+      return { success: true, user };
     } catch (e) {
       console.error("Fetch User Error:", e);
       return { success: false, user: null };
     }
   },
 
-  /**
-   * 2. プロフィール更新 (POST /user)
-   * UI側の `username` をバックエンド側の `name` に変換して送信
-   */
+
   async updateProfile(data: { wallet_address: string; name?: string; username?: string; bio?: string; avatar_url?: string; pfpUrl?: string }) {
     try {
       const payload = {
         wallet_address: data.wallet_address,
-        name: data.username || data.name, // UIで入力された username を優先
+        name: data.username || data.name,
         bio: data.bio,
-        avatar_url: data.pfpUrl || data.avatar_url // pfpUrl を avatar_url として送信
+        pfpUrl: data.pfpUrl || data.avatar_url
       };
+
+      console.log('[updateProfile] Sending payload:', payload);
 
       const res = await fetch(`${API_BASE}/user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      return await res.json();
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('[updateProfile] Error response:', text);
+        return { success: false, error: text || `Error: ${res.status}` };
+      }
+
+      const result = await res.json();
+      console.log('[updateProfile] Response:', result);
+      return result;
     } catch (e) {
       console.error("Update Profile Error:", e);
       return { success: false, error: 'Network Error' };
     }
   },
 
-  /**
-   * 3. 画像アップロード (ProfileEditModalで使用)
-   */
   async uploadProfileImage(file: File, walletAddress: string) {
     const formData = new FormData();
     formData.append('image', file);
@@ -97,9 +100,6 @@ export const api = {
     }
   },
 
-  /**
-   * 4. 招待コードリクエスト
-   */
   async requestInvite(email: string) {
     try {
       const res = await fetch(`${API_BASE}/request-invite`, {
@@ -107,15 +107,23 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
+
+      if (res.status === 409) {
+        return { success: false, error: 'This email has already been registered' };
+      }
+
+      if (!res.ok) {
+        const text = await res.text();
+        return { success: false, error: text || `Error: ${res.status}` };
+      }
+
       return await res.json();
     } catch (e) {
       return { success: false, error: 'Network Error' };
     }
   },
 
-  /**
-   * 5. 新規登録
-   */
+
   async register(data: { email: string; wallet_address: string; invite_code_used: string; avatar_url?: string; name?: string; bio?: string }) {
     try {
       const res = await fetch(`${API_BASE}/register`, {
@@ -129,26 +137,17 @@ export const api = {
     }
   },
 
-  /**
-   * 6. 画像URLのプロキシ (R2キーをURLに変換)
-   */
+
   getProxyUrl(url: string | undefined | null) {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    if (url.startsWith('blob:')) return url; // プレビュー用
+    if (url.startsWith('blob:')) return url;
     if (url.startsWith('data:')) return url;
     
-    // R2 Keyだけの場合、API経由で表示
     return `${API_BASE}/upload/image/${url}`;
   },
 
-  // ------------------------------------------------
-  // 以下、既存機能 (変更なし)
-  // ------------------------------------------------
-
-  /**
-   * Generate AI strategies
-   */
+  
   async analyze(directive: string, tags: string[] = [], customInput?: string) {
     const res = await fetch(`${API_BASE}/analyze`, {
       method: 'POST',
@@ -164,7 +163,15 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userPubkey })
     });
-    return res.json();
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error('[toggleWatchlist] Error:', data);
+      throw new Error(data.error || `Error: ${res.status}`);
+    }
+
+    return data;
   },
 
   async checkWatchlist(id: string, userPubkey: string) {
@@ -173,18 +180,24 @@ export const api = {
   },
 
   async dailyCheckIn(pubkey: string) {
-    // URLをバックエンドのルート定義 (/users/:wallet/checkin) に合わせる
-    const url = `${API_BASE}/users/${pubkey}/checkin`; 
+    const url = `${API_BASE}/users/${pubkey}/checkin`;
     try {
       const res = await fetch(url, { method: 'POST' });
       const text = await res.text();
+
+      if (!res.ok) {
+        return { success: false, error: text || `Error: ${res.status}` };
+      }
+
       try {
-        return JSON.parse(text);
+        const data = JSON.parse(text);
+        console.log('[dailyCheckIn] Response:', data);
+        return data;
       } catch (e) {
-        throw new Error(`Server Error: ${text}`);
+        return { success: false, error: `Server Error: ${text}` };
       }
     } catch (error: any) {
-      return { success: false, error: error.message }; 
+      return { success: false, error: error.message };
     }
   },
 
@@ -204,7 +217,6 @@ export const api = {
     }
   },
 
-  // ★修正: リーダーボード取得
   async getLeaderboard(sort: 'points' | 'volume' | 'created' = 'points') {
     try {
       const res = await fetch(`${API_BASE}/leaderboard?sort=${sort}`);
@@ -231,11 +243,14 @@ export const api = {
     ticker: string;
     description?: string;
     type: string;
-    // ★修正: ここに logoURI?: string を追加してください
     tokens: { symbol: string; mint: string; weight: number; logoURI?: string }[];
+    address: string; 
     config?: any; 
   }) => {
     try {
+
+      console.log("📤 Sending Strategy Data to API:", data);
+
       const res = await fetch(`${API_BASE}/strategies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -297,9 +312,6 @@ export const api = {
 
   async requestFaucet(wallet: string) {
     try {
-      // ★修正: バックエンドの定義に合わせてエンドポイントとパラメータ名を変更
-      // Endpoint: /claim
-      // Body: { wallet_address: ... }
       const res = await fetch(`${API_BASE}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -326,12 +338,25 @@ export const api = {
     return res.json();
   },
 
+  async getUserWatchlist(pubkey: string) {
+    try {
+      const res = await fetch(`${API_BASE}/users/${pubkey}/watchlist`);
+      
+      if (!res.ok) {
+        return { success: false, strategies: [] };
+      }
+      return await res.json();
+    } catch (e) {
+      console.error("Fetch Watchlist Error:", e);
+      return { success: false, strategies: [] };
+    }
+  },
+
   async discoverStrategies(limit = 50, offset = 0) {
     const res = await fetch(`${API_BASE}/discover?limit=${limit}&offset=${offset}`);
     return res.json();
   },
 
-  // 汎用アップロード (Strategy作成時などに使用)
   async uploadImage(file: Blob, walletAddress: string, type: 'strategy' | 'profile' = 'strategy') {
     const formData = new FormData();
     formData.append('image', file);

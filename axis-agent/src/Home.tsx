@@ -1,108 +1,157 @@
+/**
+ * Home - Kagemusha AI Strategy Factory
+ * Main entry with floating navigation and tactical interface
+ */
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useWallet, useConnection } from './hooks/useWallet';
+import { FloatingNav, type ViewState } from './components/common/FloatingNav';
+import { TutorialOverlay } from './components/common/TutorialOverlay';
+import { KagemushaFlow } from './components/create';
+import { DiscoverView } from './components/discover/DiscoverView';
+import { ProfileView } from './components/profile/ProfileView';
+import { StrategyDetailView } from './components/discover/StrategyDetailView';
+import type { Strategy } from './types';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 
-  /**
-   * Home - Kagemusha AI Strategy Factory
-   * Main entry with floating navigation and tactical interface
-   */
-  
-  import { useState, useEffect, useCallback } from 'react';
-  import { motion, AnimatePresence } from 'framer-motion';
-  import { useConnection } from './hooks/useWallet'; // ★ useConnectionを追加
-  import { useWallet } from './hooks/useWallet';
-  import { FloatingNav, type ViewState } from './components/common/FloatingNav';
-  import { KagemushaFlow } from './components/create';
-  import { DiscoverView } from './components/discover/DiscoverView';
-  import { ProfileView } from './components/profile/ProfileView';
-  import { StrategyDetailView } from './components/discover/StrategyDetailView';
-  import type { Strategy } from './types';
-  import { LAMPORTS_PER_SOL } from '@solana/web3.js';
-  
-  type View = 'DISCOVER' | 'CREATE' | 'PROFILE' | 'STRATEGY_DETAIL';
-  
-  export default function Home() {
-    const [view, setView] = useState<View>('CREATE');
-    
-    const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
-  
-    const { connected, publicKey } = useWallet();
-    const { connection } = useConnection(); // ★Connection取得
-    const [balance, setBalance] = useState<number | null>(null);
-  
-    // ★getBalance関数を定義
-    const getBalance = useCallback(async () => {
-      if (!publicKey || !connection) return 0;
-      try {
-          const bal = await connection.getBalance(publicKey);
-          return bal / LAMPORTS_PER_SOL;
-      } catch (e) {
-          console.error("Failed to get balance", e);
-          return 0;
-      }
-    }, [publicKey, connection]);
-  
-    useEffect(() => {
-      if (connected) {
-        getBalance().then(setBalance);
-      }
-    }, [connected, getBalance]);
-  
-    const handleStrategySelect = (strategy: Strategy) => {
-      setSelectedStrategy(strategy);
-      setView('STRATEGY_DETAIL');
-    };
-  
-    const handleBackFromDetail = () => {
-      setView('DISCOVER');
-      setSelectedStrategy(null);
-    };
-  
-    const handleNavigate = (newView: ViewState) => {
-      setView(newView);
-    };
-  
-    return (
-      <div className="bg-[#030303] min-h-screen text-white font-sans selection:bg-orange-500/30 relative overflow-x-hidden">
-        <AnimatePresence mode="wait">
-          
-          {/* 1. DISCOVER */}
-          {view === 'DISCOVER' && (
-            <motion.div key="discover" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="pb-32">
-              <DiscoverView onStrategySelect={handleStrategySelect} />
-            </motion.div>
-          )}
-  
-          {/* 2. CREATE */}
-          {view === 'CREATE' && (
-            <motion.div key="create" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pb-32">
-              <KagemushaFlow />
-            </motion.div>
-          )}
-  
-          {/* 3. PROFILE */}
-          {view === 'PROFILE' && (
-            <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="pb-32">
-              <ProfileView />
-            </motion.div>
-          )}
-  
-          {/* 4. DETAIL */}
-          {view === 'STRATEGY_DETAIL' && selectedStrategy && (
-            <motion.div key="strategy-detail" initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 100 }} className="absolute inset-0 z-50 bg-[#0C0A09]">
-              <StrategyDetailView 
-                initialData={selectedStrategy}
-                onBack={handleBackFromDetail} 
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-  
-        {/* Navigation */}
-        {view !== 'STRATEGY_DETAIL' && (
-          <FloatingNav 
-            currentView={view as ViewState} 
-            onNavigate={handleNavigate} 
-          />
-        )}
+type View = 'DISCOVER' | 'CREATE' | 'PROFILE' | 'STRATEGY_DETAIL';
+const TUTORIAL_KEY = 'kagemusha-v1-tutorial';
+
+export default function Home() {
+  const [view, setView] = useState<View>('CREATE');
+  const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  const { connected, publicKey } = useWallet();
+  const { connection } = useConnection();
+  const [balance, setBalance] = useState<number | null>(null);
+
+  // ウォレット残高の取得
+  const getBalance = useCallback(async () => {
+    if (!publicKey || !connection) return 0;
+    try {
+      const bal = await connection.getBalance(publicKey);
+      return bal / LAMPORTS_PER_SOL;
+    } catch (e) {
+      console.error("Failed to get balance", e);
+      return 0;
+    }
+  }, [publicKey, connection]);
+
+  useEffect(() => {
+    if (connected) {
+      getBalance().then(setBalance);
+    }
+  }, [connected, getBalance]);
+
+  // 初回接続時にチュートリアルをトリガー
+  useEffect(() => {
+    const isCompleted = localStorage.getItem(TUTORIAL_KEY);
+    if (connected && !isCompleted) {
+      // DOMが安定するのを少し待ってから表示
+      const timer = setTimeout(() => setShowTutorial(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [connected]);
+
+  const handleTutorialComplete = () => {
+    localStorage.setItem(TUTORIAL_KEY, 'true');
+    setShowTutorial(false);
+  };
+
+  const handleStrategySelect = (strategy: Strategy) => {
+    setSelectedStrategy(strategy);
+    setView('STRATEGY_DETAIL');
+  };
+
+  const handleBackFromDetail = () => {
+    setView('DISCOVER');
+    setSelectedStrategy(null);
+  };
+
+  const handleNavigate = (newView: ViewState) => {
+    setView(newView as View);
+  };
+
+  return (
+    <div className="bg-[#030303] min-h-screen text-white font-sans selection:bg-orange-500/30 relative overflow-x-hidden">
+      {/* Background Glows */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-900/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-900/10 blur-[120px] rounded-full" />
       </div>
-    );
-  }
-  
+
+      <AnimatePresence mode="wait">
+        {/* DISCOVER VIEW */}
+        {view === 'DISCOVER' && (
+          <motion.div 
+            key="discover" 
+            initial={{ opacity: 0, x: -10 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            exit={{ opacity: 0, x: -10 }} 
+            className="relative z-10 pb-32"
+          >
+            <DiscoverView onStrategySelect={handleStrategySelect} />
+          </motion.div>
+        )}
+
+        {/* CREATE VIEW */}
+        {view === 'CREATE' && (
+          <motion.div 
+            key="create" 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="relative z-10 pb-32"
+          >
+            <KagemushaFlow />
+          </motion.div>
+        )}
+
+        {/* PROFILE VIEW */}
+        {view === 'PROFILE' && (
+          <motion.div 
+            key="profile" 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -10 }} 
+            className="relative z-10 pb-32"
+          >
+            <ProfileView />
+          </motion.div>
+        )}
+
+        {/* STRATEGY DETAIL */}
+        {view === 'STRATEGY_DETAIL' && selectedStrategy && (
+          <motion.div 
+            key="strategy-detail" 
+            initial={{ opacity: 0, scale: 0.98 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            exit={{ opacity: 0, scale: 0.98 }} 
+            className="fixed inset-0 z-50 bg-[#030303]"
+          >
+            <StrategyDetailView
+              initialData={selectedStrategy}
+              onBack={handleBackFromDetail}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Navigation (Tutorial targets this) */}
+      {view !== 'STRATEGY_DETAIL' && (
+        <FloatingNav
+          currentView={view as ViewState}
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {/* Luxury Tutorial Overlay */}
+      <AnimatePresence>
+        {showTutorial && (
+          <TutorialOverlay onComplete={handleTutorialComplete} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

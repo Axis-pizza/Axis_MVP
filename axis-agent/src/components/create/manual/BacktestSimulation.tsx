@@ -207,10 +207,8 @@ export const BacktestSimulation = ({ tokens }: BacktestSimulationProps) => {
              {hasRun && !loading && (
                <RichChart 
                  data={chartData} 
-                 // ★修正: type="area" を削除
                  height={260}
                  isPositive={stats.totalReturn >= 0}
-                 // ...
                />
              )}
            </div>

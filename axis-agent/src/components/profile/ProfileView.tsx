@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { 
-  Eye, EyeOff, Download, Wallet, ArrowUpRight, ArrowDownRight, 
-  Trophy, TrendingUp, Sparkles, Copy, Share2, Star, Users, Gift,
-  LayoutGrid
+import {
+  Eye, EyeOff, Download, Wallet, ArrowUpRight, ArrowDownRight,
+  TrendingUp, Star, LayoutGrid
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
@@ -51,7 +50,7 @@ export const ProfileView = () => {
   const { showToast } = useToast();
   
   // --- UI State ---
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'referral' | 'leaderboard'>('portfolio');
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'leaderboard'>('portfolio');
   const [portfolioSubTab, setPortfolioSubTab] = useState<'created' | 'invested' | 'watchlist'>('created');
   const [leaderboardTab, setLeaderboardTab] = useState<'points' | 'volume' | 'created'>('points');
   
@@ -65,7 +64,7 @@ export const ProfileView = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [myStrategies, setMyStrategies] = useState<Strategy[]>([]);
   const [investedStrategies, setInvestedStrategies] = useState<Strategy[]>([]); // Future implementation
-  const [watchlist, setWatchlist] = useState<Strategy[]>([]); // Future implementation
+  const [watchlist, setWatchlist] = useState<Strategy[]>([]);
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
 
   const cardRef = useRef<HTMLDivElement>(null); 
@@ -103,13 +102,14 @@ export const ProfileView = () => {
   // --- 2. Load User Profile & Portfolio ---
   useEffect(() => {
     if (!publicKey) return;
-    
+
     const loadProfile = async () => {
       setIsLoading(true);
       try {
-        const [userRes, stratsRes] = await Promise.all([
+        const [userRes, stratsRes, watchlistRes] = await Promise.all([
           api.getUser(publicKey.toBase58()),
-          api.getUserStrategies(publicKey.toBase58())
+          api.getUserStrategies(publicKey.toBase58()),
+          api.getUserWatchlist(publicKey.toBase58())
         ]);
 
         if (userRes.success && userRes.user) {
@@ -129,10 +129,14 @@ export const ProfileView = () => {
           // 重複除外 & ソート
           const seen = new Map();
           const unique = stratsRes.strategies.filter((s: any) => {
-             const key = s.id; 
+             const key = s.id;
              return seen.has(key) ? false : seen.set(key, true);
           }).sort((a: any, b: any) => b.createdAt - a.createdAt);
           setMyStrategies(unique);
+        }
+
+        if (watchlistRes.success && watchlistRes.strategies) {
+          setWatchlist(watchlistRes.strategies);
         }
       } catch (e) {
         console.error("Profile load error", e);
@@ -174,11 +178,6 @@ export const ProfileView = () => {
   const isPos = pnlVal >= 0;
 
   // --- Handlers ---
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    showToast("Copied to clipboard!", "success");
-  };
-
   const handleDownloadCard = async () => {
     if (!captureRef.current) return;
     showToast("Generating card...", "info");
@@ -287,8 +286,8 @@ export const ProfileView = () => {
 
       {/* --- Tabs --- */}
       <div className="flex border-b border-white/10 mb-6 sticky top-0 bg-[#0C0A09] z-20 pt-2">
-         {['portfolio', 'referral', 'leaderboard'].map(t => (
-             <button 
+         {['portfolio', 'leaderboard'].map(t => (
+             <button
                 key={t}
                 onClick={() => setActiveTab(t as any)}
                 className={`flex-1 pb-3 font-bold text-sm capitalize transition-colors ${activeTab === t ? 'text-white border-b-2 border-[#D97706]' : 'text-white/40 hover:text-white/60'}`}
@@ -315,67 +314,14 @@ export const ProfileView = () => {
                : <EmptyState icon={LayoutGrid} title="No strategies yet" sub="Create your first index fund." />
             )}
             {portfolioSubTab === 'invested' && <EmptyState icon={TrendingUp} title="No investments" sub="Explore strategies to grow wealth." />}
-            {portfolioSubTab === 'watchlist' && <EmptyState icon={Star} title="Watchlist empty" sub="Star strategies to track them." />}
+            {portfolioSubTab === 'watchlist' && (
+               watchlist.length > 0 ? watchlist.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} />)
+               : <EmptyState icon={Star} title="Watchlist empty" sub="Star strategies to track them." />
+            )}
           </div>
         </div>
       )}
 
-      {/* ================================================================================= */}
-      {/* 2. REFERRAL TAB */}
-      {/* ================================================================================= */}
-      {activeTab === 'referral' && userProfile && (
-        <div className="space-y-6 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
-           
-           <div className="bg-[#1C1917] rounded-2xl p-6 border border-white/5 flex items-center gap-5">
-               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-amber-700 flex items-center justify-center text-3xl font-black text-white shadow-xl">
-                   {userProfile.username.charAt(0).toUpperCase()}
-               </div>
-               <div>
-                   <h3 className="text-xl font-bold text-white">{userProfile.username}</h3>
-                   <p className="text-xs text-white/40 font-mono mt-1">{publicKey.toBase58()}</p>
-               </div>
-           </div>
-
-           <div className="grid grid-cols-2 gap-3">
-              <div className="bg-black/30 p-4 rounded-xl border border-white/5">
-                 <p className="text-[10px] text-white/40 uppercase font-bold flex items-center gap-1"><Users className="w-3 h-3" /> Referrals</p>
-                 <p className="text-2xl font-mono font-bold text-white mt-1">{userProfile.referralCount}</p>
-              </div>
-              <div className="bg-black/30 p-4 rounded-xl border border-white/5">
-                 <p className="text-[10px] text-white/40 uppercase font-bold flex items-center gap-1"><Gift className="w-3 h-3" /> Bonus Rate</p>
-                 <p className="text-2xl font-mono font-bold text-[#D97706] mt-1">10%</p>
-              </div>
-           </div>
-
-           <div className="bg-gradient-to-br from-[#1C1917] to-orange-950/20 rounded-2xl p-5 border border-[#D97706]/20 relative overflow-hidden">
-               <h3 className="text-lg font-bold text-white mb-1 relative z-10">Invite & Earn</h3>
-               <p className="text-xs text-white/50 mb-6 relative z-10 max-w-[90%]">
-                   Share your code and earn 10% of trading fees/points from your invites.
-               </p>
-
-               <div className="space-y-3 relative z-10">
-                   <div>
-                       <label className="text-[10px] text-white/30 uppercase font-bold ml-1">Your Code</label>
-                       <div className="flex gap-2 mt-1">
-                          <div className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 font-mono font-bold text-lg text-white tracking-widest text-center">
-                             {userProfile.referralCode}
-                          </div>
-                          <button onClick={() => handleCopy(userProfile.referralCode)} className="px-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 text-white transition-colors">
-                             <Copy className="w-5 h-5" />
-                          </button>
-                       </div>
-                   </div>
-                   
-                   <button 
-                       onClick={() => handleCopy(`https://axis.fi/register?ref=${userProfile.referralCode}`)}
-                       className="w-full py-3 bg-[#D97706] text-black font-bold rounded-xl shadow-lg hover:bg-[#b46305] flex items-center justify-center gap-2"
-                   >
-                       <Share2 className="w-4 h-4" /> Share Invite Link
-                   </button>
-               </div>
-           </div>
-        </div>
-      )}
 
       {/* ================================================================================= */}
       {/* 3. LEADERBOARD TAB */}

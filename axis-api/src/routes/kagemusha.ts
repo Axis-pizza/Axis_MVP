@@ -359,16 +359,6 @@ app.get('/strategies/:id/chart', async (c) => {
   return c.json({ success: true, data, type });
 });
 
-app.post('/strategies/:id/watchlist', async (c) => {
-  const { userPubkey } = await c.req.json();
-  const id = c.req.param('id');
-  return c.json({ success: true, isWatchlisted: true });
-});
-
-app.get('/strategies/:id/watchlist', async (c) => {
-  return c.json({ success: true, isWatchlisted: false });
-});
-
 app.get('/prepare-deployment', async (c) => {
   const jitoService = createJitoService(c.env);
   const tipAccount = await jitoService.getRandomTipAccount();

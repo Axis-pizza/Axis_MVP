@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AnimatePresence } from 'framer-motion';
-import { RefreshCw, Loader2, Sparkles } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { RefreshCw, Loader2, Sparkles, Rocket, Wallet, ExternalLink, Copy, X } from 'lucide-react';
 import { SwipeCard } from './SwipeCard';
 import { api } from '../../services/api';
 import { useWallet } from '../../hooks/useWallet';
 import { JupiterService } from '../../services/jupiter';
 import { DexScreenerService } from '../../services/dexscreener';
 
+// --- Types ---
 interface TokenData {
   symbol: string;
   price: number;
@@ -20,17 +21,268 @@ interface SwipeDiscoverViewProps {
   onStrategySelect: (strategy: any) => void;
 }
 
+// --- Components ---
+
+/**
+ * CosmicLaunchEffect
+ * 画面左下から右上に駆け抜ける豪華な光の軌跡とスターダストのエフェクト
+ */
+const CosmicLaunchEffect = () => {
+  // 光の軌跡（トレイル）の数
+  const trailCount = 12;
+  // 飛び散る粒子の数
+  const particleCount = 50;
+
+  // ランダムな値を生成するヘルパー
+  const random = (min: number, max: number) => Math.random() * (max - min) + min;
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+      {/* 1. 光の軌跡 (Trails) */}
+      {Array.from({ length: trailCount }).map((_, i) => {
+        const delay = random(0, 0.4);
+        const duration = random(0.6, 1.2);
+        const startX = -10;
+        const endX = 120; // 画面右側へ
+        const startY = 110;
+        const endY = -20; // 画面上側へ
+        const width = random(2, 8); // 線の太さ
+        const angle = 45; // 角度（左下から右上）
+
+        return (
+          <motion.div
+            key={`trail-${i}`}
+            initial={{ 
+              opacity: 0, 
+              scaleY: 0,
+              x: `${startX}vw`, 
+              y: `${startY}vh`,
+              rotate: angle
+            }}
+            animate={{ 
+              opacity: [0, 1, 0], 
+              scaleY: [1, 2, 1], // 加速感
+              x: [`${startX}vw`, `${endX}vw`],
+              y: [`${startY}vh`, `${endY}vh`],
+            }}
+            transition={{
+              duration: duration,
+              delay: delay,
+              ease: [0.1, 0, 0.3, 1], // 急加速するイージング
+            }}
+            style={{
+              position: 'absolute',
+              width: `${width}px`,
+              height: '30vh', // 非常に長い尾
+              // オレンジ、ゴールド、シアン（青緑）の豪華なグラデーション
+              background: 'linear-gradient(to top, transparent, #fbbf24, #f97316, #22d3ee, transparent)',
+              filter: 'blur(4px) brightness(2)',
+              transformOrigin: 'center',
+              boxShadow: '0 0 20px rgba(249, 115, 22, 0.6)'
+            }}
+          />
+        );
+      })}
+
+      {/* 2. 飛び散るスターダスト (Particles) */}
+      {Array.from({ length: particleCount }).map((_, i) => {
+        const delay = random(0, 0.6);
+        const duration = random(0.8, 2.0);
+        const size = random(2, 5);
+        
+        // 左下エリアから発生
+        const startX = random(-10, 40); 
+        const startY = random(80, 120);
+        
+        // 拡散方向（右上全体）
+        const moveX = random(50, 150);
+        const moveY = random(-50, -150);
+
+        const colors = ['#fbbf24', '#f97316', '#22d3ee', '#ffffff'];
+        const color = colors[Math.floor(random(0, colors.length))];
+
+        return (
+          <motion.div
+            key={`particle-${i}`}
+            initial={{ 
+              opacity: 0,
+              x: `${startX}vw`,
+              y: `${startY}vh`,
+              scale: 0
+            }}
+            animate={{ 
+              opacity: [0, 1, 0],
+              x: `${startX + moveX}vw`,
+              y: `${startY + moveY}vh`,
+              scale: [0, random(1, 2), 0],
+            }}
+            transition={{
+              duration: duration,
+              delay: delay,
+              ease: "easeOut",
+            }}
+            style={{
+              position: 'absolute',
+              width: `${size}px`,
+              height: `${size}px`,
+              backgroundColor: color,
+              borderRadius: '50%',
+              boxShadow: `0 0 ${size * 2}px ${color}`,
+            }}
+          />
+        );
+      })}
+      
+      {/* 3. 左下の発射口のバースト光 */}
+       <motion.div
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: [0, 0.6, 0], scale: [1, 3] }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
+          className="absolute -bottom-20 -left-20 w-96 h-96 rounded-full bg-gradient-to-tr from-orange-500 to-cyan-500 blur-[100px] z-[-1]"
+       />
+    </div>
+  );
+};
+
+/**
+ * SuccessOverlay
+ * マッチ時の演出画面
+ */
+const SuccessOverlay = ({ strategy, onClose, onGoToStrategy }: { strategy: any, onClose: () => void, onGoToStrategy: () => void }) => {
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 touch-none overflow-hidden"
+    >
+      {/* 豪華な発射エフェクト */}
+      <CosmicLaunchEffect />
+
+      {/* 背景の微細なノイズ/グラデーション */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-orange-900/20 via-transparent to-blue-900/20 pointer-events-none" />
+      
+      {/* タイトルエリア */}
+      <motion.div 
+        initial={{ scale: 0.8, y: 30, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        transition={{ type: "spring", damping: 14, stiffness: 100, delay: 0.1 }}
+        className="relative mb-10 z-20 text-center"
+      >
+        <h1 className="text-5xl md:text-7xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-200 to-orange-500 drop-shadow-[0_0_30px_rgba(234,88,12,0.8)] transform -rotate-3 leading-none tracking-tight">
+          READY FOR<br/>TAKEOFF
+        </h1>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="flex items-center justify-center gap-2 mt-4"
+        >
+          <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+          <p className="text-cyan-400 font-mono text-sm tracking-[0.2em] uppercase font-bold">
+            Gem Discovered
+          </p>
+          <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+        </motion.div>
+      </motion.div>
+
+      {/* 戦略プレビューカード */}
+      <motion.div 
+        initial={{ opacity: 0, y: 50, rotateX: 20 }}
+        animate={{ opacity: 1, y: 0, rotateX: 0 }}
+        transition={{ delay: 0.3, type: "spring" }}
+        className="w-full max-w-xs bg-[#1C1917]/90 rounded-3xl border border-orange-500/30 p-5 mb-8 relative overflow-hidden shadow-2xl z-20 backdrop-blur-xl"
+      >
+         {/* 上部のバー */}
+         <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-500 via-yellow-400 to-cyan-500" />
+         
+         <div className="flex items-center gap-4 mb-5 pt-2">
+            <div className="relative">
+                <img 
+                  src={strategy.creatorPfpUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${strategy.creatorAddress}`}
+                  alt="creator" 
+                  className="w-16 h-16 rounded-full border-2 border-white/10 bg-black object-cover"
+                />
+                <div className="absolute -bottom-2 -right-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#1C1917] shadow-lg flex items-center gap-1">
+                    ROI {(strategy.roi || 0).toFixed(0)}%
+                </div>
+            </div>
+            <div className="min-w-0">
+               <h3 className="font-bold text-white text-xl leading-tight truncate">{strategy.name}</h3>
+               <p className="text-xs text-white/40 font-mono mt-1 flex items-center gap-1">
+                 By {strategy.creatorAddress?.slice(0, 4)}...{strategy.creatorAddress?.slice(-4)}
+               </p>
+            </div>
+         </div>
+
+         {/* トークンパイル */}
+         <div className="flex gap-1.5 overflow-hidden pl-1 opacity-90">
+            {strategy.tokens.slice(0, 6).map((t: any, i: number) => (
+                <div key={i} className="w-9 h-9 rounded-full bg-black flex items-center justify-center border border-white/10 shadow-lg relative -ml-2 first:ml-0 transition-transform hover:-translate-y-1">
+                    {t.logoURI ? (
+                        <img src={t.logoURI} alt={t.symbol} className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                        <span className="text-[9px] text-white font-bold">{t.symbol?.[0]}</span>
+                    )}
+                </div>
+            ))}
+            {strategy.tokens.length > 6 && (
+                <div className="w-9 h-9 rounded-full bg-[#292524] flex items-center justify-center border border-white/10 text-[10px] text-white font-bold relative -ml-2 shadow-lg">
+                    +{strategy.tokens.length - 6}
+                </div>
+            )}
+         </div>
+      </motion.div>
+
+      {/* アクションボタン */}
+      <div className="flex flex-col gap-3 w-full max-w-xs z-20 safe-area-bottom">
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          onClick={onGoToStrategy}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="group w-full py-4 bg-gradient-to-r from-orange-600 to-yellow-600 text-white font-black text-lg rounded-2xl shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all flex items-center justify-center gap-2 relative overflow-hidden"
+        >
+          <span className="relative z-10 flex items-center gap-2">
+            <Rocket className="w-5 h-5 fill-white" /> LFG (View Detail)
+          </span>
+          {/* ボタン内の光沢エフェクト */}
+          <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 skew-x-12" />
+        </motion.button>
+
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          onClick={onClose}
+          className="w-full py-4 bg-white/5 border border-white/10 text-white/60 font-bold text-lg rounded-2xl hover:bg-white/10 hover:text-white active:scale-95 transition-all flex items-center justify-center gap-2"
+        >
+          Keep Scouting
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+};
+
+// --- Main View Component ---
+
 export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDiscoverViewProps) => {
   const { publicKey } = useWallet();
   const [strategies, setStrategies] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   
+  // マッチした戦略を保持するState
+  const [matchedStrategy, setMatchedStrategy] = useState<any | null>(null);
+  
   const [tokenDataMap, setTokenDataMap] = useState<Record<string, TokenData>>({});
   const [userMap, setUserMap] = useState<Record<string, any>>({});
   
   const dataFetched = useRef(false);
 
+  // --- Data Fetching Logic ---
   useEffect(() => {
     if (dataFetched.current) return;
     dataFetched.current = true;
@@ -97,7 +349,6 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
 
         const mintArray = Array.from(allMints);
         if (mintArray.length > 0) {
-            // ★修正: 型キャストを追加してインデックスエラーを回避
             const [jupPrices, dexData] = await Promise.all([
                 JupiterService.getPrices(mintArray).catch(() => ({})) as Promise<Record<string, number>>,
                 DexScreenerService.getMarketData(mintArray).catch(() => ({})) as Promise<Record<string, { price: number; change24h: number }>>
@@ -107,7 +358,6 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
                 const current = initialMap[mint];
                 if (!current) return;
 
-                // ★これでエラーが消えるはず
                 const price = jupPrices[mint] || dexData[mint]?.price || current.price;
                 const change = dexData[mint]?.change24h || current.change24h;
 
@@ -123,8 +373,8 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
 
         const creators = new Set<string>();
         uniqueStrategies.forEach((s: any) => {
-          if (s.ownerPubkey) creators.add(s.ownerPubkey);
-          if (s.creator) creators.add(s.creator);
+          const addr = s.ownerPubkey || s.owner_pubkey || s.creator;
+          if (addr) creators.add(addr);
         });
         
         if (creators.size > 0) {
@@ -179,7 +429,7 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
       });
       const calculatedRoi = totalWeight > 0 ? (weightedSum / totalWeight) : 0;
 
-      const ownerAddress = s.ownerPubkey || s.creator;
+      const ownerAddress = s.ownerPubkey || s.owner_pubkey || s.creator;
       const userProfile = userMap[ownerAddress];
 
       return {
@@ -199,11 +449,32 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
     });
   }, [strategies, tokenDataMap, userMap]);
 
-  const handleSwipe = (direction: 'left' | 'right') => {
+  // --- Handlers ---
+
+  const handleSwipe = (direction: 'left' | 'right', strategy: any) => {
+    // スワイプアニメーションを待つ
     setTimeout(() => {
       setCurrentIndex(prev => prev + 1);
+      
+      // 右スワイプ（Like）の場合のみ成功画面を表示
+      if (direction === 'right') {
+        setMatchedStrategy(strategy);
+      }
     }, 200);
   };
+
+  const handleGoToStrategy = () => {
+    if (matchedStrategy) {
+      onStrategySelect(matchedStrategy);
+      setMatchedStrategy(null);
+    }
+  };
+
+  const handleCloseMatch = () => {
+    setMatchedStrategy(null);
+  };
+
+  // --- Render ---
 
   if (loading) {
     return (
@@ -241,6 +512,17 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
 
   return (
     <div className="relative w-full h-[100dvh] bg-[#030303] overflow-hidden flex flex-col">
+      {/* 成功画面（発射エフェクト）の表示制御 */}
+      <AnimatePresence>
+        {matchedStrategy && (
+          <SuccessOverlay 
+            strategy={matchedStrategy} 
+            onClose={handleCloseMatch} 
+            onGoToStrategy={handleGoToStrategy} 
+          />
+        )}
+      </AnimatePresence>
+
       <div className="flex-1 w-full flex items-center justify-center px-4 pb-53 pt-12 md:pb-24">
         <div className="relative w-full max-w-sm h-full max-h-[70vh] md:max-h-[600px]">
           <AnimatePresence>
@@ -252,8 +534,9 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
                   index={stackIndex} 
                   isTop={stackIndex === 0}
                   strategy={strategy}
-                  onSwipeLeft={() => handleSwipe('left')}
-                  onSwipeRight={() => onStrategySelect(strategy)}
+                  // 右スワイプはhandleSwipe経由でSuccessOverlayを呼び出す
+                  onSwipeLeft={() => handleSwipe('left', strategy)}
+                  onSwipeRight={() => handleSwipe('right', strategy)}
                   onTap={() => onStrategySelect(strategy)}
                 />
               );

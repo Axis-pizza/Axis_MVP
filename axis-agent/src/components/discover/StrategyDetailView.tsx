@@ -64,6 +64,7 @@ const SwipeToConfirm = ({
   const textOpacity = useMotionTransform(x, [0, maxDrag * 0.25], [1, 0]);
   const progressWidth = useMotionTransform(x, [0, maxDrag], [HANDLE_SIZE + PADDING * 2, containerWidth]);
   const progressOpacity = useMotionTransform(x, [0, maxDrag * 0.08], [0, 1]);
+  const controls = useAnimation();
 
   useEffect(() => {
     if (!constraintsRef.current) return;
@@ -338,60 +339,13 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
     loadChart();
   }, [strategy.id, timeframe, chartType]);
 
-  const handleDeposit = async (amountStr: string, asset: AssetType) => {
-    if (!wallet.publicKey) {
-      showToast("Please connect your wallet first", "error");
-      return;
-    }
-    
-    setInvestStatus('SIGNING');
-    
-    try {
-      if (asset === 'USDC') {
-        showToast("USDC Coming Soon (Switched to SOL)", "info");
-      }
-      
-      const parsedAmount = parseFloat(amountStr);
-      let targetPubkey: PublicKey;
-      try {
-        targetPubkey = new PublicKey(strategy.id);
-      } catch (e) {
-        // Fallback or Error Handling
-        throw new Error("Invalid Strategy Address");
-      }
-      
-      // ★修正: KagemushaService.depositSol を呼び出し
-      await KagemushaService.depositSol(connection, wallet, targetPubkey, parsedAmount);
-      
-      showToast(`Successfully deposited ${parsedAmount} SOL`, "success");
-      setInvestStatus('SUCCESS');
-      
-      // 成功後のデータ更新 (オプション)
-      await api.syncUserStats(wallet.publicKey.toBase58(), 0, parsedAmount);
-
-      setTimeout(() => { 
-        setIsInvestOpen(false); 
-        setInvestStatus('IDLE'); 
-      }, 1500);
-
-    } catch (e: any) {
-      console.error(e);
-      let msg = "Transaction Failed";
-      if (e.message.includes("User rejected")) msg = "Cancelled by user";
-      if (e.message.includes("0x1")) msg = "Insufficient funds";
-      
-      showToast(msg, "error");
-      setInvestStatus('ERROR');
-      setTimeout(() => setInvestStatus('IDLE'), 2000);
-    }
-  };
-
   const handleToggleWatchlist = async () => {
     if (!wallet.publicKey) {
         showToast("Connect wallet to track strategies", "info");
         return;
     }
     
+    // アニメーション実行
     controls.set({ rotate: 0, scale: 1 }); 
     controls.start({
       rotate: 360,
@@ -399,14 +353,18 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       transition: { type: "spring", stiffness: 300, damping: 12, mass: 0.5 }
     });
 
+    // 楽観的UI更新（APIを待たずに即座に切り替える）
     const nextState = !isWatchlisted;
     setIsWatchlisted(nextState);
 
     try {
       await api.toggleWatchlist(strategy.id, wallet.publicKey.toBase58());
       showToast(nextState ? "Added to watchlist" : "Removed from watchlist", "success");
-    } catch {
+    } catch (e: any) {
+      // 失敗したら元に戻す
       setIsWatchlisted(!nextState);
+      console.error("Watchlist error:", e);
+      showToast(e.message || "Failed to update watchlist", "error");
     }
   };
 
@@ -417,8 +375,100 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
   
   const handleShareToX = () => {
     const text = `Check out ${strategy.name} ($${strategy.ticker}) on Axis! 🚀`;
+    // window.location.href は現在のURL
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`, '_blank');
   };
+
+  
+  const handleDeposit = async (amountStr: string, asset: AssetType) => {
+    if (!wallet.publicKey) {
+      showToast("Please connect your wallet first", "error");
+      return;
+    }
+    
+    if (asset === 'USDC') {
+      showToast("USDC deposits are coming soon! Switched to SOL.", "info");
+      return; 
+    }
+
+    setInvestStatus('SIGNING');
+    
+    try {
+      const parsedAmount = parseFloat(amountStr);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+          throw new Error("Invalid amount");
+      }
+
+      // -------------------------------------------------------
+      // ★ 修正ポイント: アドレス解決ロジックの強化
+      // -------------------------------------------------------
+      
+      // 1. 優先順位に従ってアドレス候補を取得
+      const targetAddressStr = 
+          strategy.address || 
+          strategy.config?.strategyPubkey || 
+          (strategy.id && strategy.id.length < 50 && !strategy.id.includes('-') ? strategy.id : null);
+
+      console.log("Found Address Candidate:", targetAddressStr);
+
+      // 2. 候補がない、またはUUID（ハイフンが含まれる）場合はエラーにする
+      // UUID: 0ddd8d53-c18e-4d5d-b72e-046df12d6dd9 (36文字, ハイフンあり)
+      if (!targetAddressStr || targetAddressStr.includes('-')) {
+          console.error("Critical: No valid Solana address found. ID is UUID:", strategy.id);
+          
+          // ★ここで強制的にユーザーに通知して処理を中断する
+          showToast("Error: Strategy address not found in database.", "error");
+          setInvestStatus('ERROR');
+          setTimeout(() => setInvestStatus('IDLE'), 2000);
+          return; 
+      }
+
+      // 3. ここまで来れば Solanaアドレス とみなしてPublicKey化
+      let targetPubkey: PublicKey;
+      try {
+        targetPubkey = new PublicKey(targetAddressStr.trim());
+      } catch (e) {
+        throw new Error(`Invalid address format: ${targetAddressStr}`);
+      }
+
+      console.log(`Depositing ${parsedAmount} SOL to ${targetPubkey.toBase58()}`);
+
+      // 4. 入金実行
+      const signature = await KagemushaService.depositSol(
+          connection, 
+          wallet, 
+          targetPubkey, 
+          parsedAmount
+      );
+      
+      console.log("Deposit Success, Signature:", signature);
+      showToast(`Successfully deposited ${parsedAmount} SOL`, "success");
+      setInvestStatus('SUCCESS');
+      
+      try {
+        await api.syncUserStats(wallet.publicKey.toBase58(), 0, parsedAmount);
+      } catch (syncError) {
+        console.warn("Failed to sync stats:", syncError);
+      }
+
+      setTimeout(() => { 
+        setIsInvestOpen(false); 
+        setInvestStatus('IDLE'); 
+      }, 1500);
+
+    } catch (e: any) {
+      console.error("Deposit Transaction Failed:", e);
+      if (e.logs) console.error("Simulation Logs:", e.logs);
+
+      let msg = "Transaction Failed";
+      if (e.message.includes("User rejected")) msg = "Transaction cancelled";
+      
+      showToast(msg, "error");
+      setInvestStatus('ERROR');
+      setTimeout(() => setInvestStatus('IDLE'), 2000);
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-black text-[#E7E5E4] pb-40 font-sans selection:bg-[#D97706]/30 max-w-2xl mx-auto">

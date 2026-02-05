@@ -58,7 +58,6 @@ export const TokenCard = ({ token, selected, onSelect, showPrice = true, compact
         }
       `}
     >
-      {/* Selection indicator */}
       {selected && (
         <motion.div
           initial={{ scale: 0 }}
@@ -70,7 +69,6 @@ export const TokenCard = ({ token, selected, onSelect, showPrice = true, compact
       )}
 
       <div className="flex items-start gap-3">
-        {/* Token Logo */}
         {token.logoURI ? (
           <img src={token.logoURI} alt={token.symbol} className="w-10 h-10 rounded-full" />
         ) : (

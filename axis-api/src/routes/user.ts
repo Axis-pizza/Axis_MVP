@@ -10,34 +10,50 @@ const app = new Hono<{ Bindings: Bindings }>();
 // --- Register ---
 app.post('/register', async (c) => {
   try {
+    // email, invite_code_used を任意項目として受け取る
     const { email, wallet_address, invite_code_used, avatar_url, name, bio } = await c.req.json()
 
-    if (!email || !wallet_address || !invite_code_used) {
-      return c.json({ error: 'Missing fields' }, 400)
+    // ★変更点1: wallet_address のみ必須とする
+    if (!wallet_address) {
+      return c.json({ error: 'Wallet address is required' }, 400)
     }
 
     let referrerId: string | null = null;
     let isSystemInvite = false;
 
-    // Check User Code
-    const referrerUser = await c.env.axis_db.prepare('SELECT id FROM users WHERE invite_code = ?').bind(invite_code_used).first();
-    
-    if (referrerUser) {
-      // @ts-ignore
-      referrerId = referrerUser.id;
-    } else {
-      // Check System Code
-      const invite = await InviteModel.findInviteByCode(c.env.axis_db, invite_code_used);
-      if (invite) {
-        referrerId = (invite.creator_id === 'system') ? null : invite.creator_id;
-        isSystemInvite = true;
-      } else {
-        return c.json({ error: 'Invalid invite code' }, 400)
-      }
+    // ★変更点2: 招待コードが入力されている場合のみチェックを実行
+    if (invite_code_used) {
+        // Check User Code
+        const referrerUser = await c.env.axis_db.prepare('SELECT id FROM users WHERE invite_code = ?').bind(invite_code_used).first();
+        
+        if (referrerUser) {
+          // @ts-ignore
+          referrerId = referrerUser.id;
+        } else {
+          // Check System Code
+          const invite = await InviteModel.findInviteByCode(c.env.axis_db, invite_code_used);
+          if (invite) {
+            referrerId = (invite.creator_id === 'system') ? null : invite.creator_id;
+            isSystemInvite = true;
+          } else {
+            // コードが入力されたのに無効な場合はエラーを返す（UXのため）
+            // ※もし「無効なら無視して登録」にしたい場合はここをスルーさせてください
+            return c.json({ error: 'Invalid invite code' }, 400)
+          }
+        }
     }
 
-    const existing = await c.env.axis_db.prepare('SELECT id, invite_code FROM users WHERE email = ? OR wallet_address = ?')
-      .bind(email, wallet_address)
+    // ★変更点3: 既存ユーザーチェック (Wallet優先、Emailがあればそれもチェック)
+    let query = 'SELECT id, invite_code FROM users WHERE wallet_address = ?';
+    let params: any[] = [wallet_address];
+
+    if (email) {
+        query += ' OR email = ?';
+        params.push(email);
+    }
+
+    const existing = await c.env.axis_db.prepare(query)
+      .bind(...params)
       .first()
 
     if (existing) {
@@ -49,16 +65,31 @@ app.post('/register', async (c) => {
     const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
     const newInviteCode = `AXIS-${randomSuffix}`
 
-    await UserModel.createRegisteredUser(c.env.axis_db, newId, email, wallet_address, newInviteCode, invite_code_used, avatar_url, name, bio);
+    // ★変更点4: Emailや招待コードがない場合は null を渡して登録
+    // (注意: DBのusersテーブルで email, invite_code_used カラムが NULL許容になっている必要があります)
+    await UserModel.createRegisteredUser(
+        c.env.axis_db, 
+        newId, 
+        email || null, 
+        wallet_address, 
+        newInviteCode, 
+        invite_code_used || null, 
+        avatar_url, 
+        name, 
+        bio
+    );
 
-    if (isSystemInvite) {
+    if (isSystemInvite && invite_code_used) {
       await InviteModel.markInviteUsed(c.env.axis_db, invite_code_used, newId);
     }
 
-    try {
-      await sendInviteEmail(c.env, email, newInviteCode);
-    } catch (err) {
-      console.error("Email send failed (non-fatal):", err);
+    // ★変更点5: Emailがある場合のみ送信
+    if (email) {
+        try {
+          await sendInviteEmail(c.env, email, newInviteCode);
+        } catch (err) {
+          console.error("Email send failed (non-fatal):", err);
+        }
     }
 
     return c.json({ 
@@ -73,6 +104,7 @@ app.post('/register', async (c) => {
 })
 
 // --- Request Invite ---
+// (ここは変更なし。招待制を残すならこのままでOK)
 app.post('/request-invite', async (c) => {
   try {
     const { email } = await c.req.json();
@@ -84,7 +116,6 @@ app.post('/request-invite', async (c) => {
         return c.json({ error: 'User already registered' }, 409);
     }
 
-    // ★修正: createOneInviteにemailを渡す
     const code = await InviteModel.createOneInvite(c.env.axis_db, 'system', email);
 
     try {
@@ -109,14 +140,13 @@ app.get('/user', async (c) => {
   try {
     const user = await UserModel.findUserByWallet(c.env.axis_db, wallet);
     
-    // ユーザーが存在しない場合はデフォルト値を返す（カードが壊れないように）
     const userData = user || {
       name: 'Anonymous',
       bio: '',
       avatar_url: '',
-      total_xp: 0,          // Points
-      rank_tier: 'Novice',  // Rank
-      pnl_percent: 0,       // PnL
+      total_xp: 0,          
+      rank_tier: 'Novice',  
+      pnl_percent: 0,       
       total_invested_usd: 0
     };
 
@@ -126,7 +156,6 @@ app.get('/user', async (c) => {
         username: userData.name,
         bio: userData.bio,
         pfpUrl: userData.avatar_url,
-        // カード表示用数値
         total_xp: userData.total_xp,
         rank_tier: userData.rank_tier,
         pnl_percent: userData.pnl_percent,
@@ -140,8 +169,87 @@ app.get('/user', async (c) => {
   }
 });
 
+app.get('/users/:wallet/watchlist', async (c) => {
+  const wallet = c.req.param('wallet');
 
-// --- Update Profile ---
+  try {
+    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet).first();
+    
+    if (!user) {
+      return c.json({ success: true, strategies: [] });
+    }
+
+    const query = `
+      SELECT s.* FROM strategies s
+      JOIN watchlist w ON s.id = w.strategy_id
+      WHERE w.user_id = ?
+      ORDER BY w.created_at DESC
+    `;
+
+    const { results } = await c.env.axis_db.prepare(query).bind(user.id).all();
+
+    return c.json({ success: true, strategies: results });
+
+  } catch (e: any) {
+    console.error("Get Watchlist Error:", e);
+    return c.json({ success: false, strategies: [], error: e.message });
+  }
+});
+
+app.post('/strategies/:id/watchlist', async (c) => {
+  const strategyId = c.req.param('id');
+  const { userPubkey } = await c.req.json();
+
+  if (!userPubkey || !strategyId) {
+    return c.json({ error: 'Missing params' }, 400);
+  }
+
+  try {
+    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userPubkey).first();
+    if (!user) return c.json({ error: 'User not found' }, 404);
+
+    const existing = await c.env.axis_db.prepare(
+      'SELECT id FROM watchlist WHERE user_id = ? AND strategy_id = ?'
+    ).bind(user.id, strategyId).first();
+
+    if (existing) {
+      await c.env.axis_db.prepare(
+        'DELETE FROM watchlist WHERE user_id = ? AND strategy_id = ?'
+      ).bind(user.id, strategyId).run();
+      return c.json({ success: true, isWatchlisted: false, message: 'Removed from watchlist' });
+    } else {
+      await c.env.axis_db.prepare(
+        'INSERT INTO watchlist (id, user_id, strategy_id, created_at) VALUES (?, ?, ?, ?)'
+      ).bind(crypto.randomUUID(), user.id, strategyId, Math.floor(Date.now() / 1000)).run();
+      return c.json({ success: true, isWatchlisted: true, message: 'Added to watchlist' });
+    }
+
+  } catch (e: any) {
+    console.error("Toggle Watchlist Error:", e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+app.get('/strategies/:id/watchlist', async (c) => {
+  const strategyId = c.req.param('id');
+  const userWallet = c.req.query('user');
+
+  if (!userWallet) return c.json({ isWatchlisted: false });
+
+  try {
+    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userWallet).first();
+    if (!user) return c.json({ isWatchlisted: false });
+
+    const existing = await c.env.axis_db.prepare(
+      'SELECT id FROM watchlist WHERE user_id = ? AND strategy_id = ?'
+    ).bind(user.id, strategyId).first();
+
+    return c.json({ isWatchlisted: !!existing });
+  } catch (e) {
+    return c.json({ isWatchlisted: false });
+  }
+});
+
 app.post('/user', async (c) => { 
   let body;
   try {
@@ -172,7 +280,6 @@ app.post('/user', async (c) => {
   }
 });
 
-// --- Daily Check-in ---
 app.post('/users/:wallet/checkin', async (c) => {
     const wallet = c.req.param('wallet');
     try {
@@ -208,10 +315,8 @@ app.get('/my-invites', async (c) => {
 });
 
 
-// --- Get Leaderboard (ソート対応) ---
 app.get('/leaderboard', async (c) => {
   try {
-    // sort: points | volume | created
     const sort = c.req.query('sort') || 'points'; 
     const limit = 50;
 
@@ -226,7 +331,6 @@ app.get('/leaderboard', async (c) => {
       valueColumn = 'strategies_count';
     }
 
-    // 必要なカラムだけ取得
     const query = `
       SELECT wallet_address, name, avatar_url, rank_tier, ${valueColumn} as value
       FROM users 
@@ -250,14 +354,13 @@ app.get('/leaderboard', async (c) => {
     return c.json({ success: false, error: e.message }, 500);
   }
 });
-// 2. 投資成績の同期 (Sync)
+
 app.post('/user/stats', async (c) => {
   try {
       const { wallet_address, pnl_percent, total_invested_usd } = await c.req.json();
 
       if (!wallet_address) return c.json({ error: 'Wallet required' }, 400);
 
-      // DB更新
       await c.env.axis_db.prepare(
           `UPDATE users SET pnl_percent = ?, total_invested_usd = ?, last_snapshot_at = ? WHERE wallet_address = ?`
       ).bind(

@@ -1,4 +1,3 @@
-// components/common/BugDrawer.tsx
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Image as ImageIcon, Send, ExternalLink, Loader2, Trash2 } from 'lucide-react';
@@ -16,16 +15,13 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
   const [isSending, setIsSending] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   
-  // input[type="file"] への参照
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://axis-api.yusukekikuta-05.workers.dev';
 
-  // ファイル選択ハンドラ
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // 2MB制限 (Cloudflare Workersの制限回避のため)
       if (file.size > 2 * 1024 * 1024) {
         alert("Image size must be less than 2MB");
         return;
@@ -36,14 +32,12 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
     }
   };
 
-  // ファイル削除
   const clearFile = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // 画像をBase64に変換するヘルパー
   const convertToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -64,7 +58,6 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
         imageBase64 = await convertToBase64(selectedFile);
       }
 
-      // バックエンド (/report) へPOST送信
       const res = await fetch(`${API_BASE_URL}/report`, {
         method: 'POST',
         headers: {
@@ -73,7 +66,7 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
         body: JSON.stringify({
           user_tg: tgId,
           message: message,
-          image: imageBase64, // 画像データを追加
+          image: imageBase64,
         }),
       });
 
@@ -81,10 +74,9 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
         throw new Error('Failed to transmit signal');
       }
 
-      // 送信成功
       setStatus('success');
       
-      // 2秒後に閉じてフォームをリセット
+     
       setTimeout(() => {
         setStatus('idle');
         onClose();
@@ -106,7 +98,6 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -115,7 +106,6 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
             className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60]"
           />
 
-          {/* Drawer Sheet */}
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -123,14 +113,12 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="fixed bottom-0 left-0 right-0 z-[70] bg-[#050505] border-t border-white/10 rounded-t-[32px] p-6 pb-12 shadow-[0_-20px_60px_rgba(249,115,22,0.1)] overflow-hidden"
           >
-            {/* Handle */}
             <div className="flex justify-center mb-8">
               <div className="w-12 h-1 bg-white/10 rounded-full" />
             </div>
 
             <div className="max-w-md mx-auto relative font-serif">
               
-              {/* Close Button */}
               <button 
                 onClick={onClose}
                 className="absolute -top-4 right-0 p-2 text-white/30 hover:text-white transition-colors z-10"
@@ -138,7 +126,6 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
                 <X size={24} />
               </button>
 
-              {/* 1. Founder Card (Top) */}
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -152,13 +139,11 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
                   rel="noopener noreferrer"
                   className="relative block overflow-hidden rounded-2xl border border-orange-500/20 group cursor-pointer"
                 >
-                  {/* Card Background: Dark Orange Gradient */}
                   <div className="absolute inset-0 bg-gradient-to-br from-orange-950/80 via-black to-neutral-950 opacity-90 transition-opacity group-hover:opacity-100" />
                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 mix-blend-overlay" />
-                  
-                  {/* Card Content */}
+
                   <div className="relative p-5 flex items-center gap-4">
-                    {/* Avatar with Ring */}
+                   
                     <div className="relative">
                       <div className="absolute inset-0 bg-orange-500 blur-md opacity-20 rounded-full" />
                       <div className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-orange-500/30">
@@ -170,7 +155,7 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
                       </div>
                     </div>
                     
-                    {/* Text Info */}
+                  
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-white font-serif text-xl italic tracking-wide">Muse</span>
@@ -182,7 +167,7 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
                       </div>
                     </div>
 
-                    {/* Action Icon */}
+                    
                     <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/20 border border-white/5 group-hover:bg-orange-500 group-hover:text-black group-hover:border-orange-500 transition-all duration-300">
                       <ExternalLink size={14} />
                     </div>
@@ -190,14 +175,14 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
                 </a>
               </motion.div>
 
-              {/* Divider */}
+            
               <div className="flex items-center gap-4 mb-8">
                 <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent w-full" />
                 <span className="text-[10px] text-white/20 whitespace-nowrap font-sans tracking-widest">OR SEND SIGNAL</span>
                 <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent w-full" />
               </div>
 
-              {/* 2. Form Section (Bottom) */}
+  
               {status === 'success' ? (
                 <motion.div 
                   initial={{ scale: 0.9, opacity: 0 }}
@@ -213,7 +198,7 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
               ) : (
                 <form onSubmit={submitReport} className="space-y-5">
                   
-                  {/* Telegram Input */}
+       
                   <div className="space-y-1.5">
                     <label className="text-[10px] text-orange-500/70 uppercase tracking-widest font-sans font-bold pl-1">Your ID</label>
                     <div className="relative group">
@@ -230,7 +215,6 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
                     </div>
                   </div>
 
-                  {/* Message Input */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] text-orange-500/70 uppercase tracking-widest font-sans font-bold pl-1">Message</label>
                     <textarea 
@@ -243,7 +227,6 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
                     />
                   </div>
 
-                  {/* Screenshot Upload Area */}
                   <div>
                     <input 
                       type="file" 
@@ -270,14 +253,14 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
                         animate={{ opacity: 1, y: 0 }}
                         className="relative rounded-xl overflow-hidden border border-white/10 group"
                       >
-                        {/* Preview Image */}
+
                         {previewUrl && (
                           <div className="h-32 w-full bg-[#111] relative">
                              <img src={previewUrl} alt="Preview" className="w-full h-full object-cover opacity-60" />
                           </div>
                         )}
                         
-                        {/* File Name & Remove Button */}
+
                         <div className="absolute inset-0 flex items-center justify-between p-4 bg-gradient-to-t from-black/80 to-transparent">
                            <span className="text-xs text-white font-mono truncate max-w-[70%]">{selectedFile.name}</span>
                            <button 
@@ -292,7 +275,6 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
                     )}
                   </div>
 
-                  {/* Submit Button */}
                   <motion.button
                     whileHover={{ scale: 1.02, shadow: "0 0 20px rgba(249,115,22,0.2)" }}
                     whileTap={{ scale: 0.96 }}

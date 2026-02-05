@@ -10,7 +10,7 @@ interface ChartData {
 
 interface StrategyChartProps {
   strategyId: string;
-  refreshTrigger?: number; // 更新トリガー
+  refreshTrigger?: number;
 }
 
 const TIMEFRAMES = [
@@ -53,16 +53,13 @@ export const StrategyChart = ({ strategyId, refreshTrigger }: StrategyChartProps
     }
   }, [strategyId, period, refreshTrigger]);
 
-  // パフォーマンス計算 (NAV 100スタートなので、現在値 - 100 がそのまま%になる)
   const percentChange = latestValue ? latestValue - 100 : 0;
   const isPositive = percentChange >= 0;
 
-  // カスタムツールチップ
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const date = new Date(label * 1000);
       const val = payload[0].value;
-      // 基準値(100)からの変動率を表示
       const pnl = val - 100;
       
       return (
@@ -101,7 +98,6 @@ export const StrategyChart = ({ strategyId, refreshTrigger }: StrategyChartProps
 
   return (
     <div className="w-full">
-      {/* Header Stats */}
       <div className="flex items-end justify-between mb-4 px-2">
         <div>
           <p className="text-xs text-white/50 font-bold uppercase tracking-wider mb-1">Performance</p>
@@ -115,7 +111,6 @@ export const StrategyChart = ({ strategyId, refreshTrigger }: StrategyChartProps
           </div>
         </div>
         
-        {/* Timeframe Selector */}
         <div className="flex bg-white/5 rounded-lg p-0.5 border border-white/10">
           {TIMEFRAMES.map((tf) => (
             <button
@@ -133,7 +128,6 @@ export const StrategyChart = ({ strategyId, refreshTrigger }: StrategyChartProps
         </div>
       </div>
 
-      {/* Chart Area */}
       <div className="h-64 w-full relative">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>

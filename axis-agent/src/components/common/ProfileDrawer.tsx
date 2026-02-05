@@ -6,10 +6,8 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWallet } from '../../hooks/useWallet';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-
 import { ProfileEditModal } from './ProfileEditModal';
 
-// QRコード & シェアモーダル
 const InviteModal = ({ isOpen, onClose, pubkey }: { isOpen: boolean; onClose: () => void; pubkey: string }) => {
   const { showToast } = useToast();
   const inviteLink = `${window.location.origin}/?ref=${pubkey}`;
@@ -83,9 +81,9 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isWalletModalPending, setIsWalletModalPending] = useState(false);
   
-  // ★ Solana Wallet Adapter を使用
-  const { setVisible } = useWalletModal();
+  const { setVisible, visible: walletModalVisible } = useWalletModal();
   const { publicKey, disconnect, ready, connected } = useWallet();
 
   const resetUserData = useCallback(() => {
@@ -97,6 +95,8 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       resetUserData();
       return;
     }
+     
+    
     try {
       const res = await api.getUser(publicKey.toBase58());
       if (res.success || res.user) {
@@ -104,33 +104,59 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       }
     } catch (e) {
       console.error("Failed to fetch user", e);
+    } finally {
     }
   }, [publicKey, resetUserData]);
 
-  // ★修正: authenticated → connected
   useEffect(() => {
     if (!publicKey || !connected) {
       resetUserData();
     }
   }, [publicKey, connected, resetUserData]);
 
-  // ★修正: authenticated → connected
+  useEffect(() => {
+    if (publicKey && connected) {
+      fetchUser();
+    }
+  }, [publicKey, connected, fetchUser]);
+
+
   useEffect(() => {
     if (isOpen && publicKey && connected) {
       fetchUser();
     }
   }, [isOpen, publicKey, connected, fetchUser]);
 
+
+  useEffect(() => {
+    if (isWalletModalPending && !walletModalVisible) {
+      setIsWalletModalPending(false);
+    }
+  }, [walletModalVisible, isWalletModalPending]);
+
   const handleCheckIn = async () => {
     if (!publicKey) return;
     setLoading(true);
     try {
       const res = await api.dailyCheckIn(publicKey.toBase58());
+      console.log('[handleCheckIn] Response:', res);
+
       if (res.success) {
-        setUserData(res.user);
+        // Update XP from response if available
+        const newXp = res.user?.total_xp ?? res.user?.xp ?? res.total_xp ?? res.xp;
+        if (newXp !== undefined) {
+          setUserData((prev: any) => ({
+            ...prev,
+            total_xp: newXp,
+            ...(res.user || {})
+          }));
+        }
+
+        // Also fetch fresh data from server
+        await fetchUser();
         showToast("✅ +10 XP Claimed!", "success");
       } else {
-        showToast(res.message || "Check-in failed", "error");
+        showToast(res.error || res.message || "Check-in failed", "error");
       }
     } catch (e: any) {
       showToast(`Error: ${e.message}`, "error");
@@ -172,13 +198,17 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     }
   };
 
-  // ★修正: Solana Wallet Adapter のモーダルを開く
   const handleConnect = () => {
-    setVisible(true);
+    setIsWalletModalPending(true);
+    onClose();
+    setTimeout(() => {
+      setVisible(true);
+    }, 150);
   };
 
-  // ★修正: connected を使用
   const showConnectView = !connected || !publicKey;
+  const drawerZIndex = walletModalVisible ? 'z-[100]' : 'z-[9999]';
+  const backdropZIndex = walletModalVisible ? 'z-[99]' : 'z-[9998]';
 
   return createPortal(
     <>
@@ -188,13 +218,13 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
             <motion.div 
               initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} 
               onClick={onClose} 
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998]" 
+              className={`fixed inset-0 bg-black/60 backdrop-blur-sm ${backdropZIndex}`}
             />
             
             <motion.div 
               initial={{x:'100%'}} animate={{x:0}} exit={{x:'100%'}} 
               transition={{type:'spring', damping:25, stiffness: 200}} 
-              className="fixed top-0 right-0 bottom-0 w-[90%] max-w-sm bg-[#0C0A09] border-l border-white/10 z-[9999] flex flex-col safe-area-top shadow-2xl"
+              className={`fixed top-0 right-0 bottom-0 w-[90%] max-w-sm bg-[#0C0A09] border-l border-white/10 ${drawerZIndex} flex flex-col safe-area-top shadow-2xl`}
             >
               
               <div className="flex justify-between items-center p-6 pb-2 shrink-0">
@@ -207,7 +237,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 pt-2 custom-scrollbar">
-                {/* 未接続状態 */}
+
                 {showConnectView && (
                   <div className="flex flex-col items-center justify-center h-full text-center py-10">
                     <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
@@ -224,8 +254,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     </button>
                   </div>
                 )}
-
-                {/* 接続済み状態 */}
                 {!showConnectView && publicKey && (
                   <>
                     <div className="flex flex-col items-center mb-8">
@@ -310,7 +338,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 )}
               </div>
 
-              {/* Disconnect ボタン */}
               {!showConnectView && publicKey && (
                 <div className="mt-auto shrink-0 p-6 pt-0">
                   <button

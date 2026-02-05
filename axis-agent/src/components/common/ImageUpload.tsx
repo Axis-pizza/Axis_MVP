@@ -36,7 +36,6 @@ export const ImageUpload = ({
       const ctx = canvas.getContext('2d');
 
       img.onload = () => {
-        // Max dimensions
         const MAX_SIZE = 1024;
         let { width, height } = img;
         
@@ -62,7 +61,7 @@ export const ImageUpload = ({
             }
           },
           'image/webp',
-          0.85 // Quality
+          0.85
         );
       };
 
@@ -72,13 +71,11 @@ export const ImageUpload = ({
   };
 
   const handleFile = useCallback(async (file: File) => {
-    // Validate type
     if (!file.type.startsWith('image/')) {
       setError('Please select an image file');
       return;
     }
 
-    // Validate initial size (10MB limit for processing)
     if (file.size > 10 * 1024 * 1024) {
       setError('Image too large. Maximum 10MB.');
       return;
@@ -86,24 +83,20 @@ export const ImageUpload = ({
 
     setError(null);
     
-    // Show preview immediately
     const previewUrl = URL.createObjectURL(file);
     setPreview(previewUrl);
 
     try {
       setUploading(true);
       
-      // Compress image
       const compressed = await compressImage(file);
       
-      // Check compressed size
       if (compressed.size > 2 * 1024 * 1024) {
         setError('Compressed image still too large. Try a smaller image.');
         setUploading(false);
         return;
       }
 
-      // Upload
       const result = await api.uploadImage(compressed, walletAddress, type);
       
       if (result.success && result.url) {

@@ -34,6 +34,24 @@ app.onError((err, c) => {
   return c.json({ success: false, error: 'Internal Server Error' }, 500);
 });
 
+app.get('/init-db', async (c) => {
+  try {
+    await c.env.axis_db.prepare(`
+      CREATE TABLE IF NOT EXISTS watchlist (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        strategy_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        UNIQUE(user_id, strategy_id)
+      );
+    `).run();
+
+    return c.json({ success: true, message: "Table 'watchlist' created successfully!" });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message });
+  }
+});
+
 // --- Mount Routes ---
 app.route('/auth', authRoutes);
 app.route('/', userRoutes);
@@ -67,6 +85,8 @@ app.post('/report', async (c) => {
     return c.json({ success: false, error: 'Invalid Request' }, 400);
   }
 });
+
+
 
 async function sendBugReportEmail(
   env: Bindings, 
