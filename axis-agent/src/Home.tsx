@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet, useConnection } from './hooks/useWallet';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { FloatingNav, type ViewState } from './components/common/FloatingNav';
 import { TutorialOverlay } from './components/common/TutorialOverlay';
 import { KagemushaFlow } from './components/create';
@@ -15,7 +16,7 @@ import type { Strategy } from './types';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 type View = 'DISCOVER' | 'CREATE' | 'PROFILE' | 'STRATEGY_DETAIL';
-const TUTORIAL_KEY = 'kagemusha-v1-tutorial';
+const TUTORIAL_KEY = 'kagemusha-onboarding-v2';
 
 export default function Home() {
   const [view, setView] = useState<View>('CREATE');
@@ -24,6 +25,7 @@ export default function Home() {
 
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
+  const { setVisible: setWalletModalVisible } = useWalletModal();
   const [balance, setBalance] = useState<number | null>(null);
 
   // ウォレット残高の取得
@@ -44,19 +46,22 @@ export default function Home() {
     }
   }, [connected, getBalance]);
 
-  // 初回接続時にチュートリアルをトリガー
+  // 初回訪問時にオンボーディングを表示（ウォレット接続不要）
   useEffect(() => {
     const isCompleted = localStorage.getItem(TUTORIAL_KEY);
-    if (connected && !isCompleted) {
-      // DOMが安定するのを少し待ってから表示
-      const timer = setTimeout(() => setShowTutorial(true), 1500);
+    if (!isCompleted) {
+      const timer = setTimeout(() => setShowTutorial(true), 500);
       return () => clearTimeout(timer);
     }
-  }, [connected]);
+  }, []);
 
   const handleTutorialComplete = () => {
     localStorage.setItem(TUTORIAL_KEY, 'true');
     setShowTutorial(false);
+  };
+
+  const handleConnectWallet = () => {
+    setWalletModalVisible(true);
   };
 
   const handleStrategySelect = (strategy: Strategy) => {
@@ -149,7 +154,7 @@ export default function Home() {
       {/* Luxury Tutorial Overlay */}
       <AnimatePresence>
         {showTutorial && (
-          <TutorialOverlay onComplete={handleTutorialComplete} />
+          <TutorialOverlay onComplete={handleTutorialComplete} onConnectWallet={handleConnectWallet} />
         )}
       </AnimatePresence>
     </div>

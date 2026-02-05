@@ -434,12 +434,14 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
 
       return {
         ...s,
-        id: s.address || s.pubkey || s.id, 
-
+        id: s.address || s.pubkey || s.id,
+        address: s.address || ownerAddress,
+        ownerPubkey: ownerAddress,
+        owner: ownerAddress,
         name: s.name || 'Untitled Strategy',
         type: s.type || 'BALANCED',
         tokens: enrichedTokens,
-        roi: calculatedRoi, 
+        roi: calculatedRoi,
         tvl: Number(s.tvl || 0),
         creatorAddress: ownerAddress || 'Unknown',
         creatorPfpUrl: userProfile?.avatar_url ? api.getProxyUrl(userProfile.avatar_url) : null,
