@@ -37,7 +37,7 @@ app.onError((err, c) => {
 app.get('/init-db', async (c) => {
   try {
     await c.env.axis_db.prepare(`
-      CREATE TABLE IF NOT EXISTS watchlists (
+      CREATE TABLE IF NOT EXISTS watchlist (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         strategy_id TEXT NOT NULL,
@@ -46,7 +46,7 @@ app.get('/init-db', async (c) => {
       );
     `).run();
 
-    return c.json({ success: true, message: "Table 'watchlists' created successfully!" });
+    return c.json({ success: true, message: "Table 'watchlist' created successfully!" });
   } catch (e: any) {
     return c.json({ success: false, error: e.message });
   }
