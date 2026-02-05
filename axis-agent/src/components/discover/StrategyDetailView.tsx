@@ -5,14 +5,12 @@ import {
   TrendingUp, TrendingDown, Layers, Activity, Sparkles, ChevronRight, PieChart, Wallet, ArrowRight, X, Check
 } from 'lucide-react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { PublicKey, LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
 
 import { RichChart } from '../common/RichChart';
 import { api } from '../../services/api';
-// ★修正: 新しい KagemushaService を使用
-import { KagemushaService } from '../../services/kagemusha';
 import type { Strategy } from '../../types';
-import { useToast } from '../../context/ToastContext'; 
+import { useToast } from '../../context/ToastContext';
 
 // --- Types ---
 interface StrategyDetailViewProps {
@@ -182,12 +180,14 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div 
+          <motion.div
+            key="invest-backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50"
             onClick={onClose}
           />
           <motion.div
+            key="invest-sheet"
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed bottom-0 left-0 right-0 bg-[#0C0A09] rounded-t-[40px] z-50 overflow-hidden flex flex-col safe-area-bottom pb-8 border-t border-white/10 max-h-[85vh]"
@@ -400,30 +400,33 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       }
 
       // -------------------------------------------------------
-      // ★ 修正ポイント: アドレス解決ロジックの強化
+      // ★ 修正: アドレス解決 + plain SystemProgram.transfer
       // -------------------------------------------------------
-      
+
       // 1. 優先順位に従ってアドレス候補を取得
-      const targetAddressStr = 
-          strategy.address || 
-          strategy.config?.strategyPubkey || 
-          (strategy.id && strategy.id.length < 50 && !strategy.id.includes('-') ? strategy.id : null);
+      const strategyAny = strategy as any;
+      const targetAddressStr =
+          strategy.address ||
+          strategy.config?.strategyPubkey ||
+          strategy.ownerPubkey ||
+          strategyAny.ownerPubkey ||
+          strategyAny.creatorAddress ||
+          strategyAny.creator ||
+          strategy.owner ||
+          null;
 
       console.log("Found Address Candidate:", targetAddressStr);
 
-      // 2. 候補がない、またはUUID（ハイフンが含まれる）場合はエラーにする
-      // UUID: 0ddd8d53-c18e-4d5d-b72e-046df12d6dd9 (36文字, ハイフンあり)
-      if (!targetAddressStr || targetAddressStr.includes('-')) {
-          console.error("Critical: No valid Solana address found. ID is UUID:", strategy.id);
-          
-          // ★ここで強制的にユーザーに通知して処理を中断する
-          showToast("Error: Strategy address not found in database.", "error");
+      // 2. 候補がないか無効な場合はエラー
+      if (!targetAddressStr || targetAddressStr.includes('-') || targetAddressStr === 'Unknown') {
+          console.error("Critical: No valid Solana address found. ID:", strategy.id);
+          showToast("Error: Strategy address not found.", "error");
           setInvestStatus('ERROR');
           setTimeout(() => setInvestStatus('IDLE'), 2000);
-          return; 
+          return;
       }
 
-      // 3. ここまで来れば Solanaアドレス とみなしてPublicKey化
+      // 3. PublicKey化
       let targetPubkey: PublicKey;
       try {
         targetPubkey = new PublicKey(targetAddressStr.trim());
@@ -433,28 +436,48 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
 
       console.log(`Depositing ${parsedAmount} SOL to ${targetPubkey.toBase58()}`);
 
-      // 4. 入金実行
-      const signature = await KagemushaService.depositSol(
-          connection, 
-          wallet, 
-          targetPubkey, 
-          parsedAmount
+      // 4. 入金実行 (SystemProgram.transfer)
+      if (!wallet.signTransaction) {
+        throw new Error("Wallet does not support signing");
+      }
+
+      const lamports = Math.floor(parsedAmount * LAMPORTS_PER_SOL);
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: wallet.publicKey,
+          toPubkey: targetPubkey,
+          lamports,
+        })
       );
-      
+
+      setInvestStatus('CONFIRMING');
+      const latestBlockhash = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = latestBlockhash.blockhash;
+      transaction.feePayer = wallet.publicKey;
+
+      const signedTx = await wallet.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+
+      await connection.confirmTransaction({
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      });
+
       console.log("Deposit Success, Signature:", signature);
       showToast(`Successfully deposited ${parsedAmount} SOL`, "success");
       setInvestStatus('SUCCESS');
-      
-      try {
-        await api.syncUserStats(wallet.publicKey.toBase58(), 0, parsedAmount);
-      } catch (syncError) {
-        console.warn("Failed to sync stats:", syncError);
-      }
 
-      setTimeout(() => { 
-        setIsInvestOpen(false); 
-        setInvestStatus('IDLE'); 
+      // モーダルを先に閉じる（syncが遅延しても画面が固まらないように）
+      setTimeout(() => {
+        setIsInvestOpen(false);
+        setInvestStatus('IDLE');
       }, 1500);
+
+      // fire-and-forget: awaitしない
+      api.syncUserStats(wallet.publicKey.toBase58(), 0, parsedAmount).catch(syncError => {
+        console.warn("Failed to sync stats:", syncError);
+      });
 
     } catch (e: any) {
       console.error("Deposit Transaction Failed:", e);

@@ -37,6 +37,7 @@ export interface Strategy {
   tvl?: number | string;
   price?: number;
   owner?: string;
+  ownerPubkey?: string;
   address?: string;
   config?: {
     strategyPubkey?: string;

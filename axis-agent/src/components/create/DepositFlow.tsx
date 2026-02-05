@@ -119,9 +119,9 @@ export const DepositFlow = ({
 
       const payload = {
         name: String(strategyName).trim(),
-        description: `${strategyType} Strategy created by ${publicKey.toBase58().slice(0, 6)}...`, 
+        description: `${strategyType} Strategy created by ${publicKey.toBase58().slice(0, 6)}...`,
         type: strategyType,
-        
+
         // ★修正: ここで mint と logoURI をバックエンドへ送る
         tokens: tokens.map(t => ({
           symbol: String(t.symbol),
@@ -129,7 +129,7 @@ export const DepositFlow = ({
           mint: t.mint || "So11111111111111111111111111111111111111112",
           logoURI: t.logoURI
         })),
-        
+
         // composition も同様に
         composition: tokens.map(t => ({
           symbol: String(t.symbol),
@@ -140,10 +140,11 @@ export const DepositFlow = ({
 
         ownerPubkey: publicKey.toBase58(),
         creator: publicKey.toBase58(),
+        address: publicKey.toBase58(),
         tvl: Number(parsedAmount),
         initialInvestment: Number(parsedAmount),
-        image: "", 
-        signedTransaction: base64Tx 
+        image: "",
+        signedTransaction: base64Tx
       };
 
       console.log("🚀 Payload aligned for Discover:", JSON.stringify(payload, null, 2));
