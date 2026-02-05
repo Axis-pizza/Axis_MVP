@@ -139,14 +139,24 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     setLoading(true);
     try {
       const res = await api.dailyCheckIn(publicKey.toBase58());
+      console.log('[handleCheckIn] Response:', res);
+
       if (res.success) {
-        if (res.user) {
-          setUserData((prev: any) => ({ ...prev, ...res.user }));
+        // Update XP from response if available
+        const newXp = res.user?.total_xp ?? res.user?.xp ?? res.total_xp ?? res.xp;
+        if (newXp !== undefined) {
+          setUserData((prev: any) => ({
+            ...prev,
+            total_xp: newXp,
+            ...(res.user || {})
+          }));
         }
+
+        // Also fetch fresh data from server
         await fetchUser();
         showToast("✅ +10 XP Claimed!", "success");
       } else {
-        showToast(res.message || "Check-in failed", "error");
+        showToast(res.error || res.message || "Check-in failed", "error");
       }
     } catch (e: any) {
       showToast(`Error: ${e.message}`, "error");

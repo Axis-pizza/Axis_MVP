@@ -33,11 +33,16 @@ export interface Strategy {
     winRate: number;
     sharpeRatio: number;
   };
-  apy?: number; 
+  apy?: number;
   tvl?: number | string;
   price?: number;
   owner?: string;
-  
+  address?: string;
+  config?: {
+    strategyPubkey?: string;
+    [key: string]: unknown;
+  };
+
   backtest?: {
     timestamps: number[];
     values: number[];

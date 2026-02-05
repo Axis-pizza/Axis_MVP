@@ -49,7 +49,7 @@ export const ProfileEditModal = ({
         setStep(prev => (prev === 'OTP' || prev === 'PROFILE') ? prev : 'EMAIL');
       }
     }
-  }, [isOpen]);
+  }, [isOpen, currentProfile.username, currentProfile.bio, currentProfile.avatar_url]);
 
   const handleRequestInvite = async () => {
     if (!email.includes('@')) return showToast("Invalid Email", "error");

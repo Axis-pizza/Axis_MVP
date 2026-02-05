@@ -15,29 +15,34 @@ export const api = {
       }
 
       const res = await fetch(url);
-      
+
       if (!res.ok) {
+        console.log('[getUser] Response not OK:', res.status);
         return { success: false, user: null };
       }
-      
+
       const data = await res.json();
-      
-      if (!data || Object.keys(data).length === 0) {
-          return { success: false, user: null };
+      console.log('[getUser] Raw response:', data);
+
+      // Handle both { user: {...} } and direct {...} response formats
+      const userData = data.user || data;
+
+      if (!userData || Object.keys(userData).length === 0) {
+        return { success: false, user: null };
       }
 
-     
-      return {
-        success: true,
-        user: {
-            ...data,
-            pubkey: pubkey,
-            username: data.name || data.username,
-            avatar_url: data.pfpUrl || data.avatar_url,
-            total_xp: data.total_xp || 0,
-            rank_tier: data.rank_tier || 'Novice'
-        }
+      const user = {
+        ...userData,
+        pubkey: pubkey,
+        username: userData.username || userData.name,
+        avatar_url: userData.pfpUrl || userData.avatar_url,
+        total_xp: userData.total_xp ?? userData.xp ?? 0,
+        rank_tier: userData.rank_tier || 'Novice'
       };
+
+      console.log('[getUser] Processed user:', user);
+
+      return { success: true, user };
     } catch (e) {
       console.error("Fetch User Error:", e);
       return { success: false, user: null };
@@ -51,15 +56,26 @@ export const api = {
         wallet_address: data.wallet_address,
         name: data.username || data.name,
         bio: data.bio,
-        avatar_url: data.pfpUrl || data.avatar_url
+        pfpUrl: data.pfpUrl || data.avatar_url
       };
+
+      console.log('[updateProfile] Sending payload:', payload);
 
       const res = await fetch(`${API_BASE}/user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      return await res.json();
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('[updateProfile] Error response:', text);
+        return { success: false, error: text || `Error: ${res.status}` };
+      }
+
+      const result = await res.json();
+      console.log('[updateProfile] Response:', result);
+      return result;
     } catch (e) {
       console.error("Update Profile Error:", e);
       return { success: false, error: 'Network Error' };
@@ -91,6 +107,16 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
+
+      if (res.status === 409) {
+        return { success: false, error: 'This email has already been registered' };
+      }
+
+      if (!res.ok) {
+        const text = await res.text();
+        return { success: false, error: text || `Error: ${res.status}` };
+      }
+
       return await res.json();
     } catch (e) {
       return { success: false, error: 'Network Error' };
@@ -146,18 +172,24 @@ export const api = {
   },
 
   async dailyCheckIn(pubkey: string) {
-   
-    const url = `${API_BASE}/users/${pubkey}/checkin`; 
+    const url = `${API_BASE}/users/${pubkey}/checkin`;
     try {
       const res = await fetch(url, { method: 'POST' });
       const text = await res.text();
+
+      if (!res.ok) {
+        return { success: false, error: text || `Error: ${res.status}` };
+      }
+
       try {
-        return JSON.parse(text);
+        const data = JSON.parse(text);
+        console.log('[dailyCheckIn] Response:', data);
+        return data;
       } catch (e) {
-        throw new Error(`Server Error: ${text}`);
+        return { success: false, error: `Server Error: ${text}` };
       }
     } catch (error: any) {
-      return { success: false, error: error.message }; 
+      return { success: false, error: error.message };
     }
   },
 

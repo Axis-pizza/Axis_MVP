@@ -403,7 +403,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       // -------------------------------------------------------
       
       // 1. 優先順位に従ってアドレス候補を取得
-      let targetAddressStr = 
+      const targetAddressStr = 
           strategy.address || 
           strategy.config?.strategyPubkey || 
           (strategy.id && strategy.id.length < 50 && !strategy.id.includes('-') ? strategy.id : null);
