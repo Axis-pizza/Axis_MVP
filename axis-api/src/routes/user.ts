@@ -140,6 +140,96 @@ app.get('/user', async (c) => {
   }
 });
 
+app.get('/users/:wallet/watchlist', async (c) => {
+  const wallet = c.req.param('wallet');
+
+  try {
+    // まずユーザーIDを特定
+    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet).first();
+    
+    if (!user) {
+      return c.json({ success: true, strategies: [] });
+    }
+
+    // ウォッチリストテーブルとストラテジーテーブルをJOINして取得
+    // ※ watchlistsテーブルがある前提
+    const query = `
+      SELECT s.* FROM strategies s
+      JOIN watchlists w ON s.id = w.strategy_id
+      WHERE w.user_id = ?
+      ORDER BY w.created_at DESC
+    `;
+
+    const { results } = await c.env.axis_db.prepare(query).bind(user.id).all();
+
+    return c.json({ success: true, strategies: results });
+
+  } catch (e: any) {
+    console.error("Get Watchlist Error:", e);
+    // テーブルがない場合のエラーなども考慮して空配列を返すのが安全
+    return c.json({ success: false, strategies: [], error: e.message });
+  }
+});
+
+// 2. ウォッチリストの切替 (お気に入り登録/解除) (StrategyDetailView用)
+app.post('/strategies/:id/watchlist', async (c) => {
+  const strategyId = c.req.param('id');
+  const { userPubkey } = await c.req.json();
+
+  if (!userPubkey || !strategyId) {
+    return c.json({ error: 'Missing params' }, 400);
+  }
+
+  try {
+    // ユーザーID特定
+    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userPubkey).first();
+    if (!user) return c.json({ error: 'User not found' }, 404);
+
+    // 既に登録済みかチェック
+    const existing = await c.env.axis_db.prepare(
+      'SELECT id FROM watchlists WHERE user_id = ? AND strategy_id = ?'
+    ).bind(user.id, strategyId).first();
+
+    if (existing) {
+      // 登録済みなら -> 削除 (Remove)
+      await c.env.axis_db.prepare(
+        'DELETE FROM watchlists WHERE user_id = ? AND strategy_id = ?'
+      ).bind(user.id, strategyId).run();
+      return c.json({ success: true, isWatchlisted: false, message: 'Removed from watchlist' });
+    } else {
+      // 未登録なら -> 追加 (Add)
+      await c.env.axis_db.prepare(
+        'INSERT INTO watchlists (id, user_id, strategy_id, created_at) VALUES (?, ?, ?, ?)'
+      ).bind(crypto.randomUUID(), user.id, strategyId, Math.floor(Date.now() / 1000)).run();
+      return c.json({ success: true, isWatchlisted: true, message: 'Added to watchlist' });
+    }
+
+  } catch (e: any) {
+    console.error("Toggle Watchlist Error:", e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// 3. ウォッチリスト状態の確認 (ページを開いた時の判定用)
+app.get('/strategies/:id/watchlist', async (c) => {
+  const strategyId = c.req.param('id');
+  const userWallet = c.req.query('user');
+
+  if (!userWallet) return c.json({ isWatchlisted: false });
+
+  try {
+    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userWallet).first();
+    if (!user) return c.json({ isWatchlisted: false });
+
+    const existing = await c.env.axis_db.prepare(
+      'SELECT id FROM watchlists WHERE user_id = ? AND strategy_id = ?'
+    ).bind(user.id, strategyId).first();
+
+    return c.json({ isWatchlisted: !!existing });
+  } catch (e) {
+    return c.json({ isWatchlisted: false });
+  }
+});
 
 // --- Update Profile ---
 app.post('/user', async (c) => { 

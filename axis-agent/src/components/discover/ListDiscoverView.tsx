@@ -68,7 +68,7 @@ export const ListDiscoverView = ({ onToggleView, onStrategySelect }: ListDiscove
             description: item.description || '',
             type: item.type || 'BALANCED',
             tokens: normalizedTokens, 
-            ownerPubkey: item.ownerPubkey || item.creator || 'Unknown',
+            ownerPubkey: item.ownerPubkey || item.owner_pubkey || item.creator || 'Unknown',
             tvl: Number(item.tvl || item.initialInvestment || 0),
             createdAt: item.createdAt ? Number(item.createdAt) : Date.now() / 1000
           };

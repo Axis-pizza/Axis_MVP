@@ -373,8 +373,8 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
 
         const creators = new Set<string>();
         uniqueStrategies.forEach((s: any) => {
-          if (s.ownerPubkey) creators.add(s.ownerPubkey);
-          if (s.creator) creators.add(s.creator);
+          const addr = s.ownerPubkey || s.owner_pubkey || s.creator;
+          if (addr) creators.add(addr);
         });
         
         if (creators.size > 0) {
@@ -429,7 +429,7 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
       });
       const calculatedRoi = totalWeight > 0 ? (weightedSum / totalWeight) : 0;
 
-      const ownerAddress = s.ownerPubkey || s.creator;
+      const ownerAddress = s.ownerPubkey || s.owner_pubkey || s.creator;
       const userProfile = userMap[ownerAddress];
 
       return {

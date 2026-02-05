@@ -298,6 +298,20 @@ export const api = {
     return res.json();
   },
 
+  async getUserWatchlist(pubkey: string) {
+    try {
+      const res = await fetch(`${API_BASE}/users/${pubkey}/watchlist`);
+      
+      if (!res.ok) {
+        return { success: false, strategies: [] };
+      }
+      return await res.json();
+    } catch (e) {
+      console.error("Fetch Watchlist Error:", e);
+      return { success: false, strategies: [] };
+    }
+  },
+
   async discoverStrategies(limit = 50, offset = 0) {
     const res = await fetch(`${API_BASE}/discover?limit=${limit}&offset=${offset}`);
     return res.json();

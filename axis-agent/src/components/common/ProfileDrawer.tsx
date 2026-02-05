@@ -122,10 +122,10 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
 
   useEffect(() => {
-    if (isOpen && publicKey && connected && !userData) {
+    if (isOpen && publicKey && connected) {
       fetchUser();
     }
-  }, [isOpen, publicKey, connected, userData, fetchUser]);
+  }, [isOpen, publicKey, connected, fetchUser]);
 
 
   useEffect(() => {
@@ -140,7 +140,10 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     try {
       const res = await api.dailyCheckIn(publicKey.toBase58());
       if (res.success) {
-        setUserData(res.user);
+        if (res.user) {
+          setUserData((prev: any) => ({ ...prev, ...res.user }));
+        }
+        await fetchUser();
         showToast("✅ +10 XP Claimed!", "success");
       } else {
         showToast(res.message || "Check-in failed", "error");
