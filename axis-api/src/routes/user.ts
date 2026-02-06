@@ -357,22 +357,55 @@ app.get('/leaderboard', async (c) => {
 
 app.post('/user/stats', async (c) => {
   try {
-      const { wallet_address, pnl_percent, total_invested_usd } = await c.req.json();
+    const { wallet_address, pnl_percent, total_invested_usd, strategy_id } = await c.req.json();
 
-      if (!wallet_address) return c.json({ error: 'Wallet required' }, 400);
+    if (!wallet_address) return c.json({ error: 'Wallet required' }, 400);
 
-      await c.env.axis_db.prepare(
-          `UPDATE users SET pnl_percent = ?, total_invested_usd = ?, last_snapshot_at = ? WHERE wallet_address = ?`
-      ).bind(
-          pnl_percent || 0, 
-          total_invested_usd || 0, 
-          Math.floor(Date.now() / 1000), 
-          wallet_address
-      ).run();
+    // a) ユーザー全体の合計額を更新（加算するように修正）
+    await c.env.axis_db.prepare(
+      `UPDATE users SET total_invested_usd = total_invested_usd + ?, last_snapshot_at = ? WHERE wallet_address = ?`
+    ).bind(total_invested_usd || 0, Math.floor(Date.now() / 1000), wallet_address).run();
 
-      return c.json({ success: true });
+    // b) 個別の投資履歴を記録 (strategy_id が送られてきた場合)
+    if (strategy_id) {
+      const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet_address).first();
+      if (user) {
+        // すでに投資済みなら金額を加算、なければ新規挿入 (UPSERT)
+        const invId = crypto.randomUUID();
+        await c.env.axis_db.prepare(`
+          INSERT INTO investments (id, user_id, strategy_id, amount_usd)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, strategy_id) DO UPDATE SET amount_usd = amount_usd + ?
+        `).bind(invId, user.id, strategy_id, total_invested_usd, total_invested_usd).run();
+      }
+    }
+
+    return c.json({ success: true });
   } catch (e: any) {
-      return c.json({ success: false, error: e.message }, 500);
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+// --- 2. 投資済みETFリストの取得 (新規追加) ---
+app.get('/users/:wallet/invested', async (c) => {
+  const wallet = c.req.param('wallet');
+
+  try {
+    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet).first();
+    if (!user) return c.json({ success: true, strategies: [] });
+
+    // investmentsテーブルとstrategiesテーブルをJOINして取得
+    const query = `
+      SELECT s.* FROM strategies s
+      JOIN investments i ON s.id = i.strategy_id
+      WHERE i.user_id = ?
+      ORDER BY i.created_at DESC
+    `;
+
+    const { results } = await c.env.axis_db.prepare(query).bind(user.id).all();
+    return c.json({ success: true, strategies: results });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message });
   }
 });
 

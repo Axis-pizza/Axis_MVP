@@ -20,7 +20,6 @@ interface StrategyDetailViewProps {
 type AssetType = 'SOL' | 'USDC';
 
 // --- Icons ---
-// X (Twitter) Logo Component
 const XIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
@@ -29,8 +28,18 @@ const XIcon = ({ className }: { className?: string }) => (
 
 // --- Components (UI Parts) ---
 
-// 1. Swipe To Confirm (変更なし)
-const SwipeToConfirm = ({ onConfirm, isLoading, label }: { onConfirm: () => void; isLoading: boolean; label: string }) => {
+// 1. Swipe To Confirm (Update: Handle Success State)
+const SwipeToConfirm = ({ 
+  onConfirm, 
+  isLoading, 
+  isSuccess, 
+  label 
+}: { 
+  onConfirm: () => void; 
+  isLoading: boolean; 
+  isSuccess?: boolean;
+  label: string;
+}) => {
   const constraintsRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
   const [containerWidth, setContainerWidth] = useState(280);
@@ -52,17 +61,21 @@ const SwipeToConfirm = ({ onConfirm, isLoading, label }: { onConfirm: () => void
     return () => ro.disconnect();
   }, []);
 
+  // 状態に応じてスライダーの位置を制御
   useEffect(() => {
-    if (isLoading) x.set(maxDrag);
-    else x.set(0);
-  }, [isLoading, maxDrag, x]);
+    if (isLoading || isSuccess) {
+      x.set(maxDrag); // 処理中または成功時は右端に固定
+    } else {
+      x.set(0); // それ以外は左端へ
+    }
+  }, [isLoading, isSuccess, maxDrag, x]);
 
   const handleDragEnd = () => {
     const current = x.get();
     const threshold = maxDrag * 0.58; 
     if (current > threshold) {
       x.set(maxDrag);
-      if (!isLoading) onConfirm();
+      if (!isLoading && !isSuccess) onConfirm();
     } else {
       x.set(0);
     }
@@ -71,22 +84,22 @@ const SwipeToConfirm = ({ onConfirm, isLoading, label }: { onConfirm: () => void
   return (
     <div
       ref={constraintsRef}
-      className="relative h-14 w-full bg-[#1C1917] rounded-full overflow-hidden border border-white/10 select-none shadow-inner p-1 box-border"
+      className={`relative h-14 w-full rounded-full overflow-hidden border select-none shadow-inner p-1 box-border transition-colors duration-300 ${isSuccess ? 'bg-emerald-500/20 border-emerald-500/50' : 'bg-[#1C1917] border-white/10'}`}
     >
       <motion.div
-        className="absolute inset-y-0 left-0 bg-[#D97706] rounded-full z-0"
-        style={{ width: progressWidth, opacity: isLoading ? 1 : progressOpacity }}
+        className={`absolute inset-y-0 left-0 rounded-full z-0 ${isSuccess ? 'bg-emerald-500' : 'bg-[#D97706]'}`}
+        style={{ width: progressWidth, opacity: (isLoading || isSuccess) ? 1 : progressOpacity }}
       />
       <motion.div
         className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
         style={{ opacity: textOpacity }}
       >
-        <span className={`font-bold text-xs tracking-[0.2em] transition-colors duration-300 ${isLoading ? "text-white" : "text-white/40"}`}>
-          {isLoading ? "PROCESSING..." : `SLIDE TO ${label}`}
+        <span className={`font-bold text-xs tracking-[0.2em] transition-colors duration-300 ${isLoading || isSuccess ? "text-white" : "text-white/40"}`}>
+          {isLoading ? "PROCESSING..." : isSuccess ? "COMPLETED" : `SLIDE TO ${label}`}
         </span>
       </motion.div>
       <motion.div
-        drag={isLoading ? false : "x"}
+        drag={(!isLoading && !isSuccess) ? "x" : false} // 成功時もドラッグ不可
         dragConstraints={{ left: 0, right: maxDrag }}
         dragElastic={0.02}
         dragMomentum={false}
@@ -94,13 +107,19 @@ const SwipeToConfirm = ({ onConfirm, isLoading, label }: { onConfirm: () => void
         style={{ x, touchAction: "pan-x" }}
         className="relative w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing z-20"
       >
-        {isLoading ? <Check className="w-5 h-5 text-[#D97706]" /> : <ChevronRight className="w-5 h-5 text-[#D97706] ml-0.5" />}
+        {isLoading ? (
+          <div className="w-5 h-5 border-2 border-[#D97706] border-t-transparent rounded-full animate-spin" />
+        ) : isSuccess ? (
+          <Check className="w-6 h-6 text-emerald-600" />
+        ) : (
+          <ChevronRight className="w-5 h-5 text-[#D97706] ml-0.5" />
+        )}
       </motion.div>
     </div>
   );
 };
 
-// 2. InvestSheet (変更なし)
+// 2. InvestSheet
 interface InvestSheetProps {
   isOpen: boolean;
   onClose: () => void;
@@ -122,13 +141,17 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
     if (!publicKey) return;
     const fetchBalance = async () => {
       if (asset === 'SOL') {
-        const bal = await connection.getBalance(publicKey);
-        setBalance(bal / LAMPORTS_PER_SOL);
+        try {
+          const bal = await connection.getBalance(publicKey);
+          setBalance(bal / LAMPORTS_PER_SOL);
+        } catch (e) {
+          console.error("Failed to fetch balance", e);
+        }
       } else {
         setBalance(0);
       }
     };
-    fetchBalance();
+    if (isOpen) fetchBalance();
   }, [isOpen, asset, publicKey, connection]);
 
   useEffect(() => {
@@ -148,7 +171,8 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
   };
 
   const handleExecute = () => {
-     if (parseFloat(amount) <= 0) {
+     const val = parseFloat(amount);
+     if (isNaN(val) || val <= 0) {
        showToast("Enter valid amount", "error");
        return;
      }
@@ -163,7 +187,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
             key="backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60]"
-            onClick={onClose}
+            onClick={status === 'IDLE' || status === 'ERROR' || status === 'SUCCESS' ? onClose : undefined}
           />
           <motion.div
             key="sheet"
@@ -172,13 +196,17 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
             className="fixed bottom-0 left-0 right-0 bg-[#0C0A09] rounded-t-[32px] z-[70] overflow-hidden flex flex-col safe-area-bottom border-t border-white/10"
             style={{ maxHeight: '90vh' }}
           >
-            <div className="w-full flex justify-center pt-3 pb-1" onClick={onClose}>
+            <div className="w-full flex justify-center pt-3 pb-1" onClick={status === 'IDLE' ? onClose : undefined}>
               <div className="w-10 h-1 bg-white/20 rounded-full" />
             </div>
 
             <div className="px-6 pt-2 pb-8 flex flex-col h-full">
               <div className="flex justify-between items-center mb-6">
-                 <button onClick={onClose} className="p-2 -ml-2 rounded-full text-[#78716C] hover:text-white transition-colors">
+                 <button 
+                   onClick={onClose} 
+                   disabled={status === 'SIGNING' || status === 'CONFIRMING'}
+                   className="p-2 -ml-2 rounded-full text-[#78716C] hover:text-white transition-colors disabled:opacity-30"
+                 >
                    <X className="w-5 h-5" />
                  </button>
                  <div className="flex bg-[#1C1917] rounded-full p-0.5 border border-white/10">
@@ -186,8 +214,9 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                       <button
                         key={t}
                         onClick={() => setAsset(t)}
+                        disabled={status !== 'IDLE' && status !== 'ERROR'}
                         className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all ${
-                          asset === t ? 'bg-[#D97706] text-black shadow-md' : 'text-[#78716C] hover:text-white'
+                          asset === t ? 'bg-[#D97706] text-black shadow-md' : 'text-[#78716C] hover:text-white disabled:opacity-50'
                         }`}
                       >
                         {t}
@@ -211,7 +240,8 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                    <span>{balance.toFixed(4)} Available</span>
                    <button 
                      onClick={() => setAmount((balance * 0.95).toFixed(4))}
-                     className="text-[#D97706] font-bold"
+                     className="text-[#D97706] font-bold disabled:opacity-50"
+                     disabled={status !== 'IDLE' && status !== 'ERROR'}
                    >
                      MAX
                    </button>
@@ -223,7 +253,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                   <button
                     key={key}
                     onClick={() => handleNum(key.toString())}
-                    className="h-14 text-2xl font-light text-white active:bg-white/10 rounded-xl transition-colors flex items-center justify-center"
+                    className="h-14 text-2xl font-light text-white active:bg-white/10 rounded-xl transition-colors flex items-center justify-center disabled:opacity-30"
                     disabled={status !== 'IDLE' && status !== 'ERROR'}
                   >
                     {key}
@@ -231,7 +261,8 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                 ))}
                 <button
                   onClick={handleBackspace}
-                  className="h-14 text-[#78716C] active:text-white active:bg-white/10 rounded-xl transition-colors flex items-center justify-center"
+                  className="h-14 text-[#78716C] active:text-white active:bg-white/10 rounded-xl transition-colors flex items-center justify-center disabled:opacity-30"
+                  disabled={status !== 'IDLE' && status !== 'ERROR'}
                 >
                   <ArrowLeft className="w-6 h-6" />
                 </button>
@@ -241,6 +272,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                  <SwipeToConfirm 
                    onConfirm={handleExecute} 
                    isLoading={status === 'SIGNING' || status === 'CONFIRMING'} 
+                   isSuccess={status === 'SUCCESS'}
                    label="INVEST"
                  />
               </div>
@@ -260,7 +292,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
   const { showToast } = useToast(); 
   
   const headerOpacity = useTransform(scrollY, [0, 60], [0, 1]);
-  const headerY = useTransform(scrollY, [0, 60], [-20, 0]);
+  const headerY = useTransform(scrollY, [0, 60], [-10, 0]);
 
   const [strategy, setStrategy] = useState(initialData);
   const [chartData, setChartData] = useState<any[]>([]);
@@ -385,12 +417,17 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         SystemProgram.transfer({ fromPubkey: wallet.publicKey, toPubkey: targetPubkey, lamports })
       );
 
-      setInvestStatus('CONFIRMING');
       const latestBlockhash = await connection.getLatestBlockhash();
       transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.feePayer = wallet.publicKey;
 
-      const signedTx = await wallet.signTransaction!(transaction);
+      if (!wallet.signTransaction) {
+        throw new Error("Wallet does not support signing");
+      }
+
+      const signedTx = await wallet.signTransaction(transaction);
+      
+      setInvestStatus('CONFIRMING');
       const signature = await connection.sendRawTransaction(signedTx.serialize());
 
       await connection.confirmTransaction({
@@ -402,16 +439,28 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       showToast(`Deposited ${parsedAmount} SOL`, "success");
       setInvestStatus('SUCCESS');
 
+      // ★修正: 成功後のクリーンアップフロー
       setTimeout(() => {
-        setIsInvestOpen(false);
-        setInvestStatus('IDLE');
+        setIsInvestOpen(false); // 先にモーダルを閉じる
+        
+        // モーダルが完全に閉じるのを待ってからステータスをリセット
+        // これにより、閉じるアニメーション中にスライダーがリセットされるのを防ぐ
+        setTimeout(() => {
+          setInvestStatus('IDLE');
+        }, 500);
       }, 1500);
 
-      api.syncUserStats(wallet.publicKey.toBase58(), 0, parsedAmount).catch(() => {});
+      // fire-and-forget: UIをブロックしないようにvoidで処理
+      void api.syncUserStats(
+        wallet.publicKey.toBase58(), 
+        0, 
+        parsedAmount, 
+        strategy.id // ここでIDを渡す
+      ).catch(console.error);
 
     } catch (e: any) {
       console.error(e);
-      showToast("Transaction Failed", "error");
+      showToast(e.message || "Transaction Failed", "error");
       setInvestStatus('ERROR');
       setTimeout(() => setInvestStatus('IDLE'), 2000);
     }
@@ -421,29 +470,34 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
   return (
     <div className="min-h-screen bg-black text-[#E7E5E4] pb-32 font-sans selection:bg-[#D97706]/30">
       
-      {/* 1. Immersive Header (Sticky) */}
+      {/* 1. Immersive Header */}
       <motion.div 
-        className="fixed top-0 inset-x-0 h-14 z-40 flex items-center justify-between px-4 safe-area-top"
+        className="fixed top-0 inset-x-0 z-[100] flex items-center justify-between px-4 py-3 safe-area-top pointer-events-none"
       >
-        <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-md border-b border-white/5" style={{ opacity: headerOpacity }} />
+        <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-md border-b border-white/5 pointer-events-auto" style={{ opacity: headerOpacity }} />
         
-        <button onClick={onBack} className="relative z-10 p-2 text-white/70 hover:text-white bg-black/20 rounded-full backdrop-blur-sm">
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            onBack();
+          }} 
+          className="relative z-50 w-10 h-10 flex items-center justify-center text-white/90 hover:text-white bg-black/40 rounded-full backdrop-blur-md transition-all active:scale-90 pointer-events-auto shadow-sm border border-white/5 cursor-pointer"
+        >
           <ArrowLeft className="w-5 h-5" />
         </button>
         
-        <motion.div style={{ opacity: headerOpacity, y: headerY }} className="relative z-10 font-bold text-sm tracking-wide">
+        <motion.div style={{ opacity: headerOpacity, y: headerY }} className="relative z-10 font-bold text-sm tracking-wide pointer-events-none">
           {strategy.ticker}
         </motion.div>
 
-        <div className="relative z-10 flex gap-2">
-          <button onClick={handleToggleWatchlist} className="p-2 text-white/70 hover:text-yellow-400 bg-black/20 rounded-full backdrop-blur-sm">
+        <div className="relative z-10 flex gap-2 pointer-events-auto">
+          <button onClick={handleToggleWatchlist} className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-yellow-400 bg-black/40 rounded-full backdrop-blur-md border border-white/5 active:scale-95 transition-all">
             <motion.div animate={controls}>
               <Star className={`w-5 h-5 ${isWatchlisted ? 'fill-yellow-400 text-yellow-400' : ''}`} />
             </motion.div>
           </button>
           
-          {/* ★修正: X (Twitter) ロゴに変更 */}
-          <button onClick={handleShareToX} className="p-2 text-white/70 hover:text-white bg-black/20 rounded-full backdrop-blur-sm">
+          <button onClick={handleShareToX} className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white bg-black/40 rounded-full backdrop-blur-md border border-white/5 active:scale-95 transition-all">
             <XIcon className="w-4 h-4" />
           </button>
         </div>
@@ -524,13 +578,12 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         </div>
       </div>
 
-      {/* 4. Composition List (★修正箇所) */}
+      {/* 4. Composition List */}
       <div className="px-6">
         <h3 className="text-sm font-bold text-[#78716C] uppercase tracking-widest mb-4 flex items-center gap-2">
           <PieChart className="w-4 h-4" /> Composition
         </h3>
         
-        {/* カードデザインからリストデザインへ変更 */}
         <div className="bg-[#1C1917]/50 rounded-3xl border border-white/5 overflow-hidden">
           {tokensInfo.length > 0 ? tokensInfo.map((token, i) => (
             <div 
@@ -551,10 +604,8 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
                 </div>
               </div>
 
-              {/* 右側：パーセントとバー */}
               <div className="flex flex-col items-end gap-1 relative z-10 w-24">
                 <span className="font-bold text-white text-sm">{token.weight}%</span>
-                {/* 視覚的なウェイトバー */}
                 <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
                     <motion.div 
                         initial={{ width: 0 }} 

@@ -24,8 +24,68 @@ interface SwipeDiscoverViewProps {
 // --- Components ---
 
 /**
+ * ★追加: リアルなカード型のスケルトンローダー
+ */
+const SwipeCardSkeleton = ({ index }: { index: number }) => (
+  <div 
+    className="absolute inset-0 w-full h-full bg-[#121212] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col p-5 select-none pointer-events-none"
+    style={{
+      // スタック表示のシミュレーション
+      transform: `scale(${1 - index * 0.05}) translateY(${index * 10}px)`,
+      zIndex: 100 - index,
+      opacity: Math.max(0, 1 - index * 0.3),
+      filter: 'grayscale(100%) brightness(0.8)'
+    }}
+  >
+    {/* Header Skeleton */}
+    <div className="flex justify-between items-start mb-4">
+      <div className="space-y-2">
+        <div className="w-16 h-5 bg-white/10 rounded-full animate-pulse" />
+        <div className="w-40 h-8 bg-white/10 rounded-lg animate-pulse" />
+      </div>
+      <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse border border-white/5" />
+    </div>
+
+    {/* Description Skeleton */}
+    <div className="space-y-2 mb-6">
+      <div className="w-full h-3 bg-white/5 rounded animate-pulse" />
+      <div className="w-3/4 h-3 bg-white/5 rounded animate-pulse" />
+    </div>
+
+    {/* Stats Grid Skeleton */}
+    <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="h-24 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
+      <div className="flex flex-col gap-2 h-24">
+         <div className="flex-1 bg-white/5 rounded-xl animate-pulse border border-white/5" />
+         <div className="flex-1 bg-white/5 rounded-xl animate-pulse border border-white/5" />
+      </div>
+    </div>
+
+    {/* List Skeleton */}
+    <div className="flex-1 space-y-2 mt-2 overflow-hidden">
+       <div className="flex justify-between mb-2 px-1">
+          <div className="w-24 h-3 bg-white/5 rounded animate-pulse" />
+          <div className="w-12 h-3 bg-white/5 rounded animate-pulse" />
+       </div>
+       {[1, 2, 3, 4].map((i) => (
+         <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-xl h-14 animate-pulse border border-white/5">
+            <div className="flex items-center gap-3">
+               <div className="w-9 h-9 rounded-full bg-white/10" />
+               <div className="space-y-1.5">
+                  <div className="w-12 h-3 bg-white/10 rounded" />
+                  <div className="w-8 h-2 bg-white/10 rounded" />
+               </div>
+            </div>
+            <div className="w-10 h-4 bg-white/10 rounded" />
+         </div>
+       ))}
+    </div>
+  </div>
+);
+
+/**
  * CosmicLaunchEffect
- * 画面左下から右上に駆け抜ける豪華な光の軌跡とスターダストのエフェクト
+ * (変更なし)
  */
 const CosmicLaunchEffect = () => {
   const trailCount = 12;
@@ -95,7 +155,7 @@ const CosmicLaunchEffect = () => {
 
 /**
  * SuccessOverlay
- * マッチ時の演出画面
+ * (変更なし)
  */
 const SuccessOverlay = ({ strategy, onClose, onGoToStrategy }: { strategy: any, onClose: () => void, onGoToStrategy: () => void }) => {
   return (
@@ -403,11 +463,28 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentIndex, enrichedStrategies, handleSwipe, matchedStrategy]);
 
+  // ★修正: ローディング画面をスケルトンカードに変更
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-[100dvh] text-white/50 bg-[#030303]">
-        <Loader2 className="w-10 h-10 animate-spin text-[#D97706] mb-4" />
-        <p className="text-sm font-mono animate-pulse">Loading Index Data...</p>
+      <div className="relative w-full h-[100dvh] bg-[#030303] overflow-hidden flex flex-col">
+        <div className="flex-1 w-full flex items-center justify-center px-4 pb-53 pt-12 md:pb-24 relative">
+          <div className="relative w-full max-w-sm h-full max-h-[70vh] md:max-h-[600px] z-10">
+             {/* スケルトンを3枚スタック表示 */}
+             {[0, 1, 2].map((i) => (
+                <SwipeCardSkeleton key={i} index={i} />
+             ))}
+             
+             {/* 中央のローディングインジケーター */}
+             <div className="absolute inset-0 flex flex-col items-center justify-center z-50">
+                <div className="bg-[#0C0A09]/80 backdrop-blur-xl p-6 rounded-3xl border border-white/10 shadow-2xl flex flex-col items-center">
+                   <Loader2 className="w-8 h-8 text-[#D97706] animate-spin mb-3" />
+                   <p className="text-xs font-bold text-white/50 tracking-widest animate-pulse">
+                     SCOUTING GEMS...
+                   </p>
+                </div>
+             </div>
+          </div>
+        </div>
       </div>
     );
   }
