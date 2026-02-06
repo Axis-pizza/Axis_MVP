@@ -1,14 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Eye, EyeOff, Download, Wallet, ArrowUpRight, ArrowDownRight,
+  Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight,
   TrendingUp, Star, LayoutGrid
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
-import html2canvas from 'html2canvas';
 import { api } from '../../services/api';
-import { useToast } from '../../context/ToastContext';
+// import { useToast } from '../../context/ToastContext'; // Toastも不要なら削除可
 
 // --- Types ---
 const FIXED_BG_STYLE = {
@@ -47,7 +46,7 @@ const formatAddress = (address: string) => `${address.slice(0, 4)}...${address.s
 export const ProfileView = () => {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
-  const { showToast } = useToast();
+  // const { showToast } = useToast();
   
   // --- UI State ---
   const [activeTab, setActiveTab] = useState<'portfolio' | 'leaderboard'>('portfolio');
@@ -63,12 +62,9 @@ export const ProfileView = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [myStrategies, setMyStrategies] = useState<Strategy[]>([]);
-  const [investedStrategies, setInvestedStrategies] = useState<Strategy[]>([]); // Future implementation
+  const [investedStrategies, setInvestedStrategies] = useState<Strategy[]>([]);
   const [watchlist, setWatchlist] = useState<Strategy[]>([]);
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
-
-  const cardRef = useRef<HTMLDivElement>(null); 
-  const captureRef = useRef<HTMLDivElement>(null);
 
   // --- 1. Init (Price & Balance) ---
   useEffect(() => {
@@ -106,10 +102,11 @@ export const ProfileView = () => {
     const loadProfile = async () => {
       setIsLoading(true);
       try {
-        const [userRes, stratsRes, watchlistRes] = await Promise.all([
+        const [userRes, stratsRes, watchlistRes, investedRes] = await Promise.all([
           api.getUser(publicKey.toBase58()),
           api.getUserStrategies(publicKey.toBase58()),
-          api.getUserWatchlist(publicKey.toBase58())
+          api.getUserWatchlist(publicKey.toBase58()),
+          api.getInvestedStrategies(publicKey.toBase58())
         ]);
 
         if (userRes.success && userRes.user) {
@@ -126,7 +123,6 @@ export const ProfileView = () => {
         }
 
         if (stratsRes.success && stratsRes.strategies) {
-          // 重複除外 & ソート
           const seen = new Map();
           const unique = stratsRes.strategies.filter((s: any) => {
              const key = s.id;
@@ -138,6 +134,11 @@ export const ProfileView = () => {
         if (watchlistRes.success && watchlistRes.strategies) {
           setWatchlist(watchlistRes.strategies);
         }
+
+        if (investedRes.success && investedRes.strategies) {
+          setInvestedStrategies(investedRes.strategies); // ★Stateを更新
+        }
+        
       } catch (e) {
         console.error("Profile load error", e);
       } finally {
@@ -177,25 +178,6 @@ export const ProfileView = () => {
   const pnlVal = userProfile?.pnlPercent || 0;
   const isPos = pnlVal >= 0;
 
-  // --- Handlers ---
-  const handleDownloadCard = async () => {
-    if (!captureRef.current) return;
-    showToast("Generating card...", "info");
-    captureRef.current.style.display = 'block';
-    try {
-        const canvas = await html2canvas(captureRef.current, { backgroundColor: '#000000', scale: 2, useCORS: true });
-        const image = canvas.toDataURL("image/png");
-        const link = document.createElement("a");
-        link.href = image;
-        link.download = `axis-portfolio.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showToast("Saved!", "success");
-    } catch { showToast("Failed to save", "error"); } 
-    finally { captureRef.current.style.display = 'none'; }
-  };
-
   // --- View: Not Connected ---
   if (!publicKey) {
     return (
@@ -228,7 +210,7 @@ export const ProfileView = () => {
 
       {/* --- Net Worth Card --- */}
       <div className="mb-8 relative group perspective-1000">
-        <div ref={cardRef} className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#0C0A09] shadow-2xl" style={{ aspectRatio: '1.58/1' }}>
+        <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#0C0A09] shadow-2xl" style={{ aspectRatio: '1.58/1' }}>
             <div className="absolute inset-0 z-0" style={FIXED_BG_STYLE} />
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
             
@@ -269,19 +251,6 @@ export const ProfileView = () => {
                  </div>
             </div>
         </div>
-        <div className="flex justify-end mt-2">
-            <button onClick={handleDownloadCard} className="text-[10px] font-bold text-white/30 flex items-center gap-1 hover:text-white transition-colors">
-                <Download className="w-3 h-3" /> Save Card
-            </button>
-        </div>
-      </div>
-
-      {/* --- Hidden Capture Element (Simplified) --- */}
-      <div ref={captureRef} style={{ display: 'none', position: 'fixed', left: '-9999px', width: '1200px', height: '630px', background: '#000' }}>
-          <div style={{ padding: 60, height: '100%', display: 'flex', flexDirection: 'column', ...FIXED_BG_STYLE }}>
-              <div style={{ fontSize: 40, color: 'white', fontWeight: 'bold' }}>Axis Portfolio</div>
-              <div style={{ fontSize: 80, color: 'white', fontWeight: 'bold', marginTop: 40 }}>{formatCurrency(totalNetWorthUSD, 'USD')}</div>
-          </div>
       </div>
 
       {/* --- Tabs --- */}
@@ -313,7 +282,13 @@ export const ProfileView = () => {
                myStrategies.length > 0 ? myStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} />)
                : <EmptyState icon={LayoutGrid} title="No strategies yet" sub="Create your first index fund." />
             )}
-            {portfolioSubTab === 'invested' && <EmptyState icon={TrendingUp} title="No investments" sub="Explore strategies to grow wealth." />}
+            {portfolioSubTab === 'invested' && (
+              investedStrategies.length > 0 ? (
+                investedStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} />)
+              ) : (
+                <EmptyState icon={TrendingUp} title="No investments" sub="Explore strategies to grow wealth." />
+              )
+            )}
             {portfolioSubTab === 'watchlist' && (
                watchlist.length > 0 ? watchlist.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} />)
                : <EmptyState icon={Star} title="Watchlist empty" sub="Star strategies to track them." />

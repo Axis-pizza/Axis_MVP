@@ -201,7 +201,7 @@ export const api = {
     }
   },
 
-  async syncUserStats(wallet: string, pnl: number, invested: number) {
+  async syncUserStats(wallet: string, pnl: number, invested: number, strategyId?: string) {
     try {
       await fetch(`${API_BASE}/user/stats`, {
         method: 'POST',
@@ -209,11 +209,23 @@ export const api = {
         body: JSON.stringify({
           wallet_address: wallet,
           pnl_percent: pnl,
-          total_invested_usd: invested
+          total_invested_usd: invested,
+          strategy_id: strategyId // ★追加
         }),
       });
     } catch (e) {
       console.error("Sync stats failed", e);
+    }
+  },
+  
+  // 投資済みリスト取得APIを新規追加
+  async getInvestedStrategies(pubkey: string) {
+    try {
+      const res = await fetch(`${API_BASE}/users/${pubkey}/invested`);
+      return await res.json();
+    } catch (e) {
+      console.error("Fetch invested error:", e);
+      return { success: false, strategies: [] };
     }
   },
 
