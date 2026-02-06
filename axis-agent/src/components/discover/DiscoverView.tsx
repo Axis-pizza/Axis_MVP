@@ -11,9 +11,10 @@ const STORAGE_KEY = 'axis-discover-view-mode';
 
 interface DiscoverViewProps {
   onStrategySelect: (strategy: Strategy) => void;
+  onOverlayChange?: (isActive: boolean) => void;
 }
 
-export const DiscoverView = ({ onStrategySelect }: DiscoverViewProps) => {
+export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverViewProps) => {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return (saved === 'list' ? 'list' : 'swipe') as ViewMode;
@@ -70,9 +71,10 @@ export const DiscoverView = ({ onStrategySelect }: DiscoverViewProps) => {
       {/* --- メインコンテンツ --- */}
       <div className="relative">
         {viewMode === 'swipe' ? (
-          <SwipeDiscoverView 
-            onToggleView={toggleView} 
-            onStrategySelect={onStrategySelect} 
+          <SwipeDiscoverView
+            onToggleView={toggleView}
+            onStrategySelect={onStrategySelect}
+            onOverlayChange={onOverlayChange}
           />
         ) : (
           <ListDiscoverView 

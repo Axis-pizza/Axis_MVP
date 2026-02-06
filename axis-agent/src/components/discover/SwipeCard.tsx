@@ -267,18 +267,13 @@ export const SwipeCard = ({
            </div>
 
            {/* Right Column Stats */}
-           <div className="col-span-1 grid grid-rows-2 gap-2 h-24">
-              <div className="p-2 bg-white/5 border border-white/5 rounded-xl flex flex-col justify-center px-3">
-                 <span className="text-[10px] text-white/40 uppercase font-bold">TVL</span>
-                 <div className="text-lg font-bold text-white">
-                    {strategy.tvl < 0.01 ? '< 0.01' : strategy.tvl.toFixed(2)} <span className="text-xs text-white/50 font-normal">SOL</span>
+           <div className="col-span-1 flex h-24">
+              <div className="flex-1 p-3 bg-white/5 border border-white/5 rounded-2xl flex flex-col justify-center px-3">
+                 <span className="text-[10px] text-white/40 uppercase font-bold mb-1">TVL</span>
+                 <div className="text-2xl font-bold text-white">
+                    {strategy.tvl < 0.01 ? '< 0.01' : strategy.tvl.toFixed(2)}
                  </div>
-              </div>
-              <div className="p-2 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between px-3">
-                 <span className="text-[10px] text-white/40 uppercase font-bold">Rebalance</span>
-                 <span className="text-xs font-bold text-orange-400">
-                    {strategy.rebalanceType || 'Weekly'}
-                 </span>
+                 <span className="text-xs text-white/50 font-normal">SOL</span>
               </div>
            </div>
         </div>

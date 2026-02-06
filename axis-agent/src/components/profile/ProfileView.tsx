@@ -7,7 +7,7 @@ import { useWallet, useConnection } from '../../hooks/useWallet';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { api } from '../../services/api';
-// import { useToast } from '../../context/ToastContext'; // Toastも不要なら削除可
+import { TokenImage } from '../common/TokenImage';
 
 // --- Types ---
 const FIXED_BG_STYLE = {
@@ -43,7 +43,11 @@ const formatCurrency = (val: number, currency: 'USD' | 'SOL') => {
 
 const formatAddress = (address: string) => `${address.slice(0, 4)}...${address.slice(-4)}`;
 
-export const ProfileView = () => {
+interface ProfileViewProps {
+  onStrategySelect?: (strategy: any) => void;
+}
+
+export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   // const { showToast } = useToast();
@@ -279,18 +283,18 @@ export const ProfileView = () => {
 
           <div className="space-y-3 pb-20">
             {portfolioSubTab === 'created' && (
-               myStrategies.length > 0 ? myStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} />)
+               myStrategies.length > 0 ? myStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
                : <EmptyState icon={LayoutGrid} title="No strategies yet" sub="Create your first index fund." />
             )}
             {portfolioSubTab === 'invested' && (
               investedStrategies.length > 0 ? (
-                investedStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} />)
+                investedStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
               ) : (
                 <EmptyState icon={TrendingUp} title="No investments" sub="Explore strategies to grow wealth." />
               )
             )}
             {portfolioSubTab === 'watchlist' && (
-               watchlist.length > 0 ? watchlist.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} />)
+               watchlist.length > 0 ? watchlist.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
                : <EmptyState icon={Star} title="Watchlist empty" sub="Star strategies to track them." />
             )}
           </div>
@@ -377,28 +381,47 @@ const EmptyState = ({ icon: Icon, title, sub }: any) => (
   </div>
 );
 
-const StrategyCard = ({ strategy, solPrice }: { strategy: Strategy; solPrice: number }) => {
+const StrategyCard = ({ strategy, solPrice, onSelect }: { strategy: Strategy; solPrice: number; onSelect?: (strategy: any) => void }) => {
   const tvlUSD = (strategy.tvl || 0) * solPrice;
+  const tokens = Array.isArray(strategy.tokens) ? strategy.tokens : [];
+  const displayTokens = tokens.slice(0, 5);
+  const extraCount = tokens.length - 5;
+
   return (
-    <div className="bg-[#1C1917] p-4 rounded-xl border border-white/5 hover:border-[#D97706]/30 transition-colors">
+    <button
+      onClick={() => onSelect?.(strategy)}
+      className="w-full text-left bg-[#1C1917] p-4 rounded-xl border border-white/5 hover:border-[#D97706]/30 transition-colors active:scale-[0.98]"
+    >
       <div className="flex justify-between items-start mb-3">
         <div>
           <p className="text-white font-bold">{strategy.name}</p>
-          <p className="text-white/40 text-xs">{strategy.ticker || 'INDEX'}</p>
+          <p className="text-white/40 text-xs">{strategy.ticker || strategy.type || ''}</p>
         </div>
         <div className="text-right">
           <p className="text-white font-mono text-sm">{tvlUSD > 0 ? `$${tvlUSD.toFixed(2)}` : '-'}</p>
           <p className="text-white/40 text-[10px]">TVL</p>
         </div>
       </div>
-      {/* Mock Tokens Display (since full token list might be large) */}
-      <div className="flex gap-1 mb-3">
-         {[1,2,3].map(i => <div key={i} className="w-4 h-4 rounded-full bg-white/10" />)}
+      <div className="flex items-center gap-0 mb-3">
+         {displayTokens.map((t: any, i: number) => (
+           <div key={i} className="w-6 h-6 rounded-full overflow-hidden border-2 border-[#1C1917] bg-white/10 -ml-1.5 first:ml-0">
+             <TokenImage
+               src={t.logoURI}
+               alt={t.symbol || ''}
+               className="w-full h-full object-cover"
+             />
+           </div>
+         ))}
+         {extraCount > 0 && (
+           <div className="w-6 h-6 rounded-full bg-white/10 border-2 border-[#1C1917] -ml-1.5 flex items-center justify-center">
+             <span className="text-[8px] text-white/60 font-bold">+{extraCount}</span>
+           </div>
+         )}
       </div>
       <div className="flex justify-between items-center pt-3 border-t border-white/5">
         <span className="text-[10px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 font-bold">ACTIVE</span>
         <span className="text-[10px] text-white/30">{new Date(strategy.createdAt * 1000).toLocaleDateString()}</span>
       </div>
-    </div>
+    </button>
   );
 };

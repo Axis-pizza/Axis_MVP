@@ -19,6 +19,7 @@ interface TokenData {
 interface SwipeDiscoverViewProps {
   onToggleView: () => void;
   onStrategySelect: (strategy: any) => void;
+  onOverlayChange?: (isActive: boolean) => void;
 }
 
 // --- Components ---
@@ -259,7 +260,7 @@ const SuccessOverlay = ({ strategy, onClose, onGoToStrategy }: { strategy: any, 
 
 // --- Main View Component ---
 
-export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDiscoverViewProps) => {
+export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayChange }: SwipeDiscoverViewProps) => {
   const { publicKey } = useWallet();
   const [strategies, setStrategies] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -271,6 +272,10 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect }: SwipeDisco
   const [userMap, setUserMap] = useState<Record<string, any>>({});
   
   const dataFetched = useRef(false);
+
+  useEffect(() => {
+    onOverlayChange?.(matchedStrategy !== null);
+  }, [matchedStrategy, onOverlayChange]);
 
   useEffect(() => {
     if (dataFetched.current) return;

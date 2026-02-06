@@ -28,7 +28,7 @@ const XIcon = ({ className }: { className?: string }) => (
 
 // --- Components (UI Parts) ---
 
-// 1. Swipe To Confirm (Update: Handle Success State)
+// 1. Swipe To Confirm
 const SwipeToConfirm = ({ 
   onConfirm, 
   isLoading, 
@@ -61,12 +61,11 @@ const SwipeToConfirm = ({
     return () => ro.disconnect();
   }, []);
 
-  // 状態に応じてスライダーの位置を制御
   useEffect(() => {
     if (isLoading || isSuccess) {
-      x.set(maxDrag); // 処理中または成功時は右端に固定
+      x.set(maxDrag);
     } else {
-      x.set(0); // それ以外は左端へ
+      x.set(0);
     }
   }, [isLoading, isSuccess, maxDrag, x]);
 
@@ -99,7 +98,7 @@ const SwipeToConfirm = ({
         </span>
       </motion.div>
       <motion.div
-        drag={(!isLoading && !isSuccess) ? "x" : false} // 成功時もドラッグ不可
+        drag={(!isLoading && !isSuccess) ? "x" : false}
         dragConstraints={{ left: 0, right: maxDrag }}
         dragElastic={0.02}
         dragMomentum={false}
@@ -306,17 +305,19 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
 
   const controls = useAnimation();
 
-  // --- Logic ---
+  // --- Logic (Safety First) ---
   const latestValue = useMemo(() => {
-    if (!chartData.length) return strategy.price || 100;
-    const last = chartData[chartData.length - 1];
+    const data = chartData || [];
+    if (data.length === 0) return strategy.price || 100;
+    const last = data[data.length - 1];
     return typeof last.close === 'number' ? last.close : last.value;
   }, [chartData, strategy.price]);
 
   const changePct = useMemo(() => {
-    if (chartData.length < 2) return 0;
-    const start = typeof chartData[0].close === 'number' ? chartData[0].open : chartData[0].value;
-    return ((latestValue - start) / start) * 100;
+    const data = chartData || [];
+    if (data.length < 2) return 0;
+    const start = typeof data[0].close === 'number' ? data[0].open : data[0].value;
+    return ((latestValue - start) / (start || 1)) * 100;
   }, [chartData, latestValue]);
 
   const isPositive = changePct >= 0;
@@ -332,18 +333,19 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       try {
         const tokenRes = await api.getTokens();
         if (tokenRes.success) {
-          const enriched = strategy.tokens.map((t: any) => {
-            const meta = tokenRes.tokens.find((m: any) => m.symbol === t.symbol.toUpperCase());
+          // strategy.tokens が undefined の場合に備えてデフォルト空配列
+          const enriched = (strategy.tokens || []).map((t: any) => {
+            const meta = (tokenRes.tokens || []).find((m: any) => m.symbol === t.symbol?.toUpperCase());
             return { ...t, logoURI: meta?.logoURI, name: meta?.name || t.symbol };
           });
           setTokensInfo(enriched);
         } else {
-            setTokensInfo(strategy.tokens);
+            setTokensInfo(strategy.tokens || []);
         }
-      } catch { setTokensInfo(strategy.tokens); }
+      } catch { setTokensInfo(strategy.tokens || []); }
     };
     init();
-  }, [strategy.id, wallet.publicKey]);
+  }, [strategy.id, wallet.publicKey, strategy.tokens]);
 
   useEffect(() => {
     const loadChart = async () => {
@@ -439,24 +441,12 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       showToast(`Deposited ${parsedAmount} SOL`, "success");
       setInvestStatus('SUCCESS');
 
-      // ★修正: 成功後のクリーンアップフロー
       setTimeout(() => {
-        setIsInvestOpen(false); // 先にモーダルを閉じる
-        
-        // モーダルが完全に閉じるのを待ってからステータスをリセット
-        // これにより、閉じるアニメーション中にスライダーがリセットされるのを防ぐ
-        setTimeout(() => {
-          setInvestStatus('IDLE');
-        }, 500);
+        setIsInvestOpen(false);
+        setTimeout(() => setInvestStatus('IDLE'), 500);
       }, 1500);
 
-      // fire-and-forget: UIをブロックしないようにvoidで処理
-      void api.syncUserStats(
-        wallet.publicKey.toBase58(), 
-        0, 
-        parsedAmount, 
-        strategy.id // ここでIDを渡す
-      ).catch(console.error);
+      void api.syncUserStats(wallet.publicKey.toBase58(), 0, parsedAmount, strategy.id).catch(console.error);
 
     } catch (e: any) {
       console.error(e);
@@ -487,7 +477,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         </button>
         
         <motion.div style={{ opacity: headerOpacity, y: headerY }} className="relative z-10 font-bold text-sm tracking-wide pointer-events-none">
-          {strategy.ticker}
+          {strategy?.ticker}
         </motion.div>
 
         <div className="relative z-10 flex gap-2 pointer-events-auto">
@@ -507,10 +497,10 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       <div className="pt-24 px-0 relative">
         <div className="px-6 mb-6">
           <div className="flex flex-col items-start">
-             <h1 className="text-xl font-bold text-[#78716C] mb-1">{strategy.name}</h1>
+             <h1 className="text-xl font-bold text-[#78716C] mb-1">{strategy?.name}</h1>
              <div className="flex items-baseline gap-3">
                <span className="text-5xl font-serif font-bold tracking-tighter text-white">
-                 ${latestValue.toFixed(2)}
+                 ${latestValue?.toFixed(2)}
                </span>
              </div>
              <div className={`flex items-center gap-1 mt-2 text-sm font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -521,7 +511,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         </div>
 
         <div className="w-full h-[280px] mb-4">
-          <RichChart data={chartData} isPositive={isPositive} />
+          <RichChart data={chartData || []} isPositive={isPositive} />
         </div>
 
         <div className="flex justify-center mb-8 px-6">
@@ -552,7 +542,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
                 <span className="text-[10px] uppercase font-bold tracking-wider">TVL</span>
               </div>
               <p className="text-lg font-bold text-white">
-                {typeof strategy.tvl === 'number' ? (strategy.tvl >= 1000 ? `${(strategy.tvl/1000).toFixed(1)}k` : strategy.tvl.toFixed(0)) : '0'} <span className="text-xs font-normal text-[#57534E]">SOL</span>
+                {typeof strategy?.tvl === 'number' ? (strategy.tvl >= 1000 ? `${(strategy.tvl/1000).toFixed(1)}k` : strategy.tvl.toFixed(0)) : '0'} <span className="text-xs font-normal text-[#57534E]">SOL</span>
               </p>
            </div>
 
@@ -562,7 +552,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
                 <span className="text-[10px] uppercase font-bold tracking-wider">ROI (All)</span>
               </div>
               <p className={`text-lg font-bold ${changePct >= 0 ? 'text-[#D97706]' : 'text-red-500'}`}>
-                {changePct > 0 ? '+' : ''}{changePct.toFixed(2)}%
+                {changePct > 0 ? '+' : ''}{changePct?.toFixed(2)}%
               </p>
            </div>
 
@@ -572,7 +562,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
                 <span className="text-[10px] uppercase font-bold tracking-wider">Contract</span>
               </div>
               <p className="text-sm font-mono text-[#A8A29E] truncate w-full group-hover:text-white">
-                 {strategy.id.slice(0, 4)}...{strategy.id.slice(-4)}
+                 {strategy?.id ? `${strategy.id.slice(0, 4)}...${strategy.id.slice(-4)}` : 'N/A'}
               </p>
            </button>
         </div>
@@ -585,35 +575,34 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         </h3>
         
         <div className="bg-[#1C1917]/50 rounded-3xl border border-white/5 overflow-hidden">
-          {tokensInfo.length > 0 ? tokensInfo.map((token, i) => (
-            <div 
-              key={i} 
-              className={`relative flex items-center justify-between p-4 ${i !== tokensInfo.length - 1 ? 'border-b border-white/5' : ''}`}
+          {(tokensInfo?.length ?? 0) > 0 ? tokensInfo.map((token, i) => (
+            <div
+              key={i}
+              className={`relative p-4 ${i !== tokensInfo.length - 1 ? 'border-b border-white/5' : ''}`}
             >
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="relative shrink-0">
-                  {token.logoURI ? (
-                    <img src={token.logoURI} alt={token.symbol} className="w-10 h-10 rounded-full bg-black object-cover" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-[#292524] flex items-center justify-center font-bold text-xs text-[#D97706]">{token.symbol[0]}</div>
-                  )}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="relative shrink-0">
+                    {token.logoURI ? (
+                      <img src={token.logoURI} alt={token.symbol} className="w-10 h-10 rounded-full bg-black object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#292524] flex items-center justify-center font-bold text-xs text-[#D97706]">{token.symbol?.[0] || '?'}</div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-white text-sm">{token.symbol || 'UNK'}</h4>
+                    <p className="text-[10px] text-[#78716C] truncate">{token.name || 'Token'}</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-white text-sm">{token.symbol}</h4>
-                  <p className="text-[10px] text-[#78716C]">{token.name || 'Token'}</p>
-                </div>
+                <span className="font-bold text-white text-sm shrink-0 ml-2">{token.weight}%</span>
               </div>
-
-              <div className="flex flex-col items-end gap-1 relative z-10 w-24">
-                <span className="font-bold text-white text-sm">{token.weight}%</span>
-                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
-                        initial={{ width: 0 }} 
-                        animate={{ width: `${token.weight}%` }} 
-                        transition={{ duration: 1, delay: i * 0.1 }}
-                        className="h-full bg-[#D97706]" 
-                    />
-                </div>
+              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${token.weight}%` }}
+                      transition={{ duration: 1, delay: i * 0.1 }}
+                      className="h-full bg-[#D97706] rounded-full"
+                  />
               </div>
             </div>
           )) : (
@@ -623,7 +612,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       </div>
 
       {/* 5. Bottom Action Bar */}
-      <div className="fixed bottom-0 inset-x-0 bg-[#0C0A09] border-t border-white/10 z-40 safe-area-bottom pb-4 pt-3 px-6">
+      <div className="fixed bottom-0 inset-x-0 bg-[#0C0A09]/95 backdrop-blur-md border-t border-white/10 z-40 pt-3 px-6" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 8px) + 8px)' }}>
         <div className="flex items-center justify-between gap-4">
            <div className="flex flex-col">
               <span className="text-[10px] text-[#78716C] uppercase tracking-wider">Your Position</span>

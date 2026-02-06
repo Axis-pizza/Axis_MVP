@@ -20,8 +20,10 @@ const TUTORIAL_KEY = 'kagemusha-onboarding-v2';
 
 export default function Home() {
   const [view, setView] = useState<View>('CREATE');
+  const [previousView, setPreviousView] = useState<View>('DISCOVER');
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [isOverlayActive, setIsOverlayActive] = useState(false);
 
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
@@ -65,12 +67,13 @@ export default function Home() {
   };
 
   const handleStrategySelect = (strategy: Strategy) => {
+    setPreviousView(view);
     setSelectedStrategy(strategy);
     setView('STRATEGY_DETAIL');
   };
 
   const handleBackFromDetail = () => {
-    setView('DISCOVER');
+    setView(previousView);
     setSelectedStrategy(null);
   };
 
@@ -96,7 +99,7 @@ export default function Home() {
             exit={{ opacity: 0, x: -10 }} 
             className="relative z-10 pb-32"
           >
-            <DiscoverView onStrategySelect={handleStrategySelect} />
+            <DiscoverView onStrategySelect={handleStrategySelect} onOverlayChange={setIsOverlayActive} />
           </motion.div>
         )}
 
@@ -122,7 +125,7 @@ export default function Home() {
             exit={{ opacity: 0, y: -10 }} 
             className="relative z-10 pb-32"
           >
-            <ProfileView />
+            <ProfileView onStrategySelect={handleStrategySelect} />
           </motion.div>
         )}
 
@@ -144,7 +147,7 @@ export default function Home() {
       </AnimatePresence>
 
       {/* Floating Navigation (Tutorial targets this) */}
-      {view !== 'STRATEGY_DETAIL' && (
+      {view !== 'STRATEGY_DETAIL' && !isOverlayActive && (
         <FloatingNav
           currentView={view as ViewState}
           onNavigate={handleNavigate}
