@@ -209,10 +209,6 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6 relative z-10">
         <h1 className="text-2xl font-serif font-bold text-white">Profile</h1>
-        <div className="px-3 py-1 bg-[#1C1917] rounded-full border border-white/10 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] font-bold text-white/60">Live</span>
-        </div>
       </div>
 
       {/* --- Net Worth Card --- */}
