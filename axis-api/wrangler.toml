@@ -3,11 +3,25 @@ main = "src/app.ts"
 compatibility_date = "2024-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-# D1 Database
+# -----------------------------------------------------
+# D1 Databases
+# -----------------------------------------------------
+
+# 1. Main Database
 [[d1_databases]]
 binding = "axis_db"
 database_name = "axis-db"
 database_id = "30e73485-4507-447b-a4a0-6f1b7a10812b"
+
+# 2. VIP List Database
+[[d1_databases]]
+binding = "whitelist_db"
+database_name = "axis-wlv2"
+database_id = "ae62cf10-e8b1-4cfb-8823-91da78d51220"
+
+# -----------------------------------------------------
+# Other Bindings
+# -----------------------------------------------------
 
 # AI Binding
 [ai]
@@ -18,7 +32,7 @@ binding = "AI"
 binding = "VECTOR_INDEX"
 index_name = "axis-vector-index"
 
-# ★ここを追加（画像保存用バケットの設定）
+# Image Storage Bucket
 [[r2_buckets]]
 binding = "IMAGES"
 bucket_name = "axis-images"

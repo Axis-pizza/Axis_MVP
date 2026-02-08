@@ -1,4 +1,73 @@
-// Frontend Types
+// ==========================================
+// 1. Prediction Market & Axis Token Types (New)
+// ==========================================
+
+export interface PredictionMeta {
+  eventId: string;
+  eventTitle: string;
+  marketId: string;
+  marketQuestion: string;
+  side: 'YES' | 'NO';
+  expiry: string; // ISO 8601 string
+}
+
+export interface StandardToken {
+  source: 'jupiter';
+  address: string;
+  chainId: number;
+  decimals: number;
+  name: string;
+  symbol: string;
+  logoURI?: string;
+  price?: number;
+  tags?: string[];
+  isVerified?: boolean;
+}
+
+export interface PredictionToken {
+  source: 'dflow';
+  address: string;
+  chainId: number;
+  decimals: number;
+  name: string;
+  symbol: string;
+  logoURI?: string;
+  price?: number; // Probability price 0.0 - 1.0
+  isMock?: boolean;
+  tags?: string[];
+  isVerified?: boolean;
+  predictionMeta: PredictionMeta;
+}
+
+// アプリケーション全体で扱う統合トークン型
+export type AxisToken = StandardToken | PredictionToken;
+
+// Type Guard: 予測市場トークンかどうかを判定
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function isPredictionToken(token: any): token is PredictionToken {
+  return token && token.source === 'dflow' && 'predictionMeta' in token;
+}
+
+
+// ==========================================
+// 2. User & Profile Types
+// ==========================================
+
+export interface UserProfile {
+  username: string;
+  referralCode?: string;
+  totalPoints: number;
+  totalVolume: number;
+  rankTier: string;
+  pnlPercent: number;
+  referralCount?: number;
+  is_vip?: boolean; // ★ VIP/OG判定用 (VIP機能で利用)
+}
+
+
+// ==========================================
+// 3. Existing Strategy & Vault Types
+// ==========================================
 
 export interface TokenInfo {
   symbol: string;
@@ -17,7 +86,7 @@ export interface TokenAllocation {
   mint?: string;
   weight: number;
   logoURI?: string;
-  token?: TokenInfo;
+  token?: TokenInfo; // 将来的には AxisToken に統合予定
 }
 
 export interface Strategy {
@@ -43,7 +112,6 @@ export interface Strategy {
     strategyPubkey?: string;
     [key: string]: unknown;
   };
-
   backtest?: {
     timestamps: number[];
     values: number[];

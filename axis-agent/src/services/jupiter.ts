@@ -18,14 +18,26 @@ export interface JupiterToken {
   logoURI: string;
   tags: string[];
   isVerified?: boolean;
+  source?: 'jupiter' | 'dflow' | 'stock' | 'commodity';
+  isMock?: boolean;
+  price?: number;
+  predictionMeta?: {
+    eventId: string;
+    eventTitle: string;
+    marketId: string;
+    marketQuestion: string;
+    side: 'YES' | 'NO';
+    expiry: string;
+  };
 }
 
 const CHAIN_ID = 101;
 
-// ✅ 新しいAPIエンドポイント (2025年版)
-const TOKEN_LIST_URL = "https://lite-api.jup.ag/tokens/v2/tag?query=verified";
-const SEARCH_URL = "https://lite-api.jup.ag/tokens/v2/search";
-const PRICE_API_URL = "https://lite-api.jup.ag/price/v3";
+const BASE = "https://api.jup.ag";
+const TOKEN_LIST_URL = `${BASE}/tokens/v2/tag?query=verified`;
+const SEARCH_URL = `${BASE}/tokens/v2/search`;
+const PRICE_API_URL = `${BASE}/price/v3`;
+
 
 // バックアップ: Solana Token List (古いがまだ動く)
 const BACKUP_LIST_URL = "https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json";

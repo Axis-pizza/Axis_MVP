@@ -32,11 +32,20 @@ interface DeployedStrategy {
   config?: any;
 }
 
-export const KagemushaFlow = () => {
+interface KagemushaFlowProps {
+  onStepChange?: (step: CreateStep) => void;
+  onNavigateToDiscover?: () => void;
+}
+
+export const KagemushaFlow = ({ onStepChange, onNavigateToDiscover }: KagemushaFlowProps) => {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
   
-  const [step, setStep] = useState<CreateStep>('LANDING'); 
+  const [step, setStep] = useState<CreateStep>('LANDING');
+
+  useEffect(() => {
+    onStepChange?.(step);
+  }, [step, onStepChange]);
   
   const [deployedStrategy, setDeployedStrategy] = useState<DeployedStrategy | null>(null);
   const [userStrategies, setUserStrategies] = useState<OnChainStrategy[]>([]);
@@ -82,7 +91,11 @@ export const KagemushaFlow = () => {
   };
 
   const handleDepositComplete = () => {
-    setStep('DASHBOARD');
+    if (onNavigateToDiscover) {
+      onNavigateToDiscover();
+    } else {
+      setStep('DASHBOARD');
+    }
   };
 
   const handleCreateNew = () => {

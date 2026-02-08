@@ -135,11 +135,29 @@ app.post('/request-invite', async (c) => {
 
 app.get('/user', async (c) => { 
   const wallet = c.req.query('wallet');
+  // デバッグログ: 本当に設定が反映されたか確認
+  console.log('[DEBUG] Env Keys:', Object.keys(c.env)); 
+
   if (!wallet) return c.json({ error: 'Wallet address required' }, 400);
 
   try {
     const user = await UserModel.findUserByWallet(c.env.axis_db, wallet);
+
+    // ★修正: クラッシュ防止の安全策
+    let isVip = false;
     
+    // whitelist_db が存在するかチェックしてから使う
+    if (c.env.whitelist_db) {
+      const whitelistEntry = await c.env.whitelist_db
+        .prepare('SELECT 1 FROM users WHERE wallet_address = ?')
+        .bind(wallet)
+        .first();
+      isVip = !!whitelistEntry;
+    } else {
+      // 存在しない場合はログだけ出して、処理は続行する（エラーにしない）
+      console.error('⚠️ [WARNING] whitelist_db binding is MISSING. VIP check skipped.');
+    }
+
     const userData = user || {
       name: 'Anonymous',
       bio: '',
@@ -159,7 +177,8 @@ app.get('/user', async (c) => {
         total_xp: userData.total_xp,
         rank_tier: userData.rank_tier,
         pnl_percent: userData.pnl_percent,
-        total_invested: userData.total_invested_usd
+        total_invested: userData.total_invested_usd,
+        is_vip: isVip // VIP判定結果
       }
     });
 
@@ -281,28 +300,44 @@ app.post('/user', async (c) => {
 });
 
 app.post('/users/:wallet/checkin', async (c) => {
-    const wallet = c.req.param('wallet');
-    try {
-        const user = await UserModel.findUserByWallet(c.env.axis_db, wallet);
-        if (!user) return c.json({ success: false, message: 'User not found' }, 404);
+  const wallet = c.req.param('wallet');
+  try {
+      const user = await UserModel.findUserByWallet(c.env.axis_db, wallet);
+      if (!user) return c.json({ success: false, message: 'User not found' }, 404);
 
-        const now = Math.floor(Date.now() / 1000);
-        const lastCheckin = user.last_checkin || 0;
-        
-        if (now - lastCheckin < 20 * 60 * 60) { 
-             return c.json({ success: false, message: 'Already checked in today' });
-        }
+      const now = Math.floor(Date.now() / 1000);
+      const lastCheckin = user.last_checkin || 0;
+      
+      // 20時間チェック (テスト時は短くしてもOK)
+      if (now - lastCheckin < 20 * 60 * 60) { 
+           return c.json({ success: false, message: 'Already checked in today' });
+      }
 
-        const newXp = (user.total_xp || 0) + 10;
-        await UserModel.updateUserXp(c.env.axis_db, wallet, newXp, now);
+      // ★追加: VIP判定とポイント倍率の適用
+      const whitelistEntry = await c.env.whitelist_db
+          .prepare('SELECT 1 FROM users WHERE wallet_address = ?')
+          .bind(wallet)
+          .first();
+      const isVip = !!whitelistEntry;
 
-        return c.json({ 
-            success: true, 
-            user: { ...user, total_xp: newXp, last_checkin: now } 
-        });
-    } catch (e: any) {
-        return c.json({ success: false, error: e.message }, 500);
-    }
+      const basePoints = 10;
+      // VIPなら1.5倍 (端数切り捨て)
+      const earnedPoints = isVip ? Math.floor(basePoints * 1.5) : basePoints;
+
+      // ★変更: 固定の10ではなく計算した earnedPoints を足す
+      const newXp = (user.total_xp || 0) + earnedPoints;
+      
+      await UserModel.updateUserXp(c.env.axis_db, wallet, newXp, now);
+
+      return c.json({ 
+          success: true, 
+          user: { ...user, total_xp: newXp, last_checkin: now },
+          earnedPoints, // フロント表示用に獲得ポイントも返すと親切
+          isVip         // フロント演出用に判定結果も返す
+      });
+  } catch (e: any) {
+      return c.json({ success: false, error: e.message }, 500);
+  }
 });
 
 app.get('/my-invites', async (c) => { 

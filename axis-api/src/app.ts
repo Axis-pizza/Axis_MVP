@@ -61,6 +61,21 @@ app.route('/', kagemushaRoutes);
 app.route('/upload', uploadRoutes);
 app.route('/share', shareRoutes);
 
+app.use('*', async (c, next) => {
+  console.log('🔍 [DEBUG] Request URL:', c.req.url);
+  // c.env に入っているキー（バインディング名）を全て表示する
+  console.log('🔑 [DEBUG] Available Bindings:', Object.keys(c.env));
+  
+  // whitelist_db があるか個別にチェック
+  if (c.env.whitelist_db) {
+    console.log('✅ [DEBUG] whitelist_db is PRESENT');
+  } else {
+    console.error('❌ [DEBUG] whitelist_db is MISSING (undefined)');
+  }
+  
+  await next();
+});
+
 app.post('/report', async (c) => {
   try {
    
