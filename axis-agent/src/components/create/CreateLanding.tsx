@@ -24,7 +24,7 @@ export const CreateLanding = ({ onCreate }: CreateLandingProps) => {
                     transition={{ delay: 0.1, duration: 0.5 }}
                     className="text-6xl font-black text-white tracking-tighter leading-[0.9]"
                 >
-                    Your Strategy.<br />
+                    Your Idea.<br />
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-200">
                         Your ETF.
                     </span>

@@ -24,6 +24,7 @@ export default function Home() {
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [isOverlayActive, setIsOverlayActive] = useState(false);
+  const [hideNavInCreate, setHideNavInCreate] = useState(false);
 
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
@@ -112,7 +113,7 @@ export default function Home() {
             exit={{ opacity: 0 }} 
             className="relative z-10 pb-32"
           >
-            <KagemushaFlow />
+            <KagemushaFlow onStepChange={(step) => setHideNavInCreate(step !== 'LANDING')} />
           </motion.div>
         )}
 
@@ -147,7 +148,7 @@ export default function Home() {
       </AnimatePresence>
 
       {/* Floating Navigation (Tutorial targets this) */}
-      {view !== 'STRATEGY_DETAIL' && !isOverlayActive && (
+      {view !== 'STRATEGY_DETAIL' && !hideNavInCreate && !isOverlayActive && (
         <FloatingNav
           currentView={view as ViewState}
           onNavigate={handleNavigate}
