@@ -8,6 +8,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { api } from '../../services/api';
 import { TokenImage } from '../common/TokenImage';
+import { OGBadge } from '../common/OGBadge';
 
 // --- Types ---
 const FIXED_BG_STYLE = {
@@ -33,6 +34,7 @@ interface UserProfile {
   rankTier: string;
   pnlPercent: number;
   referralCount: number;
+  is_vip?: boolean;
 }
 
 // --- Helper Functions ---
@@ -122,7 +124,8 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
             totalVolume: u.total_invested || 0,
             rankTier: u.rank_tier || 'Novice',
             pnlPercent: u.pnl_percent || 0,
-            referralCount: u.referralCount || 0
+            referralCount: u.referralCount || 0,
+            is_vip: u.is_vip || false
           });
         }
 
@@ -219,11 +222,21 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
             
             <div className="relative z-10 h-full p-6 flex flex-col justify-between bg-black/10 backdrop-blur-[1px]">
-                 <div className="flex justify-between">
-                    <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/5">
-                        <Wallet className="w-3 h-3 text-[#D97706]" />
-                        <span className="font-bold text-white text-sm font-serif">{formatAddress(publicKey.toBase58())}</span>
+            <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/5 w-fit">
+                            <Wallet className="w-3 h-3 text-[#D97706]" />
+                            <span className="font-bold text-white text-sm font-serif">{formatAddress(publicKey.toBase58())}</span>
+                        </div>
+                        
+                        {/* VIPバッジの表示 */}
+                        {userProfile?.is_vip && (
+                           <div className="ml-1">
+                             <OGBadge size="sm" />
+                           </div>
+                        )}
                     </div>
+
                     <div className="flex gap-2">
                          <button onClick={() => setCurrencyMode(m => m === 'USD' ? 'SOL' : 'USD')} className="text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white/70 border border-white/10">{currencyMode}</button>
                          <button onClick={() => setIsHidden(!isHidden)} className="text-white/50">{isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>

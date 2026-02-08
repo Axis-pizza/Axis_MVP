@@ -11,6 +11,27 @@
 			"binding": "axis_db",
 			"database_name": "axis-db",
 			"database_id": "30e73485-4507-447b-a4a0-6f1b7a10812b"
+		},
+		{
+			// ★追加: VIPリスト管理用DB
+			"binding": "whitelist_db",
+			"database_name": "axis-wlv2",
+			"database_id": "ae62cf10-e8b1-4cfb-8823-91da78d51220"
+		}
+	],
+	// AIバインディングも必要なら追加
+	"ai": {
+		"binding": "AI"
+	},
+	// Vectorizeも必要なら追加 (以前のtomlにあったもの)
+	"vectorize": [
+		{
+			"binding": "VECTOR_INDEX",
+			"index_name": "axis-vector-index"
+		},
+		{
+			"binding": "VECTORIZE",
+			"index_name": "axis-vector-index"
 		}
 	],
 	"send_email": [
@@ -23,37 +44,10 @@
 			"binding": "IMAGES",
 			"bucket_name": "axis-images"
 		}
-	]
-	// "compatibility_flags": [
-	//   "nodejs_compat"
-	// ],
-	// "vars": {
-	//   "MY_VAR": "my-variable"
-	// },
-	// "kv_namespaces": [
-	//   {
-	//     "binding": "MY_KV_NAMESPACE",
-	//     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-	//   }
-	// ],
-	// "r2_buckets": [
-	//   {
-	//     "binding": "MY_BUCKET",
-	//     "bucket_name": "my-bucket"
-	//   }
-	// ],
-	// "d1_databases": [
-	//   {
-	//     "binding": "MY_DB",
-	//     "database_name": "my-database",
-	//     "database_id": ""
-	//   }
-	// ],
-	// "ai": {
-	//   "binding": "AI"
-	// },
-	// "observability": {
-	//   "enabled": true,
-	//   "head_sampling_rate": 1
-	// }
+	],
+	"triggers": {
+		"crons": [
+			"0 * * * *"
+		]
+	}
 }
