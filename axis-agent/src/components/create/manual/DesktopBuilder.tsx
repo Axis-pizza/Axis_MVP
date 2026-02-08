@@ -132,6 +132,9 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
     sortedVisibleTokens,
     displayTokens,
     allTokens,
+    tokenFilter,
+    setTokenFilter,
+    filterCounts,
     handleToIdentity,
     addTokenDirect,
     removeToken,
@@ -307,6 +310,31 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
                   {portfolio.length} selected
                 </span>
               )}
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex gap-1.5 mt-3 overflow-x-auto no-scrollbar">
+              {([
+                { key: 'all', label: 'All', count: 1 },
+                { key: 'crypto', label: 'Crypto', count: filterCounts.crypto },
+                { key: 'stock', label: 'Stock', count: filterCounts.stock },
+                { key: 'commodity', label: 'Commodities', count: filterCounts.commodity },
+                { key: 'prediction', label: 'Prediction', count: filterCounts.prediction },
+              ] as const).map(({ key, label, count }) => (
+                count === undefined || count > 0 ? (
+                  <button
+                    key={key}
+                    onClick={() => setTokenFilter(key)}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      tokenFilter === key
+                        ? 'bg-amber-600 text-black'
+                        : 'bg-white/5 text-white/40 hover:bg-white/10'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ) : null
+              ))}
             </div>
           </div>
 

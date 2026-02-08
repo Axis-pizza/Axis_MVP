@@ -113,7 +113,10 @@ export default function Home() {
             exit={{ opacity: 0 }} 
             className="relative z-10 pb-32"
           >
-            <KagemushaFlow onStepChange={(step) => setHideNavInCreate(step !== 'LANDING')} />
+            <KagemushaFlow
+              onStepChange={(step) => setHideNavInCreate(step !== 'LANDING')}
+              onNavigateToDiscover={() => setView('DISCOVER')}
+            />
           </motion.div>
         )}
 

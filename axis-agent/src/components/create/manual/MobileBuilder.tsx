@@ -282,6 +282,9 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
     displayTokens,
     allTokens,
     flyingToken,
+    tokenFilter,
+    setTokenFilter,
+    filterCounts,
     handleToIdentity,
     triggerAddAnimation,
     handleAnimationComplete,
@@ -504,6 +507,31 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
                 {portfolio.length} selected
               </motion.span>
             )}
+          </div>
+
+          {/* Filter Tabs */}
+          <div className="flex gap-1.5 mt-3 overflow-x-auto no-scrollbar">
+            {([
+              { key: 'all', label: 'All', count: 1 },
+              { key: 'crypto', label: 'Crypto', count: filterCounts.crypto },
+              { key: 'stock', label: 'Stock', count: filterCounts.stock },
+              { key: 'commodity', label: 'Commodities', count: filterCounts.commodity },
+              { key: 'prediction', label: 'Prediction', count: filterCounts.prediction },
+            ] as const).map(({ key, label, count }) => (
+              count === undefined || count > 0 ? (
+                <button
+                  key={key}
+                  onClick={() => setTokenFilter(key)}
+                  className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+                    tokenFilter === key
+                      ? 'bg-amber-600 text-black'
+                      : 'bg-white/5 text-white/40 active:bg-white/10'
+                  }`}
+                >
+                  {label}
+                </button>
+              ) : null
+            ))}
           </div>
         </div>
 

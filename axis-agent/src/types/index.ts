@@ -1,5 +1,52 @@
 // Frontend Types
 
+// --- Prediction Market Token Types ---
+
+export interface PredictionMeta {
+  eventId: string;
+  eventTitle: string;
+  marketId: string;
+  marketQuestion: string;
+  side: 'YES' | 'NO';
+  expiry: string; // ISO 8601
+}
+
+export interface StandardToken {
+  source: 'jupiter';
+  address: string;
+  chainId: number;
+  decimals: number;
+  name: string;
+  symbol: string;
+  logoURI?: string;
+  price?: number;
+  tags?: string[];
+  isVerified?: boolean;
+}
+
+export interface PredictionToken {
+  source: 'dflow';
+  address: string;
+  chainId: number;
+  decimals: number;
+  name: string;
+  symbol: string;
+  logoURI?: string;
+  price?: number; // Probability price 0.0 - 1.0
+  isMock?: true;
+  tags?: string[];
+  isVerified?: boolean;
+  predictionMeta: PredictionMeta;
+}
+
+export type AxisToken = StandardToken | PredictionToken;
+
+export function isPredictionToken(token: { predictionMeta?: unknown }): token is PredictionToken {
+  return 'predictionMeta' in token && token.predictionMeta != null;
+}
+
+// --- Existing Types ---
+
 export interface TokenInfo {
   symbol: string;
   name: string;

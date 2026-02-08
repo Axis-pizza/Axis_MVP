@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { JupiterService, type JupiterToken } from '../services/jupiter';
+import { fetchPredictionTokens, fetchStockTokens, fetchCommodityTokens } from '../services/dflow';
 import { toast } from 'sonner';
 import type { StrategyConfig, AssetItem, ManualData, ManualDashboardProps } from '../components/create/manual/types';
 
@@ -35,6 +36,7 @@ export const useManualDashboard = ({
 
   const [focusedField, setFocusedField] = useState<'ticker' | 'name' | 'desc' | null>('ticker');
   const [flyingToken, setFlyingToken] = useState<{ token: JupiterToken; x: number; y: number } | null>(null);
+  const [tokenFilter, setTokenFilter] = useState<'all' | 'crypto' | 'stock' | 'commodity' | 'prediction'>('all');
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // --- Computed ---
@@ -45,30 +47,58 @@ export const useManualDashboard = ({
 
   const visibleTokens = useMemo(() => displayTokens.slice(0, 100), [displayTokens]);
 
+  const filteredVisibleTokens = useMemo(() => {
+    if (tokenFilter === 'all') return visibleTokens;
+    if (tokenFilter === 'crypto') return visibleTokens.filter(t => !t.source || t.source === 'jupiter');
+    if (tokenFilter === 'stock') return visibleTokens.filter(t => t.source === 'stock');
+    if (tokenFilter === 'commodity') return visibleTokens.filter(t => t.source === 'commodity');
+    if (tokenFilter === 'prediction') return visibleTokens.filter(t => t.source === 'dflow');
+    return visibleTokens;
+  }, [visibleTokens, tokenFilter]);
+
   const sortedVisibleTokens = useMemo(() => {
-    if (!hasSelection) return visibleTokens;
-    const selected = visibleTokens.filter(t => selectedIds.has(t.address));
-    const unselected = visibleTokens.filter(t => !selectedIds.has(t.address));
+    if (!hasSelection) return filteredVisibleTokens;
+    const selected = filteredVisibleTokens.filter(t => selectedIds.has(t.address));
+    const unselected = filteredVisibleTokens.filter(t => !selectedIds.has(t.address));
     return [...selected, ...unselected];
-  }, [visibleTokens, selectedIds, hasSelection]);
+  }, [filteredVisibleTokens, selectedIds, hasSelection]);
+
+  const filterCounts = useMemo(() => ({
+    crypto: displayTokens.filter(t => !t.source || t.source === 'jupiter').length,
+    stock: displayTokens.filter(t => t.source === 'stock').length,
+    commodity: displayTokens.filter(t => t.source === 'commodity').length,
+    prediction: displayTokens.filter(t => t.source === 'dflow').length,
+  }), [displayTokens]);
 
   // --- Init ---
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
       try {
-        const list = await JupiterService.getLiteList();
+        const [list, predictionTokens, stockTokens, commodityTokens] = await Promise.all([
+          JupiterService.getLiteList(),
+          fetchPredictionTokens().catch((e) => {
+            console.warn('[ManualDashboard] Failed to load prediction tokens:', e);
+            return [] as JupiterToken[];
+          }),
+          fetchStockTokens().catch(() => [] as JupiterToken[]),
+          fetchCommodityTokens().catch(() => [] as JupiterToken[]),
+        ]);
+
         const popular = POPULAR_SYMBOLS
           .map(sym => list.find(t => t.symbol === sym))
           .filter((t): t is JupiterToken => t !== undefined);
         const others = list.filter(t => !POPULAR_SYMBOLS.includes(t.symbol));
-        setAllTokens([...popular, ...others]);
-        setDisplayTokens([...popular, ...others]);
+
+        const merged = [...popular, ...predictionTokens, ...stockTokens, ...commodityTokens, ...others];
+        setAllTokens(merged);
+        setDisplayTokens(merged);
 
         if (initialTokens) {
           const initialAssets: AssetItem[] = [];
+          const allList = [...list, ...predictionTokens, ...stockTokens, ...commodityTokens];
           initialTokens.forEach(p => {
-            const t = list.find(x => x.symbol === p.symbol);
+            const t = allList.find(x => x.symbol === p.symbol);
             if (t) initialAssets.push({ token: t, weight: p.weight, locked: true, id: t.address });
           });
           setPortfolio(initialAssets);
@@ -237,7 +267,13 @@ export const useManualDashboard = ({
     hasSelection,
     isValidAllocation,
     visibleTokens,
+    filteredVisibleTokens,
     sortedVisibleTokens,
+    filterCounts,
+
+    // Filter
+    tokenFilter,
+    setTokenFilter,
 
     // Wallet
     connected,
