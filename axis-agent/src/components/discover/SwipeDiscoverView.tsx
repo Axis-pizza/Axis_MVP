@@ -270,6 +270,7 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
   
   const [tokenDataMap, setTokenDataMap] = useState<Record<string, TokenData>>({});
   const [userMap, setUserMap] = useState<Record<string, any>>({});
+  const [tickerMap, setTickerMap] = useState<Record<string, string>>({});
   
   const dataFetched = useRef(false);
 
@@ -365,15 +366,28 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
         });
         
         if (creators.size > 0) {
-          const userPromises = Array.from(creators).map(pubkey => 
-            api.getUser(pubkey).then(res => res.success ? res.user : null).catch(() => null)
-          );
-          const users = await Promise.all(userPromises);
+          const creatorArray = Array.from(creators);
+          const [users, creatorStrats] = await Promise.all([
+            Promise.all(creatorArray.map(pubkey =>
+              api.getUser(pubkey).then(res => res.success ? res.user : null).catch(() => null)
+            )),
+            Promise.all(creatorArray.map(pubkey =>
+              api.getUserStrategies(pubkey).then(res => res.strategies || []).catch(() => [])
+            )),
+          ]);
+
           const newUserMap: Record<string, any> = {};
           users.forEach((user) => {
             if (user && user.pubkey) newUserMap[user.pubkey] = user;
           });
           setUserMap(newUserMap);
+
+          // /discover はtickerを返さないため、getUserStrategiesから補完
+          const newTickerMap: Record<string, string> = {};
+          creatorStrats.flat().forEach((s: any) => {
+            if (s.id && s.ticker) newTickerMap[s.id] = s.ticker;
+          });
+          setTickerMap(newTickerMap);
         }
 
       } catch (e) {
@@ -420,11 +434,12 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
 
       return {
         ...s,
-        id: s.address || s.pubkey || s.id, 
+        id: s.address || s.pubkey || s.id,
         name: s.name || 'Untitled Strategy',
+        ticker: s.ticker || tickerMap[s.id] || '',
         type: s.type || 'BALANCED',
         tokens: enrichedTokens,
-        roi: calculatedRoi, 
+        roi: calculatedRoi,
         tvl: Number(s.tvl || 0),
         creatorAddress: ownerAddress || 'Unknown',
         creatorPfpUrl: userProfile?.avatar_url ? api.getProxyUrl(userProfile.avatar_url) : null,
@@ -432,7 +447,7 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
         createdAt: s.createdAt || (Date.now() / 1000),
       };
     });
-  }, [strategies, tokenDataMap, userMap]);
+  }, [strategies, tokenDataMap, userMap, tickerMap]);
 
   const handleSwipe = useCallback((direction: 'left' | 'right', strategy: any) => {
     if (isSwiping || matchedStrategy) return;

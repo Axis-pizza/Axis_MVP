@@ -57,10 +57,6 @@ export const CreateLanding = ({ onCreate }: CreateLandingProps) => {
                     {/* Hover Shine Effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full group-hover:animate-shine" />
                 </button>
-                
-                <p className="mt-4 text-xs text-white/20 font-mono">
-                    No code required • Gas optimized
-                </p>
             </motion.div>
 
         </div>

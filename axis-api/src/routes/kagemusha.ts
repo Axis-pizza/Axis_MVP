@@ -180,6 +180,7 @@ app.post('/deploy', async (c) => {
     // メタデータ抽出
     const owner = metadata.ownerPubkey || metadata.creator || 'unknown';
     const name = metadata.name || 'Untitled';
+    const ticker = metadata.ticker || '';
     const strategyType = metadata.type || 'BALANCED';
     const tokens = metadata.tokens || metadata.composition || [];
     const config = metadata.config || {};
@@ -211,13 +212,14 @@ app.post('/deploy', async (c) => {
         const newTotalDeposited = (recentCheck.total_deposited as number || 0) + depositAmount;
         
         await c.env.axis_db.prepare(`
-          UPDATE strategies 
-          SET tvl = ?, 
-              total_deposited = ?, 
+          UPDATE strategies
+          SET tvl = ?,
+              total_deposited = ?,
               jito_bundle_id = ?,
+              ticker = COALESCE(NULLIF(?, ''), ticker),
               status = 'active'
           WHERE id = ?
-        `).bind(newTvl, newTotalDeposited, bundleId || 'simulated', recentCheck.id).run();
+        `).bind(newTvl, newTotalDeposited, bundleId || 'simulated', ticker, recentCheck.id).run();
         
         // デプロイXP（更新時も付与）
         await addXP(c.env.axis_db, owner, 500, 'STRATEGY_DEPLOY', 'Deployed on-chain strategy');
@@ -236,21 +238,22 @@ app.post('/deploy', async (c) => {
       
       await c.env.axis_db.prepare(`
         INSERT INTO strategies (
-          id, owner_pubkey, name, type, composition, config, description, 
+          id, owner_pubkey, name, ticker, type, composition, config, description,
           jito_bundle_id, status, created_at, tvl, total_deposited, roi
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, 0)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, 0)
       `).bind(
         id,
         owner,
         name,
+        ticker,
         strategyType,
         JSON.stringify(tokens),
         JSON.stringify(config),
         description,
         bundleId || 'simulated',
         now,
-        depositAmount,      // ★ tvl
-        depositAmount       // ★ total_deposited
+        depositAmount,
+        depositAmount
       ).run();
 
       await addXP(c.env.axis_db, owner, 500, 'STRATEGY_DEPLOY', 'Deployed on-chain strategy');
