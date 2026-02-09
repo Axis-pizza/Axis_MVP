@@ -26,4 +26,8 @@ export type Bindings = {
   // AI & Vector
   AI: any
   VECTOR_INDEX: VectorizeIndex
+
+  SERVER_PRIVATE_KEY: string // Base58形式の秘密鍵文字列
+  HELIUS_RPC_URL: string     // トランザクション配信用
+  WEBHOOK_AUTH_SECRET?: string // (任意) Webhookのセキュリティ用
 }

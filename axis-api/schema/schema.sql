@@ -107,3 +107,12 @@ CREATE TABLE watchlist (
 ALTER TABLE users ADD COLUMN pnl_percent REAL DEFAULT 0;       -- 損益率
 ALTER TABLE users ADD COLUMN total_invested_usd REAL DEFAULT 0; -- 総投資額 (Volume用)
 ALTER TABLE users ADD COLUMN strategies_count INTEGER DEFAULT 0; -- 作成した戦略数
+
+CREATE TABLE processed_deposits (
+  signature TEXT PRIMARY KEY,
+  strategy_id TEXT NOT NULL,
+  user_address TEXT NOT NULL,
+  amount_lamports INTEGER NOT NULL,
+  mint_amount INTEGER NOT NULL,
+  processed_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
