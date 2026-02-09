@@ -111,6 +111,7 @@ export const KagemushaFlow = ({ onStepChange, onNavigateToDiscover }: KagemushaF
                  <DepositFlow
                    strategyAddress={deployedStrategy.address}
                    strategyName={deployedStrategy.name}
+                   strategyTicker={deployedStrategy.ticker}
                    strategyType={deployedStrategy.type as 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE'}
                    tokens={deployedStrategy.tokens}
                    initialAmount={0}

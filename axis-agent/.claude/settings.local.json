@@ -3,7 +3,11 @@
     "allow": [
       "mcp__ide__getDiagnostics",
       "mcp__ide__executeCode",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(echo:*)",
+      "Bash(npx wrangler:*)"
     ]
   }
 }

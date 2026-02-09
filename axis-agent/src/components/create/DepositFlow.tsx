@@ -27,6 +27,7 @@ interface TokenAllocation {
 interface DepositFlowProps {
   strategyAddress: string;
   strategyName: string;
+  strategyTicker?: string;
   strategyType: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
   tokens: TokenAllocation[];
   onBack: () => void;
@@ -41,6 +42,7 @@ const QUICK_AMOUNTS = [0.5, 1.0, 5.0];
 export const DepositFlow = ({
   strategyAddress,
   strategyName,
+  strategyTicker,
   strategyType,
   tokens,
   onBack,
@@ -119,6 +121,7 @@ export const DepositFlow = ({
 
       const payload = {
         name: String(strategyName).trim(),
+        ticker: strategyTicker || '',
         description: `${strategyType} Strategy created by ${publicKey.toBase58().slice(0, 6)}...`,
         type: strategyType,
 
@@ -153,6 +156,28 @@ export const DepositFlow = ({
         await api.deploy(signature, payload);
       } catch (apiError: any) {
         console.error("🔥 API Error (Saving failed but tx successful):", apiError);
+      }
+
+      // ticker を確実に保存するため createStrategy も呼ぶ
+      if (strategyTicker) {
+        try {
+          await api.createStrategy({
+            owner_pubkey: publicKey.toBase58(),
+            name: String(strategyName).trim(),
+            ticker: strategyTicker,
+            description: `${strategyType} Strategy created by ${publicKey.toBase58().slice(0, 6)}...`,
+            type: strategyType,
+            tokens: tokens.map(t => ({
+              symbol: String(t.symbol),
+              weight: Math.floor(Number(t.weight)),
+              mint: t.mint || '',
+              logoURI: t.logoURI,
+            })),
+            address: strategyAddress || publicKey.toBase58(),
+          });
+        } catch (e) {
+          console.error("createStrategy (ticker save) failed:", e);
+        }
       }
 
       setStatus('SUCCESS');

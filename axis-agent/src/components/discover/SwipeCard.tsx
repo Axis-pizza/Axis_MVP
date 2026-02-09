@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
-import { TrendingUp, TrendingDown, Clock, Copy, ExternalLink, Wallet } from 'lucide-react';
+import { motion, useMotionValue, useTransform, type PanInfo, AnimatePresence } from 'framer-motion';
+import { Clock, Copy, ExternalLink, Wallet, CheckCircle2 } from 'lucide-react';
 
 // --- Types ---
 interface Token {
   symbol: string;
   weight: number;
-  address?: string; // Mint Address
+  address?: string;
   logoURI?: string | null;
   currentPrice?: number;
   change24h?: number; 
@@ -15,15 +15,15 @@ interface Token {
 interface StrategyCardData {
   id: string;
   name: string;
+  ticker?: string;
   type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
   tokens: Token[];
-  roi: number;     
+  roi: number;
   tvl: number;
   creatorAddress: string;
-  creatorPfpUrl?: string | null; 
+  creatorPfpUrl?: string | null;
   description?: string;
   createdAt: number;
-  rebalanceType?: string;
 }
 
 interface SwipeCardProps {
@@ -35,41 +35,122 @@ interface SwipeCardProps {
   index: number;
 }
 
+// --- Constants ---
 const SWIPE_THRESHOLD = 100;
 const ROTATION_RANGE = 15;
 
+// --- Helper: Generate realistic chart path from change % ---
+const generateChartPath = (change24h: number, id: string): string => {
+  // Seed from strategy id for consistent chart per card
+  let seed = 0;
+  for (let i = 0; i < id.length; i++) seed = ((seed << 5) - seed + id.charCodeAt(i)) | 0;
+  const seededRandom = (i: number) => {
+    const x = Math.sin(seed + i * 127.1) * 43758.5453;
+    return x - Math.floor(x);
+  };
 
-// --- Helpers ---
+  const points = 12;
+  const width = 200;
+  const height = 60;
+  const padding = 6;
+  const usableH = height - padding * 2;
 
-// Memeコイン対応価格フォーマッター
-const formatPrice = (price: any) => {
-  const p = Number(price);
-  if (isNaN(p) || p === 0) return '$0.00';
-
-  if (p < 0.000001) return '$' + p.toFixed(8);
-  if (p < 0.01) return '$' + p.toFixed(6);
-  if (p < 1) return '$' + p.toFixed(4);
-  
-  return '$' + p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
-// ✅ 修正: 文字サイズやアイコンサイズを柔軟に変更可能に
-const FormatChange = ({ value, className, iconSize = "w-3 h-3" }: { value: any, className?: string, iconSize?: string }) => {
-  const c = Number(value);
-  
-  if (isNaN(c) || !isFinite(c)) {
-    return <span className={`font-bold text-gray-500 ${className}`}>0.00%</span>;
+  // Build y values that trend with change24h
+  const trend = Math.max(-30, Math.min(30, change24h)); // clamp
+  const yValues: number[] = [];
+  let y = usableH * 0.5;
+  for (let i = 0; i < points; i++) {
+    const noise = (seededRandom(i) - 0.5) * usableH * 0.35;
+    const drift = (-trend / 100) * usableH * (i / (points - 1));
+    y = Math.max(padding, Math.min(height - padding, usableH * 0.5 + drift + noise));
+    yValues.push(y);
   }
 
-  const isPositive = c >= 0;
+  // Smooth cubic bezier path
+  const step = width / (points - 1);
+  let d = `M0,${yValues[0]}`;
+  for (let i = 1; i < points; i++) {
+    const x0 = (i - 1) * step;
+    const x1 = i * step;
+    const cx = (x0 + x1) / 2;
+    d += ` C${cx},${yValues[i - 1]} ${cx},${yValues[i]} ${x1},${yValues[i]}`;
+  }
+  return d;
+};
+
+// --- Sub-Component: Glowing Line Chart ---
+const MiniChart = ({ change24h, strategyId }: { change24h: number; strategyId: string }) => {
+  const color = "#10B981";
+  const linePath = generateChartPath(change24h, strategyId);
+  const fillPath = `${linePath} V60 H0 Z`;
+  const filterId = `glow-${strategyId.slice(0, 8)}`;
+  const gradId = `grad-${strategyId.slice(0, 8)}`;
+
   return (
-    <span className={`flex items-center justify-center font-black ${isPositive ? 'text-[#10B981]' : 'text-[#EF4444]'} ${className}`}>
-      {isPositive ? <TrendingUp className={`${iconSize} mr-1.5`} /> : <TrendingDown className={`${iconSize} mr-1.5`} />}
-      {Math.abs(c).toFixed(2)}%
-    </span>
+    <div className="relative w-full h-28 overflow-visible">
+      <svg viewBox="0 0 200 60" className="w-full h-full overflow-visible">
+        <defs>
+          <filter id={filterId} x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10B981" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Glow layer (extra bright behind) */}
+        <motion.path
+          d={linePath}
+          fill="none"
+          stroke={color}
+          strokeWidth="6"
+          strokeLinecap="round"
+          opacity={0.25}
+          filter={`url(#${filterId})`}
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 1.5, ease: "easeInOut" }}
+        />
+        {/* Fill area */}
+        <motion.path
+          d={fillPath}
+          fill={`url(#${gradId})`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.6 }}
+          transition={{ duration: 1, delay: 0.5 }}
+        />
+        {/* Main line */}
+        <motion.path
+          d={linePath}
+          fill="none"
+          stroke={color}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          filter={`url(#${filterId})`}
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ duration: 1.5, ease: "easeInOut" }}
+        />
+      </svg>
+    </div>
   );
 };
 
+// --- Helper: Token Icon ---
+const TokenIcon = ({ symbol, address, src, className }: { symbol: string, address?: string, src?: string | null, className?: string }) => {
+  const [imgSrc, setImgSrc] = useState(src || `https://static.jup.ag/tokens/${address}.png`);
+  return (
+    <img 
+      src={imgSrc} 
+      alt={symbol} 
+      className={className}
+      onError={() => setImgSrc(`https://ui-avatars.com/api/?name=${symbol}&background=random&color=fff`)}
+    />
+  );
+};
+
+// --- Helpers ---
 const timeAgo = (timestamp: number) => {
   if (!timestamp) return 'Recently';
   const seconds = Math.floor(Date.now() / 1000) - timestamp;
@@ -77,48 +158,9 @@ const timeAgo = (timestamp: number) => {
   if (days > 0) return `${days}d ago`;
   const hours = Math.floor(seconds / 3600);
   if (hours > 0) return `${hours}h ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes > 0) return `${minutes}m ago`;
   return 'Just now';
-};
-
-const TokenIcon = ({ symbol, src, address, className }: { symbol: string, src?: string | null, address?: string, className?: string }) => {
-  const getInitialSrc = () => {
-    if (src && src.startsWith('http')) return src;
-    if (address) return `https://static.jup.ag/tokens/${address}.png`; 
-    return `https://jup.ag/tokens/${symbol}.svg`;
-  };
-
-  const [imgSrc, setImgSrc] = useState<string>(getInitialSrc());
-  const [errorCount, setErrorCount] = useState(0);
-
-  useEffect(() => {
-    setErrorCount(0);
-    setImgSrc(getInitialSrc());
-  }, [src, address, symbol]);
-
-  const handleError = () => {
-    const nextCount = errorCount + 1;
-    setErrorCount(nextCount);
-
-    if (nextCount === 1) {
-      if (address) {
-        setImgSrc(`https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${address}/logo.png`);
-      } else {
-        setImgSrc(`https://ui-avatars.com/api/?name=${symbol}&background=random&color=fff&size=128&bold=true`);
-      }
-    } else if (nextCount === 2) {
-      setImgSrc(`https://ui-avatars.com/api/?name=${symbol}&background=random&color=fff&size=128&bold=true`);
-    }
-  };
-
-  return (
-    <img 
-      src={imgSrc}
-      alt={symbol}
-      className={className}
-      onError={handleError}
-      loading="lazy"
-    />
-  );
 };
 
 // --- Main Component ---
@@ -133,39 +175,67 @@ export const SwipeCard = ({
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-ROTATION_RANGE, ROTATION_RANGE]);
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
-  const isPositive = strategy.roi >= 0;
-  
   const nopeOpacity = useTransform(x, [-100, -20], [1, 0]);
   const likeOpacity = useTransform(x, [20, 100], [0, 1]);
 
+  const [liveNav, setLiveNav] = useState(0);
+  const [liveRoi, setLiveRoi] = useState(strategy.roi);
+  const [copied, setCopied] = useState(false);
   const isDragging = useRef(false);
 
-  const handleDragStart = () => {
-    isDragging.current = true;
+  // --- Real-time DexScreener Fetching ---
+  useEffect(() => {
+    if (!isTop) return;
+    
+    const fetchLiveStats = async () => {
+      const addresses = strategy.tokens.map(t => t.address).filter(Boolean);
+      if (addresses.length === 0) return;
+
+      try {
+        const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${addresses.join(',')}`);
+        const data = await res.json();
+        
+        const priceMap: Record<string, number> = {};
+        const changeMap: Record<string, number> = {};
+
+        data.pairs?.forEach((pair: any) => {
+          const addr = pair.baseToken.address;
+          if (!priceMap[addr]) {
+            priceMap[addr] = parseFloat(pair.priceUsd);
+            changeMap[addr] = parseFloat(pair.priceChange.h24);
+          }
+        });
+
+        let currentNav = 0;
+        let weightedChange = 0;
+
+        strategy.tokens.forEach(t => {
+          const price = priceMap[t.address || ''] || t.currentPrice || 0;
+          const change = changeMap[t.address || ''] || t.change24h || 0;
+          currentNav += price * (t.weight / 100);
+          weightedChange += change * (t.weight / 100);
+        });
+
+        setLiveNav(currentNav);
+        setLiveRoi(weightedChange);
+      } catch (e) {
+        console.error("DexScreener Error:", e);
+      }
+    };
+
+    fetchLiveStats();
+    const timer = setInterval(fetchLiveStats, 15000);
+    return () => clearInterval(timer);
+  }, [strategy.tokens, isTop]);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(strategy.id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    if (info.offset.x > SWIPE_THRESHOLD) {
-      onSwipeRight();
-    } else if (info.offset.x < -SWIPE_THRESHOLD) {
-      onSwipeLeft();
-    }
-    setTimeout(() => {
-      isDragging.current = false;
-    }, 200);
-  };
-
-  const handleClick = () => {
-    if (!isDragging.current && isTop) {
-      onTap();
-    }
-  };
-
-  const typeColors = {
-    AGGRESSIVE: 'text-orange-500 bg-orange-500/10 border-orange-500/20',
-    BALANCED: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
-    CONSERVATIVE: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
-  };
+  const isPositive = liveRoi >= 0;
 
   return (
     <motion.div
@@ -176,168 +246,131 @@ export const SwipeCard = ({
         opacity: isTop ? opacity : 1,
         scale: 1 - index * 0.05,
         zIndex: 100 - index,
-        y: index * 10, 
+        y: index * 12, 
       }}
       drag={isTop ? 'x' : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.7}
-      onDragStart={isTop ? handleDragStart : undefined}
-      onDragEnd={isTop ? handleDragEnd : undefined}
-      onClick={handleClick}
-      initial={{ scale: 0.95, opacity: 0 }}
-      animate={{ scale: 1 - index * 0.05, opacity: 1, y: index * 10 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      onDragStart={() => (isDragging.current = true)}
+      onDragEnd={(_, info) => {
+        if (info.offset.x > SWIPE_THRESHOLD) onSwipeRight();
+        else if (info.offset.x < -SWIPE_THRESHOLD) onSwipeLeft();
+        setTimeout(() => (isDragging.current = false), 200);
+      }}
+      onClick={() => !isDragging.current && isTop && onTap()}
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1 - index * 0.05, opacity: 1, y: index * 12 }}
     >
-      <div className="w-full h-full bg-[#121212] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col relative select-none">
-      <div className={`absolute inset-0 pointer-events-none opacity-60 ${
-          isPositive
-            ? 'bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.08),transparent_60%)]'
-            : 'bg-[radial-gradient(ellipse_at_top_left,rgba(239,68,68,0.08),transparent_60%)]'
-        }`} />
+      {/* ====== PFP: カード外にはみ出す ====== */}
+      <div className="absolute -top-6 -left-3 z-50">
+        <div className="relative">
+          <img 
+            src={strategy.creatorPfpUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${strategy.creatorAddress}`} 
+            className="w-14 h-14 rounded-full border-[3px] border-[#0C0C0E] object-cover bg-black shadow-lg shadow-black/50"
+          />
+          <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-yellow-500 rounded-full border-2 border-[#0C0C0E] flex items-center justify-center">
+            <CheckCircle2 className="w-3 h-3 text-black stroke-[3px]" />
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full h-full bg-[#0C0C0E] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col relative select-none">
+        
+        {/* 背景の環境光 (Neon Glow) */}
+        <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full blur-[100px] bg-emerald-500/20" />
+
         {/* Swipe Indicators */}
-        {isTop && (
-          <>
-            <motion.div 
-              className="absolute top-10 left-10 z-50 border-[6px] border-emerald-500 text-emerald-500 font-black text-4xl px-4 py-2 rounded-xl transform -rotate-12 bg-black/40 backdrop-blur-sm pointer-events-none"
-              style={{ opacity: likeOpacity }}
-            >
-              LIKE
-            </motion.div>
-            <motion.div 
-              className="absolute top-10 right-10 z-50 border-[6px] border-red-500 text-red-500 font-black text-4xl px-4 py-2 rounded-xl transform rotate-12 bg-black/40 backdrop-blur-sm pointer-events-none"
-              style={{ opacity: nopeOpacity }}
-            >
-              PASS
-            </motion.div>
-          </>
-        )}
+        <AnimatePresence>
+          {isTop && (
+            <>
+              <motion.div style={{ opacity: likeOpacity }} className="absolute top-16 left-8 z-50 border-[4px] border-emerald-500 text-emerald-500 font-black text-3xl px-4 py-1 rounded-xl -rotate-12 pointer-events-none">LIKE</motion.div>
+              <motion.div style={{ opacity: nopeOpacity }} className="absolute top-16 right-8 z-50 border-[4px] border-red-500 text-red-500 font-black text-3xl px-4 py-1 rounded-xl rotate-12 pointer-events-none">PASS</motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
-        {/* --- Header --- */}
-        <div className="p-5 pb-2">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${typeColors[strategy.type] || typeColors.BALANCED} mb-2`}>
-                {strategy.type}
-              </div>
-              <h2 className="text-2xl font-bold text-white leading-tight line-clamp-1">{strategy.name}</h2>
-            </div>
-            {/* PFP */}
-            <div className="flex flex-col items-center">
-               <div className="w-10 h-10 rounded-full bg-[#292524] p-0.5 border border-white/10 overflow-hidden">
-                 <img 
-                    src={strategy.creatorPfpUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${strategy.creatorAddress}`} 
-                    alt="Creator" 
-                    className="w-full h-full rounded-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/identicon/svg?seed=${strategy.creatorAddress}`;
-                    }}
-                 />
-               </div>
-               <span className="text-[9px] text-white/40 mt-1 font-mono">{strategy.creatorAddress.slice(0,4)}</span>
+        {/* ====== Header: $TICKER大きく + name + description ====== */}
+        <div className="pt-8 px-6 pb-2 z-10">
+          {/* $TICKER — 一番大きく目立つ */}
+          <div className="flex items-center justify-between mb-1">
+            <h1 className="text-4xl font-black text-white tracking-tight leading-none">
+              ${strategy.ticker || strategy.tokens[0]?.symbol || 'TOKEN'}
+            </h1>
+            <div className={`px-4 py-2 rounded-xl font-black text-lg border transition-colors ${
+              isPositive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'
+            }`}>
+              {isPositive ? '▲' : '▼'} {Math.abs(liveRoi).toFixed(2)}%
             </div>
           </div>
-          
-          <p className="text-xs text-white/60 line-clamp-2 min-h-[2.5em]">
-            {strategy.description || "No description provided."}
-          </p>
-          
-          <div className="flex items-center gap-3 mt-3">
-             <div className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-lg border border-white/5">
-                <span className="text-[10px] text-white/40 font-mono">
-                  {strategy.id.slice(0, 4)}...{strategy.id.slice(-4)}
-                </span>
-                <Copy className="w-3 h-3 text-white/20" />
-             </div>
-             <div className="flex items-center gap-1 text-[10px] text-white/40">
-                <Clock className="w-3 h-3" />
-                {timeAgo(strategy.createdAt)}
-             </div>
+
+          {/* Strategy name + type */}
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-sm font-semibold text-white/60">{strategy.name}</h2>
+            <span className="text-white/20">·</span>
+            <span className="text-white/20 text-[10px] font-mono tracking-tighter uppercase">{strategy.type}</span>
           </div>
+
+          {/* Description (三本線に相当) */}
+          {strategy.description && (
+            <p className="text-xs text-white/30 mt-2 line-clamp-2 leading-relaxed">{strategy.description}</p>
+          )}
         </div>
 
-        {/* --- Stats --- */}
-        <div className="px-5 py-2 grid grid-cols-2 gap-2">
-           
-           {/* ✅ 修正: 24h Change Card (大きく表示 & 中央揃え) */}
-           <div className={`col-span-1 p-3 rounded-2xl border ${strategy.roi >= 0 ? 'bg-[#10B981]/10 border-[#10B981]/20' : 'bg-[#EF4444]/10 border-[#EF4444]/20'} flex flex-col items-center justify-center h-24`}>
-              <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 opacity-70 ${strategy.roi >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                 24h Change
-              </span>
-              <FormatChange value={strategy.roi} className="text-3xl" iconSize="w-6 h-6" />
-           </div>
+        {/* ====== Center: Chart ====== */}
+        <div className="px-6 flex-1 flex flex-col justify-center z-10">
+          <MiniChart change24h={liveRoi} strategyId={strategy.id} />
+        </div>
 
-           {/* Right Column Stats */}
-           <div className="col-span-1 flex h-24">
-              <div className="flex-1 p-3 bg-white/5 border border-white/5 rounded-2xl flex flex-col justify-center px-3">
-                 <span className="text-[10px] text-white/40 uppercase font-bold mb-1">TVL</span>
-                 <div className="text-2xl font-bold text-white">
-                    {strategy.tvl < 0.01 ? '< 0.01' : strategy.tvl.toFixed(2)}
-                 </div>
-                 <span className="text-xs text-white/50 font-normal">SOL</span>
+        {/* ====== Footer: Token Icons (左) + Price & Time (右) + CA Bar ====== */}
+        <div className="px-6 pb-5 z-10 space-y-4">
+          {/* Token Icons + Price/Time row */}
+          <div className="flex justify-between items-end">
+            {/* Left: Token icons */}
+            <div className="space-y-1.5">
+              <div className="flex -space-x-2.5">
+                {strategy.tokens.slice(0, 5).map((token, i) => (
+                  <TokenIcon 
+                    key={i}
+                    symbol={token.symbol} 
+                    address={token.address}
+                    src={token.logoURI}
+                    className="w-8 h-8 rounded-full border-2 border-[#0C0C0E] relative hover:z-20 transition-all cursor-pointer"
+                  />
+                ))}
+                {strategy.tokens.length > 5 && (
+                  <div className="w-8 h-8 rounded-full border-2 border-[#0C0C0E] bg-[#1c1c1e] flex items-center justify-center text-[10px] font-bold text-white/40">
+                    +{strategy.tokens.length - 5}
+                  </div>
+                )}
               </div>
-           </div>
-        </div>
+            </div>
 
-        {/* --- Composition List --- */}
-        <div className="flex-1 px-5 py-2 overflow-hidden flex flex-col">
-           <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-white/40 uppercase tracking-widest flex items-center gap-1">
-                <Wallet className="w-3 h-3" /> Composition
-              </span>
-              <span className="text-[10px] text-white/20">{strategy.tokens.length} Assets</span>
-           </div>
-           
-           <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-              {strategy.tokens.map((token, i) => (
-                 <div key={i} className="flex items-center justify-between p-3 bg-white/[0.03] rounded-xl border border-white/5 hover:bg-white/[0.05] transition-colors">
-                    {/* Left: Icon & Symbol & Price */}
-                    <div className="flex items-center gap-3">
-                       <div className="w-9 h-9 rounded-full bg-white/10 overflow-hidden flex-shrink-0 border border-white/5">
-                          <TokenIcon 
-                            symbol={token.symbol} 
-                            src={token.logoURI} 
-                            address={token.address}
-                            className="w-full h-full object-cover"
-                          />
-                       </div>
-                       <div>
-                          <div className="font-bold text-sm text-white">{token.symbol}</div>
-                          <div className="text-[11px] text-white/50 font-mono">
-                             {formatPrice(token.currentPrice)}
-                          </div>
-                       </div>
-                    </div>
-                    
-                    {/* Right: Weight & 24h Change */}
-                    <div className="text-right min-w-[60px]">
-                       <div className="font-bold text-sm text-white mb-0.5">{token.weight}%</div>
-                       
-                       {token.change24h !== undefined ? (
-                          <div className="flex justify-end">
-                            <FormatChange value={token.change24h} className="text-[10px]" />
-                          </div>
-                       ) : (
-                          <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
-                             <div className="h-full bg-orange-500 rounded-full" style={{ width: `${token.weight}%` }} />
-                          </div>
-                       )}
-                    </div>
-                 </div>
-              ))}
-           </div>
-        </div>
+            {/* Right: Price + Time */}
+            <div className="text-right space-y-1">
+              <div className="text-2xl font-black text-white tracking-tight">
+                {liveNav > 0 ? `$${liveNav.toFixed(2)}` : '---'}
+              </div>
+              <div className="flex items-center justify-end gap-1.5 text-[11px] text-white/40 font-medium">
+                <Clock className="w-3 h-3" /> {timeAgo(strategy.createdAt)}
+              </div>
+            </div>
+          </div>
 
-        {/* --- Footer --- */}
-        <div className="p-3 border-t border-white/5 bg-[#0C0A09] flex justify-center">
-           <a 
-              href={`https://explorer.solana.com/address/${strategy.id}?cluster=devnet`}
-              target="_blank" 
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()} 
-              className="text-[10px] text-white/20 font-mono hover:text-white/50 flex items-center gap-1 transition-colors"
-           >
-              Contract: {strategy.id.slice(0, 8)}... <ExternalLink className="w-2.5 h-2.5" />
-           </a>
+          {/* CA Section (ticker & address) */}
+          <div className="flex items-center justify-between p-3 bg-black/60 rounded-2xl border border-white/5 group active:scale-[0.98] transition-all">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="px-2 py-0.5 bg-emerald-500/10 rounded border border-emerald-500/20">
+                <span className="text-emerald-500 font-black text-[10px]">CA</span>
+              </div>
+              <span className="text-[11px] text-white/40 font-mono truncate max-w-[180px]">{strategy.id}</span>
+            </div>
+            <button 
+              onClick={handleCopy}
+              className="p-2 hover:bg-white/5 rounded-xl transition-colors relative"
+            >
+              {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-white/20" />}
+            </button>
+          </div>
         </div>
 
       </div>
