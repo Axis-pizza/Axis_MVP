@@ -1,13 +1,4 @@
-/**
- * Jupiter Token Service (2025 API V2 Edition)
- * 
- * ⚠️ 2025年10月以降、旧APIは廃止されました
- * - token.jup.ag → 廃止
- * - tokens.jup.ag → 廃止
- * - api.jup.ag/tokens/** → 廃止
- * 
- * ✅ 新API: lite-api.jup.ag を使用
- */
+
 
 export interface JupiterToken {
   address: string;
@@ -33,16 +24,16 @@ export interface JupiterToken {
 
 const CHAIN_ID = 101;
 
+// ✅ 動的APIのエンドポイント
 const BASE = "https://api.jup.ag";
-const TOKEN_LIST_URL = `${BASE}/tokens/v2/tag?query=verified`;
+const TOKEN_LIST_URL = `${BASE}/tokens/v2/tag?query=verified`; // 動的リスト取得
 const SEARCH_URL = `${BASE}/tokens/v2/search`;
 const PRICE_API_URL = `${BASE}/price/v3`;
-
 
 // バックアップ: Solana Token List (古いがまだ動く)
 const BACKUP_LIST_URL = "https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json";
 
-// --- Critical Fallback (Offline) ---
+// --- Critical Fallback (Offline/Emergency) ---
 const CRITICAL_FALLBACK: JupiterToken[] = [
   { address: "So11111111111111111111111111111111111111112", chainId: 101, decimals: 9, name: "Wrapped SOL", symbol: "SOL", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", tags: ["verified"], isVerified: true },
   { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", chainId: 101, decimals: 6, name: "USD Coin", symbol: "USDC", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", tags: ["verified"], isVerified: true },
@@ -53,11 +44,18 @@ const CRITICAL_FALLBACK: JupiterToken[] = [
   { address: "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4", chainId: 101, decimals: 6, name: "Jupiter Perps LP", symbol: "JLP", logoURI: "https://static.jup.ag/jlp/icon.png", tags: ["verified"], isVerified: true },
 ];
 
-const CACHE_KEY = "jup_tokens_v3_lite"; // キャッシュキーを変更して古いキャッシュをクリア
+const CACHE_KEY = "jup_tokens_v3_dynamic"; // キャッシュキーを変更して古いキャッシュをクリア
 const CACHE_TTL = 1000 * 60 * 60 * 6; // 6時間
 
 let liteCache: JupiterToken[] | null = null;
 let refreshPromise: Promise<void> | null = null;
+
+// --- Helper: Get API Key safely ---
+const getApiKey = () => {
+  return typeof import.meta !== 'undefined' 
+    ? import.meta.env?.VITE_JUPITER_API_KEY 
+    : undefined;
+};
 
 function loadLocalCache(): JupiterToken[] | null {
   try {
@@ -90,8 +88,7 @@ function saveLocalCache(tokens: JupiterToken[]) {
  */
 function clearOldCache() {
   try {
-    // 古いキャッシュキーを削除
-    const oldKeys = ["jup_lite_tokens_v2_strict", "jup_lite_tokens", "jup_tokens_v2"];
+    const oldKeys = ["jup_lite_tokens_v2_strict", "jup_lite_tokens", "jup_tokens_v2", "jup_tokens_v3_lite"];
     oldKeys.forEach(key => localStorage.removeItem(key));
   } catch {}
 }
@@ -113,22 +110,30 @@ function mapJupTokenV2(t: any): JupiterToken {
 }
 
 /**
- * トークンリストを取得（新API対応）
+ * トークンリストを取得（動的API + API Key対応）
  */
 async function fetchTokenList(): Promise<JupiterToken[]> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
+  const timer = setTimeout(() => controller.abort(), 15000); // タイムアウトを少し長めに
 
   try {
-    console.log("[Jupiter] Fetching token list from lite-api.jup.ag...");
+    console.log("[Jupiter] Fetching dynamic token list from api.jup.ag...");
     
+    // ✅ 重要: API Keyをヘッダーに付与
+    const apiKey = getApiKey();
+    const headers: HeadersInit = { "Accept": "application/json" };
+    if (apiKey) {
+      headers["x-api-key"] = apiKey;
+    }
+
     const res = await fetch(TOKEN_LIST_URL, { 
       signal: controller.signal,
-      headers: { "Accept": "application/json" }
+      headers: headers 
     });
     
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const errText = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}: ${res.statusText} - ${errText}`);
     }
 
     const data = await res.json();
@@ -136,7 +141,7 @@ async function fetchTokenList(): Promise<JupiterToken[]> {
     // API V2のレスポンス形式: 配列で返ってくる
     const list = Array.isArray(data) ? data.map(mapJupTokenV2) : [];
     
-    console.log(`[Jupiter] Fetched ${list.length} verified tokens`);
+    console.log(`[Jupiter] Fetched ${list.length} verified tokens from dynamic API`);
     
     if (list.length > 0) {
       return list;
@@ -147,7 +152,7 @@ async function fetchTokenList(): Promise<JupiterToken[]> {
   } catch (e: any) {
     console.warn("[Jupiter] Primary API failed:", e.message);
     
-    // バックアップ: jsdelivr経由のSolana Token List
+    // バックアップ: jsdelivr経由のSolana Token List (静的ファイルなのでAPIキー不要)
     try {
       console.log("[Jupiter] Trying backup (jsdelivr)...");
       const resBackup = await fetch(BACKUP_LIST_URL, { signal: controller.signal });
@@ -246,7 +251,7 @@ export const JupiterService = {
   },
 
   /**
-   * トークン検索（新API対応）
+   * トークン検索（新API対応 + API Key）
    */
   searchTokens: async (query: string): Promise<JupiterToken[]> => {
     const q = query.trim();
@@ -263,14 +268,11 @@ export const JupiterService = {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 8000);
 
     try {
-      // API Keyがある場合はヘッダーに追加
-      const apiKey = typeof import.meta !== 'undefined' 
-        ? import.meta.env?.VITE_JUPITER_API_KEY 
-        : undefined;
-      
+      // ✅ API Keyをヘッダーに追加
+      const apiKey = getApiKey();
       const headers: HeadersInit = { "Accept": "application/json" };
       if (apiKey) headers["x-api-key"] = apiKey;
 
@@ -282,13 +284,7 @@ export const JupiterService = {
       if (!res.ok) {
         console.warn(`[Jupiter] Search API error: ${res.status}`);
         // APIがエラーの場合はローカル検索にフォールバック
-        const list = await JupiterService.getLiteList();
-        const lower = q.toLowerCase();
-        return list.filter(t => 
-          t.symbol.toLowerCase().includes(lower) || 
-          t.name.toLowerCase().includes(lower) ||
-          t.address === q
-        ).slice(0, 30);
+        throw new Error(`Search API failed with ${res.status}`);
       }
 
       const data = await res.json();
@@ -314,7 +310,7 @@ export const JupiterService = {
   },
 
   /**
-   * 価格取得（新API対応）
+   * 価格取得（新API対応 + API Key）
    */
   getPrices: async (mintAddresses: string[]): Promise<Record<string, number>> => {
     if (mintAddresses.length === 0) return {};
@@ -335,15 +331,13 @@ export const JupiterService = {
 
     try {
       const ids = uncachedMints.join(",");
-      const apiKey = typeof import.meta !== 'undefined' 
-        ? import.meta.env?.VITE_JUPITER_API_KEY 
-        : undefined;
-
+      // ✅ API Keyをヘッダーに追加
+      const apiKey = getApiKey();
       const headers: HeadersInit = { "Accept": "application/json" };
       if (apiKey) headers["x-api-key"] = apiKey;
 
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
+      const timer = setTimeout(() => controller.abort(), 8000);
 
       const response = await fetch(`${PRICE_API_URL}?ids=${ids}`, { 
         headers, 
@@ -404,7 +398,7 @@ export const JupiterService = {
     const found = list.find(t => t.address === mintAddress);
     if (found) return found;
     
-    // 見つからなければ検索
+    // 見つからなければ検索 (検索APIにもキーが適用される)
     const results = await JupiterService.searchTokens(mintAddress);
     return results.find(t => t.address === mintAddress) || null;
   }
