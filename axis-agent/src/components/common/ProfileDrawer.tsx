@@ -7,6 +7,8 @@ import { useWallet } from '../../hooks/useWallet';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { ProfileEditModal } from './ProfileEditModal';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 const InviteModal = ({ isOpen, onClose, pubkey }: { isOpen: boolean; onClose: () => void; pubkey: string }) => {
   const { showToast } = useToast();
@@ -82,7 +84,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isWalletModalPending, setIsWalletModalPending] = useState(false);
-  
+  const { connection } = useConnection();
   const { setVisible, visible: walletModalVisible } = useWalletModal();
   const { publicKey, disconnect, ready, connected } = useWallet();
 
@@ -167,16 +169,29 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     if (!publicKey) return;
     setFaucetLoading(true);
     try {
-      const res = await api.requestFaucet(publicKey.toBase58());
+      // 1 SOL (Devnet) をリクエスト
+      const airdropSignature = await connection.requestAirdrop(
+        publicKey,
+        1 * LAMPORTS_PER_SOL
+      );
+
+      // トランザクションの確認待ち
+      const latestBlockHash = await connection.getLatestBlockhash();
+      await connection.confirmTransaction({
+        blockhash: latestBlockHash.blockhash,
+        lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+        signature: airdropSignature,
+      });
       
-      if (res.success) {
-        showToast("💰 1,000 USDC Sent to your wallet!", "success");
-      } else {
-        showToast(res.message || "Failed to request faucet", "error");
-      }
+      showToast("💰 1 SOL Airdropped successfully!", "success");
     } catch (e: any) {
       console.error("Faucet Error:", e);
-      showToast("Network Error", "error");
+      // レート制限(429)などのエラーハンドリング
+      if (e.message?.includes("429")) {
+        showToast("Rate limit reached. Please try again later.", "error");
+      } else {
+        showToast("Airdrop failed. Devnet may be congested.", "error");
+      }
     } finally {
       setFaucetLoading(false);
     }
@@ -319,12 +334,11 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       <button 
                         onClick={handleFaucet}
                         disabled={faucetLoading}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-blue-500/20 bg-[#1C1917] py-3.5 font-bold text-blue-400 transition-all active:scale-95 hover:bg-[#292524] disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-500/20 bg-[#1C1917] py-3.5 font-bold text-purple-400 transition-all active:scale-95 hover:bg-[#292524] disabled:opacity-50"
                       >
                         {faucetLoading ? <Sparkles className="h-5 w-5 animate-spin" /> : <Droplets className="h-5 w-5" />}
-                        Get 1,000 USDC (Devnet)
+                        Get 1 SOL (Devnet)
                       </button>
-
                       <button 
                         onClick={() => setIsInviteOpen(true)}
                         className="group flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#1C1917] py-3.5 font-bold text-[#E7E5E4] transition-all active:scale-95 hover:bg-[#292524]"
@@ -332,6 +346,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                         <QrCode className="h-5 w-5 text-[#78716C] transition-colors group-hover:text-white" /> 
                         Invite & Earn
                       </button>
+                      
                     </div>
                   </>
                 )}
