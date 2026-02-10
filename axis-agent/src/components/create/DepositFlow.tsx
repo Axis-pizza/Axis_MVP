@@ -150,8 +150,6 @@ export const DepositFlow = ({
         signedTransaction: base64Tx
       };
 
-      console.log("🚀 Payload aligned for Discover:", JSON.stringify(payload, null, 2));
-
       try {
         await api.deploy(signature, payload);
       } catch (apiError: any) {

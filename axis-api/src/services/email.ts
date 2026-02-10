@@ -39,7 +39,6 @@ export async function sendInviteEmail(env: { EMAIL: SendEmailBinding }, to: stri
 
     await env.EMAIL.send(message);
     
-    console.log(`Invite email sent to ${to}`);
     return true;
 
   } catch (error) {
@@ -110,7 +109,6 @@ export async function sendBugReportEmail(
 
     await env.EMAIL.send(message);
     
-    console.log(`Bug report forwarded to ${TARGET_EMAIL}`);
     return true;
 
   } catch (error) {

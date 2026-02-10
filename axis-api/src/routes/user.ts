@@ -135,8 +135,6 @@ app.post('/request-invite', async (c) => {
 
 app.get('/user', async (c) => { 
   const wallet = c.req.query('wallet');
-  // デバッグログ: 本当に設定が反映されたか確認
-  console.log('[DEBUG] Env Keys:', Object.keys(c.env)); 
 
   if (!wallet) return c.json({ error: 'Wallet address required' }, 400);
 
@@ -224,8 +222,20 @@ app.post('/strategies/:id/watchlist', async (c) => {
   }
 
   try {
-    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userPubkey).first();
-    if (!user) return c.json({ error: 'User not found' }, 404);
+    let user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userPubkey).first();
+    if (!user) {
+      const newId = crypto.randomUUID();
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      try {
+        await c.env.axis_db.prepare(
+          'INSERT INTO users (id, wallet_address, invite_code, total_xp, rank_tier, last_checkin) VALUES (?, ?, ?, 0, "Novice", 0)'
+        ).bind(newId, userPubkey, inviteCode).run();
+        user = { id: newId };
+      } catch (err) {
+        user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userPubkey).first();
+        if (!user) return c.json({ error: 'Failed to create user' }, 500);
+      }
+    }
 
     const existing = await c.env.axis_db.prepare(
       'SELECT id FROM watchlist WHERE user_id = ? AND strategy_id = ?'
@@ -269,7 +279,7 @@ app.get('/strategies/:id/watchlist', async (c) => {
   }
 });
 
-app.post('/user', async (c) => { 
+app.post('/user', async (c) => {
   let body;
   try {
     body = await c.req.json();
@@ -280,11 +290,25 @@ app.post('/user', async (c) => {
   const { wallet_address, name, bio, avatar_url, badges } = body;
 
   if (!wallet_address) return c.json({ success: false, error: 'Wallet address is required' }, 400);
-  
+
   try {
     const existing = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
+
     if (!existing) {
-      return c.json({ success: false, error: "User not found" }, 404);
+      const id = crypto.randomUUID();
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      await UserModel.createRegisteredUser(
+        c.env.axis_db,
+        id,
+        '',
+        wallet_address,
+        inviteCode,
+        '',
+        avatar_url,
+        name,
+        bio
+      );
+      return c.json({ success: true, message: "Profile created successfully" });
     }
 
     const badgesStr = Array.isArray(badges) ? JSON.stringify(badges) : (badges || null);

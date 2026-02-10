@@ -139,7 +139,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     setLoading(true);
     try {
       const res = await api.dailyCheckIn(publicKey.toBase58());
-      console.log('[handleCheckIn] Response:', res);
 
       if (res.success) {
         // Update XP from response if available

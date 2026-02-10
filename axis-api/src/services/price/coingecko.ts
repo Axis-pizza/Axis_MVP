@@ -65,8 +65,6 @@ export class CoinGeckoService {
         }));
       
       this.cacheTime = Date.now();
-      console.log(`[CoinGecko] Cached ${this.tokenCache.length} Solana ecosystem tokens`);
-      
       return this.tokenCache;
     } catch (error) {
       console.error('[CoinGecko] Token list fetch failed:', error);

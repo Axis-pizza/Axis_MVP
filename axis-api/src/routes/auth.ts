@@ -24,8 +24,6 @@ app.post('/request-invite', async (c) => {
 
     if (c.env.EMAIL) {
       c.executionCtx.waitUntil(sendInviteEmail(c.env, email, code).catch(e => console.error(e)));
-    } else {
-      console.log(`📧 [LOCAL] Email: ${email} | Code: ${code}`);
     }
 
     return c.json({ success: true, message: 'Invite code sent' });

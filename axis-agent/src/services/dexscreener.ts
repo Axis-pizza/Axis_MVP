@@ -88,9 +88,6 @@ interface DexTokenData {
         });
       });
   
-      // 🔍 DEBUG: 最終取得数
-      console.log(`[DexScreener] Fetched data for ${Object.keys(finalResult).length} tokens`);
-      
       return finalResult;
     }
   };

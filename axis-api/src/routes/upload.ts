@@ -21,9 +21,6 @@ app.post('/image', async (c) => {
     const walletAddress = formData.get('wallet_address') as string | null;
     const imageType = (formData.get('type') as 'strategy' | 'profile') || 'strategy';
 
-    // デバッグ用ログ
-    console.log(`Upload Request: Wallet=${walletAddress}, Type=${imageType}, File=${file?.name}, Size=${file?.size}`);
-
     if (!walletAddress) {
        return c.json({ success: false, error: 'Wallet address is required' }, 400);
     }

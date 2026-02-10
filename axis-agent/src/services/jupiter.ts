@@ -65,7 +65,6 @@ function loadLocalCache(): JupiterToken[] | null {
     
     // キャッシュの有効期限をチェック
     if (ts && Date.now() - ts > CACHE_TTL) {
-      console.log("[Jupiter] Cache expired, will refresh");
       return null;
     }
     
@@ -117,8 +116,6 @@ async function fetchTokenList(): Promise<JupiterToken[]> {
   const timer = setTimeout(() => controller.abort(), 15000); // タイムアウトを少し長めに
 
   try {
-    console.log("[Jupiter] Fetching dynamic token list from api.jup.ag...");
-    
     // ✅ 重要: API Keyをヘッダーに付与
     const apiKey = getApiKey();
     const headers: HeadersInit = { "Accept": "application/json" };
@@ -141,8 +138,6 @@ async function fetchTokenList(): Promise<JupiterToken[]> {
     // API V2のレスポンス形式: 配列で返ってくる
     const list = Array.isArray(data) ? data.map(mapJupTokenV2) : [];
     
-    console.log(`[Jupiter] Fetched ${list.length} verified tokens from dynamic API`);
-    
     if (list.length > 0) {
       return list;
     }
@@ -154,7 +149,6 @@ async function fetchTokenList(): Promise<JupiterToken[]> {
     
     // バックアップ: jsdelivr経由のSolana Token List (静的ファイルなのでAPIキー不要)
     try {
-      console.log("[Jupiter] Trying backup (jsdelivr)...");
       const resBackup = await fetch(BACKUP_LIST_URL, { signal: controller.signal });
       
       if (resBackup.ok) {
@@ -166,7 +160,6 @@ async function fetchTokenList(): Promise<JupiterToken[]> {
           .slice(0, 300)
           .map(mapJupTokenV2);
         
-        console.log(`[Jupiter] Backup loaded ${filtered.length} tokens`);
         return filtered.length > 0 ? filtered : CRITICAL_FALLBACK;
       }
     } catch (backupErr) {
@@ -190,7 +183,6 @@ export const JupiterService = {
     liteCache = null;
     clearOldCache();
     localStorage.removeItem(CACHE_KEY);
-    console.log("[Jupiter] Cache cleared");
   },
 
   /**
@@ -277,8 +269,6 @@ export const JupiterService = {
       if (apiKey) headers["x-api-key"] = apiKey;
 
       const url = `${SEARCH_URL}?query=${encodeURIComponent(q)}`;
-      console.log("[Jupiter] Searching:", url);
-      
       const res = await fetch(url, { headers, signal: controller.signal });
       
       if (!res.ok) {
@@ -290,7 +280,6 @@ export const JupiterService = {
       const data = await res.json();
       const results = Array.isArray(data) ? data.map(mapJupTokenV2) : [];
       
-      console.log(`[Jupiter] Search found ${results.length} results for "${q}"`);
       return results;
       
     } catch (e) {

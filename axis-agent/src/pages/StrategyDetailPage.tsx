@@ -48,7 +48,6 @@ export const StrategyDetailPage = () => {
            }
         } catch (chainErr) {
            // Not a valid pubkey or not found on chain, ignore and try API
-           console.log("Not found on chain or invalid key, trying API cache...");
         }
 
         // 2. If not found on chain, try API Cache (Discover list)

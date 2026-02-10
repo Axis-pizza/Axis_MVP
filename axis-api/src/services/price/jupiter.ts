@@ -39,7 +39,6 @@ export class JupiterService {
           decimals: t.decimals,
           logoURI: t.logoURI,
         }));
-        console.log(`[Jupiter] Cached ${this.tokenCache.length} tokens from Jupiter (Strict)`);
       } catch (jupError) {
         console.warn(`[Jupiter] Failed to fetch from Jupiter (${jupError}), trying CoinGecko fallback...`);
         
@@ -57,7 +56,6 @@ export class JupiterService {
           decimals: t.decimals,
           logoURI: t.logoURI,
         }));
-        console.log(`[Jupiter] Cached ${this.tokenCache.length} tokens from CoinGecko`);
       }
       
       this.cacheTime = Date.now();

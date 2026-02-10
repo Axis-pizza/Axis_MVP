@@ -139,7 +139,6 @@ export async function fetchPredictionTokens(): Promise<JupiterToken[]> {
     tokens.push(buildToken(event, 'YES'));
     tokens.push(buildToken(event, 'NO'));
   }
-  console.log(`[dFlow] Loaded prediction tokens: ${tokens.length}`);
   return tokens;
 }
 
@@ -173,7 +172,6 @@ export async function fetchStockTokens(): Promise<JupiterToken[]> {
     price: prices[t.address] ?? t.price,
   }));
 
-  console.log(`[xStocks] Loaded stock tokens: ${withPrices.length}`);
   return withPrices;
 }
 
@@ -213,7 +211,6 @@ export async function fetchCommodityTokens(): Promise<JupiterToken[]> {
     const prices = await JupiterService.getPrices(tokens.map(t => t.address));
     const withPrices = tokens.map(t => ({ ...t, price: prices[t.address] ?? t.price }));
 
-    console.log(`[Remora] Loaded commodity tokens: ${withPrices.length}`);
     return withPrices;
   } catch (e) {
     console.warn("[Remora] fetchCommodityTokens failed:", e);

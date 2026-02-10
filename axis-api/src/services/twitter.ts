@@ -70,7 +70,6 @@ export async function handleTwitterCallback(c: Context<{ Bindings: Bindings }>) 
       `${url.origin}/auth/twitter/callback`
     );
 
-    console.log("[Debug] Exchanging authorization code...");
     const tokens = await twitter.validateAuthorizationCode(
       code,
       storedCodeVerifier
@@ -81,9 +80,6 @@ export async function handleTwitterCallback(c: Context<{ Bindings: Bindings }>) 
         ? tokens.accessToken()
         : tokens.accessToken;
 
-    console.log(`[Debug] Access Token Length: ${accessToken.length}`);
-
-    console.log("[Debug] Fetching user info...");
     const response = await fetch(
       "https://api.twitter.com/2/users/me?user.fields=profile_image_url",
       {

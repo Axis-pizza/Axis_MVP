@@ -10,7 +10,6 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) {
-      console.log("🔗 Invite Code Saved:", ref);
       localStorage.setItem('axis_referrer', ref);
       window.history.replaceState({}, '', window.location.pathname);
     }

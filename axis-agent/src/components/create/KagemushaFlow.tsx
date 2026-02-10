@@ -98,7 +98,6 @@ export const KagemushaFlow = ({ onStepChange }: KagemushaFlowProps) => {
 
   // ★ Builder(Identity)完了時の処理
   const handleBuilderComplete = (data: ManualData) => {
-    console.log("🟢 [Flow] handleBuilderComplete called", data);
     // データ構造のチェック
     if (!data) {
       console.error("❌ [Flow] Data is null/undefined");
@@ -113,7 +112,6 @@ export const KagemushaFlow = ({ onStepChange }: KagemushaFlowProps) => {
       return;
     }
 
-    console.log("🟢 [Flow] Setting step to BLUEPRINT", { tokens: data.tokens.length, config: data.config });
     setDraftStrategy(data);
     setStep('BLUEPRINT');
   };
@@ -202,8 +200,7 @@ export const KagemushaFlow = ({ onStepChange }: KagemushaFlowProps) => {
                    const os = userStrategies.find(us => us.address === s.id);
                    if(os) setSelectedDashboardStrategy(os);
                }}
-               onDeposit={(s) => {
-                 console.log("Deposit to existing strategy:", s.id);
+               onDeposit={(_s) => {
                }}
                onRebalance={(s) => {
                  const os = userStrategies.find(us => us.address === s.id);
