@@ -9,17 +9,15 @@ import { PublicKey, LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana
 import { 
   getAssociatedTokenAddress, 
   createTransferInstruction, 
-  getAccount, 
-  TOKEN_PROGRAM_ID, 
-  ASSOCIATED_TOKEN_PROGRAM_ID 
+  TOKEN_PROGRAM_ID 
 } from '@solana/spl-token';
 import { RichChart } from '../common/RichChart';
 import { api } from '../../services/api';
 import type { Strategy } from '../../types';
 import { useToast } from '../../context/ToastContext';
 
+// 定数はコンポーネント外に定義
 const MASTER_MINT_ADDRESS = new PublicKey("2JiisncKr8DhvA68MpszFDjGAVu2oFtqJJC837LLiKdT");
-
 
 // --- Types ---
 interface StrategyDetailViewProps {
@@ -37,7 +35,7 @@ const XIcon = ({ className }: { className?: string }) => (
 
 // --- Components (UI Parts) ---
 
-// 1. Swipe To Confirm (Pump Style)
+// 1. Swipe To Confirm
 const SwipeToConfirm = ({ 
   onConfirm, 
   isLoading, 
@@ -137,14 +135,15 @@ const SwipeToConfirm = ({
     </div>
   );
 };
+
+// 2. InvestSheet
 interface InvestSheetProps {
   isOpen: boolean;
   onClose: () => void;
   strategy: Strategy;
-  // モード(buy/sell)と金額を親に渡すように変更
   onConfirm: (amount: string, mode: 'BUY' | 'SELL') => Promise<void>; 
   status: TransactionStatus;
-  userEtfBalance: number; // ユーザーのETF保有量を受け取る
+  userEtfBalance: number;
 }
 
 const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBalance }: InvestSheetProps) => {
@@ -152,12 +151,10 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
   const { publicKey } = useWallet();
   const { showToast } = useToast();
   
-  const [mode, setMode] = useState<'BUY' | 'SELL'>('BUY'); // タブ状態管理
+  const [mode, setMode] = useState<'BUY' | 'SELL'>('BUY');
   const [amount, setAmount] = useState('0');
   const [solBalance, setSolBalance] = useState(0);
-
-  // 仮のレート (バックエンドと合わせる必要あり)
-  const MOCK_PRICE_PER_TOKEN = 0.01; // 1 Token = 0.01 SOL
+  const MOCK_PRICE_PER_TOKEN = 1.0; // 1:1 Rate
 
   useEffect(() => {
     if (!publicKey || !isOpen) return;
@@ -175,22 +172,14 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
   useEffect(() => {
     if (isOpen) {
         setAmount('0');
-        setMode('BUY'); // デフォルトはBuy
+        setMode('BUY');
     }
   }, [isOpen]);
 
-  // 入力値に基づいた見積もり計算
   const estimatedOutput = useMemo(() => {
     const val = parseFloat(amount);
     if (isNaN(val) || val <= 0) return '0.00';
-    
-    if (mode === 'BUY') {
-        // SOL -> ETF (SOL / Price)
-        return (val / MOCK_PRICE_PER_TOKEN).toFixed(2);
-    } else {
-        // ETF -> SOL (ETF * Price)
-        return (val * MOCK_PRICE_PER_TOKEN).toFixed(4);
-    }
+    return (val * MOCK_PRICE_PER_TOKEN).toFixed(4); // 1:1 conversion
   }, [amount, mode]);
 
   const currentBalance = mode === 'BUY' ? solBalance : userEtfBalance;
@@ -238,7 +227,6 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
             className="fixed bottom-0 left-0 right-0 bg-[#0C0A09] rounded-t-[32px] z-[70] overflow-hidden flex flex-col safe-area-bottom border-t border-white/10 shadow-2xl"
             style={{ maxHeight: '92vh' }}
           >
-            {/* Header */}
             <div className="w-full flex justify-center pt-4 pb-2" onClick={status === 'IDLE' ? onClose : undefined}>
               <div className="w-12 h-1.5 bg-white/10 rounded-full" />
             </div>
@@ -271,9 +259,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
               {/* Main Display */}
               <div className="flex-1 flex flex-col justify-center items-center mb-8 relative">
                  {status !== 'IDLE' && status !== 'ERROR' ? (
-                   /* Transaction Status UI (Keep existing logic) */
                    <div className="flex flex-col items-center gap-6 py-4">
-                     {/* ... (Existing Step Indicator code) ... */}
                      <div className="text-center">
                         <p className="text-sm font-bold text-white mb-1">Processing Transaction...</p>
                         <p className="text-xs text-[#78716C]">{mode === 'BUY' ? 'Sending SOL...' : `Sending ${ticker}...`}</p>
@@ -281,7 +267,6 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
                      <Loader2 className="w-12 h-12 text-[#D97706] animate-spin" />
                    </div>
                  ) : (
-                   /* Input UI */
                    <>
                      <div className="flex flex-col items-center z-10">
                        <div className="flex items-baseline justify-center gap-2 mb-1">
@@ -293,7 +278,6 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
                          </span>
                        </div>
                        
-                       {/* Balance Display */}
                        <div className="flex items-center gap-2 text-xs text-[#78716C] font-mono bg-white/5 py-1.5 px-3 rounded-full border border-white/5">
                           <Wallet className="w-3 h-3" />
                           <span>{currentBalance.toFixed(4)} Available</span>
@@ -311,7 +295,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
                      </div>
 
                      <div className="flex flex-col items-center">
-                        <div className="text-sm font-bold text-[#78716C] uppercase mb-1">You Receive (Est.)</div>
+                        <div className="text-sm font-bold text-[#78716C] uppercase mb-1">You Receive (1:1 Rate)</div>
                         <div className="flex items-center gap-2 text-3xl font-bold text-white">
                            <span>{estimatedOutput}</span>
                            <span className={mode === 'BUY' ? 'text-[#D97706]' : 'text-emerald-500'}>
@@ -323,10 +307,9 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
                  )}
               </div>
 
-              {/* Numpad (Existing code) */}
+              {/* Numpad */}
               {(status === 'IDLE' || status === 'ERROR') && (
                 <div className="grid grid-cols-3 gap-3 mb-8 max-w-[280px] mx-auto w-full">
-                  {/* ... Existing Numpad Buttons ... */}
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0].map((key) => (
                     <button
                       key={key}
@@ -385,7 +368,6 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
     if (!wallet.publicKey) return;
     const fetchEtfBalance = async () => {
         try {
-            // 共通トークンの残高を確認
             const userAta = await getAssociatedTokenAddress(MASTER_MINT_ADDRESS, wallet.publicKey!);
             const account = await connection.getTokenAccountBalance(userAta);
             setUserEtfBalance(account.value.uiAmount || 0);
@@ -447,24 +429,50 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
     loadChart();
   }, [strategy.id, timeframe]);
 
+  // ▼▼▼ 修正: アニメーションの復活とUI改善 ▼▼▼
   const handleToggleWatchlist = async () => {
-    if (!wallet.publicKey) return showToast("Connect wallet required", "info");
+    if (!wallet.publicKey) {
+        showToast("Connect wallet required", "info");
+        return;
+    }
+
+    // 1. アニメーション実行 (クルッと回ってポンと弾む)
+    controls.set({ rotate: 0, scale: 1 });
+    controls.start({
+      rotate: 360,
+      scale: [1, 1.4, 1],
+      transition: { duration: 0.5, type: "spring", stiffness: 260, damping: 20 }
+    });
+
     const nextState = !isWatchlisted;
     setIsWatchlisted(nextState);
-    try { await api.toggleWatchlist(strategy.id, wallet.publicKey.toBase58()); } catch (e) { setIsWatchlisted(!nextState); }
+
+    // 2. トーストでフィードバック
+    showToast(nextState ? "Added to Watchlist" : "Removed from Watchlist", "success");
+
+    try {
+      await api.toggleWatchlist(strategy.id, wallet.publicKey.toBase58());
+    } catch (e: any) {
+      setIsWatchlisted(!nextState); // 失敗したら戻す
+      showToast("Failed to update", "error");
+    }
   };
+  // ▲▲▲ 修正ここまで ▲▲▲
 
   const handleCopyCA = () => {
     navigator.clipboard.writeText(MASTER_MINT_ADDRESS.toString());
     showToast("Token Address Copied", "success");
   };
+  
+  const handleShareToX = () => {
+    const text = `Check out ${strategy.name} ($${strategy.ticker}) on Axis! 🚀`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`, '_blank');
+  };
 
-  // --- Transaction Logic (Buy/Sell) ---
+  // --- Transaction Logic ---
   const handleTransaction = async (amountStr: string, mode: 'BUY' | 'SELL') => {
     if (!wallet.publicKey) return showToast("Connect Wallet", "error");
     
-    // Vault Address (運営の受け取り先)
-    // strategy.vaultAddress があればそれを使う、なければバックエンドの Admin Pubkey
     const vaultAddressStr = (strategy as any).vaultAddress || (strategy as any).ownerPubkey;
     if (!vaultAddressStr) {
         showToast("System Error: Vault not found", "error");
@@ -478,7 +486,6 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       const transaction = new Transaction();
 
       if (mode === 'BUY') {
-        // --- BUY: SOL Transfer ---
         const lamports = Math.floor(amount * LAMPORTS_PER_SOL);
         transaction.add(
           SystemProgram.transfer({
@@ -489,13 +496,9 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         );
       } 
       else {
-        // --- SELL: ETF Token Transfer ---
-        // 1. User ATA
         const userAta = await getAssociatedTokenAddress(MASTER_MINT_ADDRESS, wallet.publicKey);
-        // 2. Vault ATA
         const vaultAta = await getAssociatedTokenAddress(MASTER_MINT_ADDRESS, vaultPubkey);
-
-        const decimals = 9; // Common Token Decimals
+        const decimals = 9; 
         const tokenAmount = BigInt(Math.floor(amount * Math.pow(10, decimals)));
 
         transaction.add(
@@ -528,36 +531,27 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
 
       setInvestStatus('PROCESSING');
       
-      // ▼▼▼ 追加: バックエンドに通知して、反対売買（お返し）を実行させる ▼▼▼
       try {
-          // 本来は api.ts に関数を作るべきですが、手っ取り早くここでfetchします
-          // あなたのAPIのURLに書き換えてください
           const API_BASE = "https://axis-api.yusukekikuta-05.workers.dev"; 
-          
           await fetch(`${API_BASE}/trade`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   userPubkey: wallet.publicKey.toBase58(),
                   amount: parseFloat(amountStr),
-                  mode: mode,      // 'BUY' or 'SELL'
+                  mode: mode,
                   signature: signature,
                   strategyId: strategy.id
               })
           });
       } catch (apiErr) {
           console.error("API Call Failed:", apiErr);
-          // トランザクション自体は成功しているのでエラーにはしない
       }
       
-      // Helius Webhook待ち (演出)
       setTimeout(() => {
         setInvestStatus('SUCCESS');
         const msg = mode === 'BUY' ? `Received ${amount} AXIS` : `Sold ${amount} AXIS`;
         showToast(`Success! ${msg}`, "success");
-
-        // バックエンドに通知 (念のため)
-        // api.notifySwap(signature, mode, amount); 
 
         setTimeout(() => {
           setIsInvestOpen(false);
@@ -576,30 +570,51 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
   return (
     <div className="h-screen bg-black text-[#E7E5E4] font-sans selection:bg-[#D97706]/30 flex flex-col overflow-hidden">
       
-      {/* Header */}
-      <motion.div className="absolute top-0 inset-x-0 z-[100] flex items-center justify-between px-4 py-3 safe-area-top pointer-events-none">
+      {/* 1. Immersive Header */}
+      <motion.div 
+        className="absolute top-0 inset-x-0 z-[100] flex items-center justify-between px-4 py-3 safe-area-top pointer-events-none"
+      >
         <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-md border-b border-white/5 pointer-events-auto" style={{ opacity: headerOpacity }} />
-        <button onClick={(e) => { e.stopPropagation(); onBack(); }} className="relative z-50 w-10 h-10 flex items-center justify-center text-white/90 hover:text-white bg-black/40 rounded-full backdrop-blur-md transition-all active:scale-90 pointer-events-auto shadow-sm border border-white/5 cursor-pointer">
+        
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            onBack();
+          }} 
+          className="relative z-50 w-10 h-10 flex items-center justify-center text-white/90 hover:text-white bg-black/40 rounded-full backdrop-blur-md transition-all active:scale-90 pointer-events-auto shadow-sm border border-white/5 cursor-pointer"
+        >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <motion.div style={{ opacity: headerOpacity, y: headerY }} className="relative z-10 font-bold text-sm tracking-wide pointer-events-none">{strategy?.ticker}</motion.div>
+        
+        <motion.div style={{ opacity: headerOpacity, y: headerY }} className="relative z-10 font-bold text-sm tracking-wide pointer-events-none">
+          {strategy?.ticker}
+        </motion.div>
+
         <div className="relative z-10 flex gap-2 pointer-events-auto">
-          <button onClick={handleToggleWatchlist} className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-yellow-400 bg-black/40 rounded-full backdrop-blur-md border border-white/5 active:scale-95 transition-all">
-            <motion.div animate={controls}><Star className={`w-5 h-5 ${isWatchlisted ? 'fill-yellow-400 text-yellow-400' : ''}`} /></motion.div>
+          {/* ▼▼▼ 修正: アニメーション付きボタン ▼▼▼ */}
+          <button onClick={handleToggleWatchlist} className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-yellow-400 bg-black/40 rounded-full backdrop-blur-md border border-white/5 active:scale-90 transition-all">
+            <motion.div animate={controls}>
+              <Star className={`w-5 h-5 transition-colors duration-300 ${isWatchlisted ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+            </motion.div>
           </button>
-          <button className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white bg-black/40 rounded-full backdrop-blur-md border border-white/5 active:scale-95 transition-all">
+          
+          <button onClick={handleShareToX} className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white bg-black/40 rounded-full backdrop-blur-md border border-white/5 active:scale-90 transition-all">
             <XIcon className="w-4 h-4" />
           </button>
         </div>
       </motion.div>
 
-      {/* Content */}
+      {/* 2. Scrollable Content Area */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-32 no-scrollbar">
         <div className="px-4 md:px-24 pt-24 space-y-6">
+
+          {/* Hero Section */}
           <div className="flex flex-col items-start">
               <h1 className="text-xl font-bold text-[#78716C] mb-1">{strategy?.name}</h1>
               <div className="flex items-baseline gap-3">
-                <span className="text-5xl font-serif font-bold tracking-tighter text-white">${latestValue?.toFixed(2)}</span>
+                <span className="text-5xl font-serif font-bold tracking-tighter text-white">
+                  ${latestValue?.toFixed(2)}
+                </span>
               </div>
               <div className={`flex items-center gap-1 mt-2 text-sm font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
                 {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
@@ -611,57 +626,102 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
             <RichChart data={chartData || []} isPositive={isPositive} />
           </div>
 
+          {/* Stats Strip */}
           <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-4 md:-mx-6 px-4 md:px-6 pb-2">
             <div className="flex-shrink-0 min-w-[140px] p-4 bg-[#1C1917] rounded-2xl border border-white/5 flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 text-[#78716C]"><Layers className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-bold tracking-wider">TVL</span></div>
-                <p className="text-lg font-bold text-white">{typeof strategy?.tvl === 'number' ? (strategy.tvl >= 1000 ? `${(strategy.tvl/1000).toFixed(1)}k` : strategy.tvl.toFixed(0)) : '0'} <span className="text-xs font-normal text-[#57534E]">SOL</span></p>
+                <div className="flex items-center gap-1.5 text-[#78716C]">
+                  <Layers className="w-3.5 h-3.5" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider">TVL</span>
+                </div>
+                <p className="text-lg font-bold text-white">
+                  {typeof strategy?.tvl === 'number' ? (strategy.tvl >= 1000 ? `${(strategy.tvl/1000).toFixed(1)}k` : strategy.tvl.toFixed(0)) : '0'} <span className="text-xs font-normal text-[#57534E]">SOL</span>
+                </p>
             </div>
+
             <div className="flex-shrink-0 min-w-[140px] p-4 bg-[#1C1917] rounded-2xl border border-white/5 flex flex-col gap-1">
-                <div className="flex items-center gap-1.5 text-[#78716C]"><Activity className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-bold tracking-wider">ROI</span></div>
-                <p className={`text-lg font-bold ${changePct >= 0 ? 'text-[#D97706]' : 'text-red-500'}`}>{changePct > 0 ? '+' : ''}{changePct?.toFixed(2)}%</p>
+                <div className="flex items-center gap-1.5 text-[#78716C]">
+                  <Activity className="w-3.5 h-3.5" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider">ROI (All)</span>
+                </div>
+                <p className={`text-lg font-bold ${changePct >= 0 ? 'text-[#D97706]' : 'text-red-500'}`}>
+                  {changePct > 0 ? '+' : ''}{changePct?.toFixed(2)}%
+                </p>
             </div>
+
             <button onClick={handleCopyCA} className="flex-shrink-0 min-w-[140px] p-4 bg-[#1C1917] rounded-2xl border border-white/5 flex flex-col gap-1 hover:bg-[#292524] transition-colors text-left group">
-                <div className="flex items-center gap-1.5 text-[#78716C]"><Copy className="w-3.5 h-3.5" /><span className="text-[10px] uppercase font-bold tracking-wider">Contract</span></div>
-                <p className="text-sm font-mono text-[#A8A29E] truncate w-full group-hover:text-white">{MASTER_MINT_ADDRESS.toString().slice(0, 4)}...{MASTER_MINT_ADDRESS.toString().slice(-4)}</p>
+                <div className="flex items-center gap-1.5 text-[#78716C]">
+                  <Copy className="w-3.5 h-3.5" />
+                  <span className="text-[10px] uppercase font-bold tracking-wider">Contract</span>
+                </div>
+                <p className="text-sm font-mono text-[#A8A29E] truncate w-full group-hover:text-white">
+                  {MASTER_MINT_ADDRESS.toString().slice(0, 4)}...{MASTER_MINT_ADDRESS.toString().slice(-4)}
+                </p>
             </button>
           </div>
 
+          {/* Composition List */}
           <div>
-            <h3 className="text-sm font-bold text-[#78716C] uppercase tracking-widest mb-4 flex items-center gap-2"><PieChart className="w-4 h-4" /> Composition</h3>
+            <h3 className="text-sm font-bold text-[#78716C] uppercase tracking-widest mb-4 flex items-center gap-2">
+              <PieChart className="w-4 h-4" /> Composition
+            </h3>
+            
             <div className="bg-[#1C1917]/50 rounded-3xl border border-white/5 overflow-hidden">
               {(tokensInfo?.length ?? 0) > 0 ? tokensInfo.map((token, i) => (
-                <div key={i} className={`relative p-4 ${i !== tokensInfo.length - 1 ? 'border-b border-white/5' : ''}`}>
+                <div
+                  key={i}
+                  className={`relative p-4 ${i !== tokensInfo.length - 1 ? 'border-b border-white/5' : ''}`}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative shrink-0">
-                        {token.logoURI ? <img src={token.logoURI} alt={token.symbol} className="w-10 h-10 rounded-full bg-black object-cover" /> : <div className="w-10 h-10 rounded-full bg-[#292524] flex items-center justify-center font-bold text-xs text-[#D97706]">{token.symbol?.[0] || '?'}</div>}
+                        {token.logoURI ? (
+                          <img src={token.logoURI} alt={token.symbol} className="w-10 h-10 rounded-full bg-black object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-[#292524] flex items-center justify-center font-bold text-xs text-[#D97706]">{token.symbol?.[0] || '?'}</div>
+                        )}
                       </div>
-                      <div className="min-w-0"><h4 className="font-bold text-white text-sm">{token.symbol || 'UNK'}</h4><p className="text-[10px] text-[#78716C] truncate">{token.name || 'Token'}</p></div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-white text-sm">{token.symbol || 'UNK'}</h4>
+                        <p className="text-[10px] text-[#78716C] truncate">{token.name || 'Token'}</p>
+                      </div>
                     </div>
                     <span className="font-bold text-white text-sm shrink-0 ml-2">{token.weight}%</span>
                   </div>
-                  <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${token.weight}%` }} transition={{ duration: 1, delay: i * 0.1 }} className="h-full bg-[#D97706] rounded-full" /></div>
+                  <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${token.weight}%` }}
+                          transition={{ duration: 1, delay: i * 0.1 }}
+                          className="h-full bg-[#D97706] rounded-full"
+                      />
+                  </div>
                 </div>
-              )) : <div className="text-center py-8 text-[#57534E] text-sm">Loading composition...</div>}
+              )) : (
+                <div className="text-center py-8 text-[#57534E] text-sm">Loading composition...</div>
+              )}
             </div>
           </div>
+
         </div>
       </div>
 
-      {/* Action Bar */}
+      {/* 3. Bottom Action Bar */}
       <div className="absolute bottom-0 inset-x-0 bg-[#0C0A09]/95 backdrop-blur-md border-t border-white/10 z-40 pt-3 px-6 pb-[calc(env(safe-area-inset-bottom,8px)+8px)]">
         <div className="flex items-center justify-between gap-4">
            <div className="flex flex-col">
               <span className="text-[10px] text-[#78716C] uppercase tracking-wider">Your AXIS</span>
               <span className="text-lg font-serif font-bold text-white">{userEtfBalance.toFixed(2)}</span>
            </div>
-           <button onClick={() => setIsInvestOpen(true)} className="bg-[#D97706] text-black font-bold px-8 py-3 rounded-full shadow-[0_4px_20px_rgba(217,119,6,0.3)] active:scale-95 transition-all flex items-center gap-2">
+           
+           <button 
+             onClick={() => setIsInvestOpen(true)} 
+             className="bg-[#D97706] text-black font-bold px-8 py-3 rounded-full shadow-[0_4px_20px_rgba(217,119,6,0.3)] active:scale-95 transition-all flex items-center gap-2"
+           >
              Trade <ArrowRight className="w-4 h-4" />
            </button>
         </div>
       </div>
 
-      {/* InvestSheetの呼び出し。userEtfBalanceとonConfirm(handleTransaction)を渡す */}
       <InvestSheet isOpen={isInvestOpen} onClose={() => setIsInvestOpen(false)} strategy={strategy} onConfirm={handleTransaction} status={investStatus} userEtfBalance={userEtfBalance} />
     </div>
   );

@@ -38,14 +38,6 @@ export const DeploymentBlueprint = ({
   onComplete,
   onDeploySuccess 
 }: DeploymentBlueprintProps) => {
-  console.log("🔵 [Blueprint] Component Rendering...", {
-    strategyName,
-    strategyType,
-    tokens,
-    description,
-    info
-  });
-
   if (!tokens) {
       console.error("🔴 [Blueprint] Critical: Tokens is undefined!");
   }

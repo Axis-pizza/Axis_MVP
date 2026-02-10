@@ -61,21 +61,6 @@ app.route('/', kagemushaRoutes);
 app.route('/upload', uploadRoutes);
 app.route('/share', shareRoutes);
 
-app.use('*', async (c, next) => {
-  console.log('🔍 [DEBUG] Request URL:', c.req.url);
-  // c.env に入っているキー（バインディング名）を全て表示する
-  console.log('🔑 [DEBUG] Available Bindings:', Object.keys(c.env));
-  
-  // whitelist_db があるか個別にチェック
-  if (c.env.whitelist_db) {
-    console.log('✅ [DEBUG] whitelist_db is PRESENT');
-  } else {
-    console.error('❌ [DEBUG] whitelist_db is MISSING (undefined)');
-  }
-  
-  await next();
-});
-
 app.post('/report', async (c) => {
   try {
    
@@ -85,9 +70,6 @@ app.post('/report', async (c) => {
       return c.json({ success: false, error: 'Missing fields' }, 400);
     }
 
-    console.log(`📨 Received Report from ${body.user_tg} (Has Image: ${!!body.image})`);
-
-  
     const sent = await sendBugReportEmail(c.env, body);
 
     if (sent) {
@@ -177,7 +159,6 @@ async function sendBugReportEmail(
     // @ts-ignore
     await env.EMAIL.send(message);
     
-    console.log(`✅ Email sent to ${ADMIN_EMAIL}`);
     return true;
 
   } catch (error) {
@@ -198,7 +179,6 @@ async function snapshotAllStrategies(env: Bindings) {
     ).all();
 
     if (!strategies || strategies.length === 0) {
-      console.log("No strategies to snapshot.");
       return;
     }
 
@@ -266,7 +246,6 @@ async function snapshotAllStrategies(env: Bindings) {
 
     if (statements.length > 0) {
       await env.axis_db.batch(statements);
-      console.log(`✅ Snapshotted ${statements.length} strategies.`);
     }
 
   } catch (e) {
@@ -285,11 +264,8 @@ async function distributeHoldingXP(env: Bindings) {
     ).all();
 
     if (!strategies || strategies.length === 0) {
-      console.log("⚠️ No strategies found for XP.");
       return;
     }
-
-    console.log(`🔍 Processing ${strategies.length} strategies for XP...`);
 
     // ユーザーごとの集計用マップ
     const userHoldings: Record<string, number> = {};
@@ -326,8 +302,6 @@ async function distributeHoldingXP(env: Bindings) {
           "UPDATE users SET total_xp = total_xp + ? WHERE pubkey = ?"
         ).bind(earnedXp, pubkey).run();
         
-        console.log(`✨ Paid ${earnedXp} XP to ${pubkey} (Holdings: $${totalUsd})`);
-
         // B. 紹介者ボーナス (10%)
         const user = await db.prepare("SELECT referrer_id FROM users WHERE pubkey = ?").bind(pubkey).first();
         if (user && user.referrer_id) {
@@ -342,12 +316,10 @@ async function distributeHoldingXP(env: Bindings) {
               "UPDATE users SET total_xp = total_xp + ? WHERE pubkey = ?"
             ).bind(bonus, user.referrer_id).run();
             
-            console.log(`🎁 Referral Bonus: ${bonus} XP to ${user.referrer_id}`);
           }
         }
       }
     }
-    console.log("✅ Daily XP Distribution Complete!");
 
   } catch (e) {
     console.error("❌ Cron Job Failed (XP):", e);
@@ -360,8 +332,6 @@ export default {
 
   // Cron Job (定期実行) のハンドラー
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
-    console.log("⏰ Cron Job Started: Daily Tasks...");
-    
     ctx.waitUntil(Promise.all([
       snapshotAllStrategies(env), // 価格保存
       distributeHoldingXP(env)    // XP配布

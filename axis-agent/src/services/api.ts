@@ -17,12 +17,10 @@ export const api = {
       const res = await fetch(url);
 
       if (!res.ok) {
-        console.log('[getUser] Response not OK:', res.status);
         return { success: false, user: null };
       }
 
       const data = await res.json();
-      console.log('[getUser] Raw response:', data);
 
       // Handle both { user: {...} } and direct {...} response formats
       const userData = data.user || data;
@@ -40,8 +38,6 @@ export const api = {
         rank_tier: userData.rank_tier || 'Novice'
       };
 
-      console.log('[getUser] Processed user:', user);
-
       return { success: true, user };
     } catch (e) {
       console.error("Fetch User Error:", e);
@@ -56,10 +52,8 @@ export const api = {
         wallet_address: data.wallet_address,
         name: data.username || data.name,
         bio: data.bio,
-        pfpUrl: data.pfpUrl || data.avatar_url
+        avatar_url: data.pfpUrl || data.avatar_url
       };
-
-      console.log('[updateProfile] Sending payload:', payload);
 
       const res = await fetch(`${API_BASE}/user`, {
         method: 'POST',
@@ -74,7 +68,6 @@ export const api = {
       }
 
       const result = await res.json();
-      console.log('[updateProfile] Response:', result);
       return result;
     } catch (e) {
       console.error("Update Profile Error:", e);
@@ -191,7 +184,6 @@ export const api = {
 
       try {
         const data = JSON.parse(text);
-        console.log('[dailyCheckIn] Response:', data);
         return data;
       } catch (e) {
         return { success: false, error: `Server Error: ${text}` };
@@ -260,9 +252,6 @@ export const api = {
     config?: any; 
   }) => {
     try {
-
-      console.log("📤 Sending Strategy Data to API:", data);
-
       const res = await fetch(`${API_BASE}/strategies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -310,8 +299,6 @@ export const api = {
    */
   async deploy(signature: string, metadata: any) {
     try {
-      console.log("[API] Deploying strategy...", { signature, metadata });
-
       const response = await fetch(`${API_BASE}/deploy`, {
         method: 'POST',
         headers: {
@@ -329,7 +316,6 @@ export const api = {
         throw new Error(data.error || `Deployment failed: ${response.status}`);
       }
 
-      console.log("[API] Deploy Success:", data);
       return data;
     } catch (error) {
       console.error('[API] Deploy Error:', error);

@@ -133,8 +133,6 @@ export class JitoBundleService {
    * @param encodedTransactions Base64 encoded signed transactions (from frontend)
    */
   async sendBundle(encodedTransactions: string[]): Promise<{ bundleId: string }> {
-    console.log(`[Jito] Sending bundle with ${encodedTransactions.length} transactions, network: ${this.network}`);
-
     // For devnet, use standard RPC instead of Jito (Jito is mainnet-only)
     if (this.network === 'devnet') {
       return this.sendViaStandardRpc(encodedTransactions);
@@ -148,8 +146,6 @@ export class JitoBundleService {
    * Send transactions via standard Solana RPC (for devnet)
    */
   private async sendViaStandardRpc(encodedTransactions: string[]): Promise<{ bundleId: string }> {
-    console.log('[Jito] Using standard RPC for devnet');
-
     const signatures: string[] = [];
 
     for (const base64Tx of encodedTransactions) {
@@ -173,7 +169,6 @@ export class JitoBundleService {
           });
         }
 
-        console.log('[RPC] Transaction sent:', signature);
         signatures.push(signature);
       } catch (error: any) {
         console.error('[RPC] Transaction failed:', error);
@@ -192,7 +187,6 @@ export class JitoBundleService {
     try {
       // Convert base64 to base58 for Jito
       const base58Transactions = encodedTransactions.map(tx => this.base64ToBase58(tx));
-      console.log('[Jito] Converted to base58, sending bundle...');
 
       const response = await fetch(this.endpoint, {
         method: 'POST',
@@ -212,7 +206,6 @@ export class JitoBundleService {
         throw new Error(data.error.message);
       }
 
-      console.log('[Jito] Bundle sent successfully:', data.result);
       return { bundleId: data.result };
     } catch (error: any) {
       console.error('[Jito] Bundle send failed:', error);

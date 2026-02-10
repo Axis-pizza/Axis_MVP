@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { Bindings } from '../config/env';
 import * as VaultModel from '../models/vault';
-import { STRICT_LIST } from '../config/constants';
 // もし ../services/blockchain からのインポートでエラーが出る場合は、この行を一時的にコメントアウトしてください
 import { JitoBundleService } from '../services/blockchain';
 
@@ -72,9 +71,4 @@ app.post('/vaults', async (c) => {
   }
 });
 
-app.get('/tokens', (c) => {
-    return c.json(STRICT_LIST);
-});
-
-// ★この行が確実に存在することを確認してください
 export default app;

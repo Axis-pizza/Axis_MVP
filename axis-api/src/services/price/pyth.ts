@@ -74,7 +74,6 @@ export class PythPriceService {
         });
       }
 
-      console.log(`[Pyth] Fetched ${Object.keys(prices).length} prices`);
       return prices;
 
     } catch (error) {

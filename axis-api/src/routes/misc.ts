@@ -3,6 +3,7 @@ import { Bindings } from '../config/env';
 import * as AIService from '../services/ai';
 import * as SolanaService from '../services/solana';
 import * as InviteModel from '../models/invite';
+import * as UserModel from '../models/user';
 import * as AuthService from '../services/auth';
 
 const app = new Hono<{ Bindings: Bindings }>();

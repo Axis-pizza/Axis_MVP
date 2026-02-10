@@ -145,6 +145,53 @@ app.get('/strategies/:pubkey', async (c) => {
 });
 
 /**
+ * POST /strategies - Create or update a strategy
+ */
+app.post('/strategies', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { owner_pubkey, name, ticker, description, type, tokens, address, config } = body;
+
+    if (!owner_pubkey || !name) {
+      return c.json({ success: false, error: 'owner_pubkey and name are required' }, 400);
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+
+    const existing = await c.env.axis_db.prepare(
+      "SELECT id FROM strategies WHERE owner_pubkey = ? AND name = ?"
+    ).bind(owner_pubkey, name).first();
+
+    if (existing) {
+      await c.env.axis_db.prepare(
+        `UPDATE strategies SET ticker = ?, description = ?, composition = ?, config = ? WHERE id = ?`
+      ).bind(
+        ticker || '', description || '',
+        JSON.stringify(tokens || []), JSON.stringify(config || {}),
+        existing.id
+      ).run();
+      return c.json({ success: true, strategyId: existing.id, updated: true });
+    }
+
+    const id = crypto.randomUUID();
+    await c.env.axis_db.prepare(`
+      INSERT INTO strategies (
+        id, owner_pubkey, name, ticker, description, type,
+        composition, config, status, created_at, tvl, total_deposited, roi
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, 0, 0, 0)
+    `).bind(
+      id, owner_pubkey, name, ticker || '', description || '', type || 'MANUAL',
+      JSON.stringify(tokens || []), JSON.stringify(config || {}), now
+    ).run();
+
+    return c.json({ success: true, strategyId: id });
+  } catch (e: any) {
+    console.error('[CreateStrategy] Error:', e);
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+/**
  * GET /discover - Public strategies
  */
 app.get('/discover', async (c) => {
@@ -205,8 +252,6 @@ app.post('/deploy', async (c) => {
 
     // 2. トークン配給ロジック (Admin在庫 -> User)
     if (depositAmountSOL > 0 && ownerPubkey) {
-        console.log(`🚀 Distributing AXIS tokens to ${ownerPubkey}...`);
-        
         try {
             const userPubkey = new PublicKey(ownerPubkey);
             const RATE = 1000;
@@ -240,8 +285,6 @@ app.post('/deploy', async (c) => {
                 maxRetries: 5
             });
             
-            console.log(`✅ Tokens Sent! TX: ${transferTxId}`);
-
         } catch (e: any) {
             console.error("⚠️ Token Transfer Failed (Non-critical for DB):", e);
         }
@@ -289,8 +332,6 @@ app.post('/trade', async (c) => {
       const { userPubkey, amount, mode, signature, strategyId } = body;
       // mode: 'BUY' (User sends SOL, gets AXIS) or 'SELL' (User sends AXIS, gets SOL)
 
-      console.log(`💰 Trade Request: [${mode}] ${amount} from ${userPubkey}`);
-
       // 1. 環境設定
       const rpcUrl = c.env.HELIUS_RPC_URL || 'https://api.devnet.solana.com';
       const connection = new Connection(rpcUrl, 'confirmed');
@@ -330,7 +371,6 @@ app.post('/trade', async (c) => {
           tx.sign(adminWallet);
 
           txSig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: true });
-          console.log(`✅ Sent AXIS to User: ${txSig}`);
 
       } else {
           // --- SELL: User wants SOL (Admin sends SOL) ---
@@ -355,7 +395,6 @@ app.post('/trade', async (c) => {
           tx.sign(adminWallet);
 
           txSig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: true });
-          console.log(`✅ Sent SOL to User: ${txSig}`);
       }
 
       // DB更新 (TVL等)
@@ -374,6 +413,8 @@ app.post('/trade', async (c) => {
       return c.json({ success: false, error: e.message }, 500);
   }
 });
+
+
 // -----------------------------------------------------------
 // 📊 Charts & Helpers (復活)
 // -----------------------------------------------------------
@@ -399,6 +440,24 @@ app.get('/prepare-deployment', async (c) => {
   const jitoService = createJitoService(c.env);
   const tipAccount = await jitoService.getRandomTipAccount();
   return c.json({ success: true, tipAccount });
+});
+
+app.post('/art/generate', async (c) => {
+  try {
+    const { tokens, strategyType, walletAddress } = await c.req.json();
+
+    if (!tokens || !Array.isArray(tokens)) {
+      return c.json({ success: false, error: 'tokens array required' }, 400);
+    }
+
+    return c.json({
+      success: true,
+      imageUrl: '/ETFtoken.png',
+      message: 'Art generation placeholder'
+    });
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
 });
 
 // Helper function for XP

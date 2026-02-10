@@ -48,9 +48,8 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
         <div className="flex items-center gap-3">
 
           {/* プロフィールボタン */}
-          <button 
+          <button
             onClick={() => {
-              console.log("Drawer Button Clicked!");
               setIsDrawerOpen(true);
             }}
             className="p-2 rounded-full bg-white/5 hover:bg-white/10 active:scale-95 transition-all relative"
