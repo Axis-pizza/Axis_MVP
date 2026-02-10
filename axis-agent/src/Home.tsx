@@ -3,7 +3,7 @@
  * Main entry with floating navigation and tactical interface
  */
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useWallet, useConnection } from './hooks/useWallet';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { FloatingNav, type ViewState } from './components/common/FloatingNav';
@@ -90,65 +90,38 @@ export default function Home() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-900/10 blur-[120px] rounded-full" />
       </div>
 
-      <AnimatePresence mode="wait">
         {/* DISCOVER VIEW */}
         {view === 'DISCOVER' && (
-          <motion.div 
-            key="discover" 
-            initial={{ opacity: 0, x: -10 }} 
-            animate={{ opacity: 1, x: 0 }} 
-            exit={{ opacity: 0, x: -10 }} 
-            className="relative z-10 pb-32"
-          >
+          <div className="relative z-10 pb-32">
             <DiscoverView onStrategySelect={handleStrategySelect} onOverlayChange={setIsOverlayActive} />
-          </motion.div>
+          </div>
         )}
 
         {/* CREATE VIEW */}
         {view === 'CREATE' && (
-          <motion.div 
-            key="create" 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
-            className="relative z-10 pb-32"
-          >
+          <div className="relative z-10 pb-32">
             <KagemushaFlow
               onStepChange={(step) => setHideNavInCreate(step !== 'LANDING' && step !== 'DASHBOARD')}
-              onNavigateToDiscover={() => setView('DISCOVER')}
             />
-          </motion.div>
+          </div>
         )}
 
         {/* PROFILE VIEW */}
         {view === 'PROFILE' && (
-          <motion.div 
-            key="profile" 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            exit={{ opacity: 0, y: -10 }} 
-            className="relative z-10 pb-32"
-          >
+          <div className="relative z-10 pb-32">
             <ProfileView onStrategySelect={handleStrategySelect} />
-          </motion.div>
+          </div>
         )}
 
         {/* STRATEGY DETAIL */}
         {view === 'STRATEGY_DETAIL' && selectedStrategy && (
-          <motion.div 
-            key="strategy-detail" 
-            initial={{ opacity: 0, scale: 0.98 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            exit={{ opacity: 0, scale: 0.98 }} 
-            className="fixed inset-0 z-50 bg-[#030303]"
-          >
+          <div className="fixed inset-0 z-50 bg-[#030303]">
             <StrategyDetailView
               initialData={selectedStrategy}
               onBack={handleBackFromDetail}
             />
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
 
       {/* Floating Navigation (Tutorial targets this) */}
       {view !== 'STRATEGY_DETAIL' && !hideNavInCreate && !isOverlayActive && (

@@ -17,6 +17,8 @@ export const ManualDashboard = ({
   const isMobile = useIsMobile();
   const dashboard = useManualDashboard({ onDeploySuccess, initialConfig, initialTokens });
 
+  // ★ フック内の handleDeploy を使用（正しいデータマッピング + ウォレットチェック付き）
+
   return (
     <div className="fixed inset-0 z-[100] flex flex-col h-[100dvh] bg-black text-white overflow-hidden font-sans">
       {dashboard.step === 'builder' && (
@@ -34,7 +36,7 @@ export const ManualDashboard = ({
         portfolioCount={dashboard.portfolio.length}
         connected={dashboard.connected}
         onBack={dashboard.handleBackToBuilder}
-        onDeploy={dashboard.handleDeploy}
+        onDeploy={dashboard.handleDeploy} // ★ フック内の正しいマッピングを使用
         onGenerateRandomTicker={dashboard.generateRandomTicker}
       />
     </div>

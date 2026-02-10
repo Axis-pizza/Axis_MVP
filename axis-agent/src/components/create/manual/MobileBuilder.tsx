@@ -565,7 +565,7 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
                 const showDivider = hasSelection && !searchQuery && index === portfolio.length && index > 0;
 
                 return (
-                  <div key={token.address}>
+                  <div key={`${token.address}-${index}`}>
                     {showDivider && (
                       <div className="px-3 pt-5 pb-2 flex items-center gap-3 sticky top-0 bg-[#0a0a0a] z-10">
                         <span className="text-xs font-medium uppercase tracking-wider text-white/20">

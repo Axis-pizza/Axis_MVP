@@ -1,5 +1,5 @@
 -- =====================================================
--- 1. リセット (全削除)
+-- 1. リセット (全削除: 開発用)
 -- =====================================================
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS strategies;
@@ -7,9 +7,10 @@ DROP TABLE IF EXISTS watchlist;
 DROP TABLE IF EXISTS xp_rates;
 DROP TABLE IF EXISTS xp_snapshots;
 DROP TABLE IF EXISTS xp_ledger;
+DROP TABLE IF EXISTS processed_deposits;
 
 -- =====================================================
--- 2. ユーザー管理 (XP & Referral統合)
+-- 2. ユーザー管理
 -- =====================================================
 CREATE TABLE users (
   id TEXT PRIMARY KEY,
@@ -26,15 +27,16 @@ CREATE TABLE users (
   otp_code TEXT,
   otp_expires INTEGER,
   
-  -- ゲーム要素（既存）
+  -- ゲーム要素
   total_xp INTEGER DEFAULT 500,
   rank_tier TEXT DEFAULT 'Novice',
   last_checkin INTEGER DEFAULT 0,
 
-  -- ★追加: 投資成績データ
-  pnl_percent REAL DEFAULT 0,       -- 通算損益率 (例: 12.5)
-  total_invested_usd REAL DEFAULT 0, -- 総投資額 (USD)
-  last_snapshot_at INTEGER,         -- 最終更新日時 (Unix Timestamp)
+  -- 投資成績データ (ALTER分をここに統合)
+  pnl_percent REAL DEFAULT 0,
+  total_invested_usd REAL DEFAULT 0,
+  strategies_count INTEGER DEFAULT 0,
+  last_snapshot_at INTEGER,
 
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
@@ -42,20 +44,37 @@ CREATE TABLE users (
 CREATE INDEX idx_users_xp ON users(total_xp DESC);
 
 -- =====================================================
--- 3. 戦略 (ETF)
+-- 3. 戦略 (ETF) - ここを完全版に修正
 -- =====================================================
 CREATE TABLE strategies (
   id TEXT PRIMARY KEY,
   owner_pubkey TEXT NOT NULL,
   name TEXT NOT NULL,
-  ticker TEXT NOT NULL,
+  ticker TEXT NOT NULL,          -- ★ 必須
   description TEXT,
   image_url TEXT,
-  config TEXT NOT NULL, -- JSON
   
-  -- Hylo型レート区分
-  category TEXT DEFAULT 'COMMUNITY', -- 'OFFICIAL', 'VERIFIED', 'COMMUNITY'
+  -- システム区分
+  type TEXT DEFAULT 'BALANCED',  -- ★ APIが送ってくる 'type' に対応
+  category TEXT DEFAULT 'COMMUNITY',
+  mint_address TEXT,             -- ★ Mint後に保存されるアドレス
   
+  -- 構成データ
+  composition TEXT,              -- トークン構成JSON
+  config TEXT,                   -- JSON文字列 (設定など)
+  vault_address TEXT,            -- サーバーWalletアドレス（Webhook照合に必須）
+
+  -- 統計データ (ダッシュボード表示用)
+  tvl REAL DEFAULT 0,
+  total_deposited REAL DEFAULT 0,
+  roi REAL DEFAULT 0,
+  pnl REAL DEFAULT 0,
+  pnl_percent REAL DEFAULT 0,
+  investors_count INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'active',
+
+  is_active BOOLEAN DEFAULT 1,
+  last_rebalance INTEGER,
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
@@ -64,31 +83,31 @@ CREATE TABLE strategies (
 -- =====================================================
 CREATE TABLE xp_rates (
   strategy_id TEXT PRIMARY KEY,
-  base_rate REAL NOT NULL DEFAULT 1.0, -- XP per $1 per Day
+  base_rate REAL NOT NULL DEFAULT 1.0,
   is_active BOOLEAN DEFAULT 1
 );
 
 -- =====================================================
--- 5. XPシステム: 資産スナップショット (Devnet Cap対応用)
+-- 5. XPシステム: 資産スナップショット
 -- =====================================================
 CREATE TABLE xp_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_pubkey TEXT NOT NULL,
   strategy_id TEXT NOT NULL,
-  amount_usd REAL NOT NULL,       -- 生の資産額
-  capped_usd REAL NOT NULL,       -- キャップ適用後の計算対象額 (Max $5000)
+  amount_usd REAL NOT NULL,
+  capped_usd REAL NOT NULL,
   snapshot_at INTEGER DEFAULT (strftime('%s', 'now')),
   is_processed BOOLEAN DEFAULT 0
 );
 
 -- =====================================================
--- 6. XPシステム: 履歴台帳 (Ledger)
+-- 6. XPシステム: 履歴台帳
 -- =====================================================
 CREATE TABLE xp_ledger (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_pubkey TEXT NOT NULL,
   amount REAL NOT NULL,
-  action_type TEXT NOT NULL, -- 'HOLDING', 'REFERRAL_BONUS', 'DAILY_CHECKIN'
+  action_type TEXT NOT NULL,
   description TEXT,
   related_id TEXT,
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
@@ -96,14 +115,24 @@ CREATE TABLE xp_ledger (
 
 CREATE INDEX idx_xp_ledger_user ON xp_ledger(user_pubkey);
 
--- その他: ウォッチリストなど
+-- =====================================================
+-- 7. ウォッチリスト
+-- =====================================================
 CREATE TABLE watchlist (
   user_pubkey TEXT NOT NULL,
   strategy_id TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   PRIMARY KEY (user_pubkey, strategy_id)
 );
+
 -- =====================================================
-ALTER TABLE users ADD COLUMN pnl_percent REAL DEFAULT 0;       -- 損益率
-ALTER TABLE users ADD COLUMN total_invested_usd REAL DEFAULT 0; -- 総投資額 (Volume用)
-ALTER TABLE users ADD COLUMN strategies_count INTEGER DEFAULT 0; -- 作成した戦略数
+-- 8. 二重Mint防止用
+-- =====================================================
+CREATE TABLE processed_deposits (
+    signature TEXT PRIMARY KEY,
+    strategy_id TEXT NOT NULL,
+    user_address TEXT NOT NULL,
+    amount_lamports INTEGER NOT NULL,
+    mint_amount TEXT,
+    processed_at INTEGER DEFAULT (unixepoch())
+);

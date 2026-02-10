@@ -7,6 +7,9 @@ import * as AuthService from '../services/auth';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+const FRONTEND_BASE_URL = 'https://app.axis-protocol.xyz'; 
+const LOGO_URL = `${FRONTEND_BASE_URL}/ETFtoken.png`;
+
 // --- AI Chat ---
 app.post('/chat', async (c) => {
     try {
@@ -17,6 +20,35 @@ app.post('/chat', async (c) => {
         console.error("AI Error:", e);
         return c.json({ message: `System Error: ${e.message}`, uiAction: "NONE", data: {} });
     }
+});
+
+app.get('/metadata/:ticker', (c) => {
+    const ticker = c.req.param('ticker');
+    const name = c.req.query('name') || `${ticker} ETF`;
+    
+    // URL生成 (自分のAPIのURL)
+    const url = new URL(c.req.url);
+    const baseUrl = `${url.protocol}//${url.host}`;
+
+    return c.json({
+      name: name,
+      symbol: ticker,
+      description: `Axis Protocol Strategy Token: ${name}`,
+      image: LOGO_URL, // ★ ここで固定画像を指定
+      external_url: `${FRONTEND_BASE_URL}/`,
+      attributes: [
+        { trait_type: "Type", value: "ETF Strategy" },
+        { trait_type: "Platform", value: "Axis Protocol" }
+      ],
+      properties: {
+        files: [
+          {
+            uri: LOGO_URL,
+            type: "image/png"
+          }
+        ]
+      }
+    });
 });
 
 // --- Faucet Claim ---
