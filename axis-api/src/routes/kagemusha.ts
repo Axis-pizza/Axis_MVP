@@ -8,6 +8,22 @@ import { Bindings } from '../config/env';
 import { StrategyGenerator } from '../services/strategy';
 import { PriceService } from '../services/price';
 import { JitoBundleService } from '../services/blockchain';
+import { 
+    Keypair, Connection, SystemProgram, Transaction, sendAndConfirmTransaction, PublicKey 
+} from '@solana/web3.js';
+import { 
+    createInitializeMintInstruction, MINT_SIZE, TOKEN_PROGRAM_ID, 
+    getMinimumBalanceForRentExemptMint, getAssociatedTokenAddress, 
+    createAssociatedTokenAccountInstruction, createMintToInstruction, 
+    createTransferInstruction 
+} from '@solana/spl-token';
+import bs58 from 'bs58';
+
+// ▼▼▼ Metaplex Token Metadata v2 (raw instruction API) ▼▼▼
+import { createCreateMetadataAccountV3Instruction } from '@metaplex-foundation/mpl-token-metadata';
+
+const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
+// ▲▲▲ Metaplex ▲▲▲
 
 const app = new Hono<{ Bindings: Bindings }>();
 const priceService = new PriceService();
@@ -16,6 +32,8 @@ const priceService = new PriceService();
 const createJitoService = (env: Bindings) => {
   return new JitoBundleService('devnet', 'tokyo', env.SOLANA_RPC_URL);
 };
+
+// ... (analyze, tokens などのエンドポイントは変更なし) ...
 
 // -----------------------------------------------------------
 // 🧠 AI Analysis & Token Data
@@ -99,7 +117,6 @@ app.get('/tokens/:address/history', async (c) => {
 
 /**
  * POST /strategies - Manual Creation (Draft / DB Only)
- * ★注意: このエンドポイントはDraftのみ。最終保存は/deployで行う
  */
 app.post('/strategies', async (c) => {
   try {
@@ -112,7 +129,6 @@ app.post('/strategies', async (c) => {
 
     const now = Math.floor(Date.now() / 1000);
 
-    // ★修正: 重複チェック - 同じowner + name + 60秒以内のものがあればスキップ
     const recentCheck = await c.env.axis_db.prepare(`
       SELECT id FROM strategies 
       WHERE owner_pubkey = ? AND name = ? AND created_at > ?
@@ -125,7 +141,6 @@ app.post('/strategies', async (c) => {
 
     const id = crypto.randomUUID();
 
-    // DB Insert
     const result = await c.env.axis_db.prepare(`
       INSERT INTO strategies (
         id, owner_pubkey, name, ticker, description, type, 
@@ -145,7 +160,6 @@ app.post('/strategies', async (c) => {
 
     if (!result.success) throw new Error('DB Insert Failed');
 
-    // XP
     await addXP(c.env.axis_db, owner_pubkey, 100, 'STRATEGY_DRAFT', 'Drafted new strategy');
 
     return c.json({ success: true, strategy_id: id });
@@ -157,118 +171,243 @@ app.post('/strategies', async (c) => {
 
 /**
  * POST /deploy - Deploy via Jito (On-chain Transaction)
- * ★修正: TVL保存 + 重複防止ロジック追加
+ * Strategy作成 + Token発行 (10億枚) + 初期配分 + Metadata登録
  */
 app.post('/deploy', async (c) => {
   try {
     const body = await c.req.json();
+    
     const signedTransaction = body.signedTransaction || body.signature; 
-    const metadata = body.metadata || body; 
-
-    if (!signedTransaction) return c.json({ success: false, error: 'Signature required' }, 400);
-
-    // Jito送信（失敗しても続行）
-    const jitoService = createJitoService(c.env);
-    let bundleId = null;
-    try {
-        const result = await jitoService.sendBundle([signedTransaction]);
-        bundleId = result.bundleId;
-    } catch (e) {
-        console.warn("Jito bundle skipped/failed:", e);
+    if (signedTransaction) {
+        const jitoService = createJitoService(c.env);
+        try {
+            await jitoService.sendBundle([signedTransaction]);
+        } catch (e) {
+            console.warn("Jito bundle skipped/failed:", e);
+        }
     }
 
-    // メタデータ抽出
-    const owner = metadata.ownerPubkey || metadata.creator || 'unknown';
-    const name = metadata.name || 'Untitled';
-    const ticker = metadata.ticker || '';
-    const strategyType = metadata.type || 'BALANCED';
-    const tokens = metadata.tokens || metadata.composition || [];
-    const config = metadata.config || {};
-    const description = metadata.description || '';
-    
-    // ★重要: TVL/initialInvestmentを取得
-    const depositAmount = metadata.tvl || metadata.initialInvestment || 0;
-    
-    console.log(`[Deploy] Owner: ${owner}, Name: ${name}, TVL: ${depositAmount}`);
-    
-    if (c.env.axis_db) {
-      const now = Math.floor(Date.now() / 1000);
-      
-      // ★修正: 重複チェック - 同じowner + name + tokens構成 + 60秒以内
-      const tokensKey = JSON.stringify(tokens.map((t: any) => ({ s: t.symbol, w: t.weight })).sort((a: any, b: any) => a.s.localeCompare(b.s)));
-      
-      const recentCheck = await c.env.axis_db.prepare(`
-        SELECT id, total_deposited, tvl FROM strategies 
-        WHERE owner_pubkey = ? AND name = ? AND created_at > ?
-        ORDER BY created_at DESC
-        LIMIT 1
-      `).bind(owner, name, now - 120).first();
-      
-      if (recentCheck) {
-        console.log(`[Deploy] Found recent strategy ${recentCheck.id}, updating TVL`);
-        
-        // 既存レコードを更新（TVLを設定）
-        const newTvl = depositAmount;
-        const newTotalDeposited = (recentCheck.total_deposited as number || 0) + depositAmount;
-        
-        await c.env.axis_db.prepare(`
-          UPDATE strategies
-          SET tvl = ?,
-              total_deposited = ?,
-              jito_bundle_id = ?,
-              ticker = COALESCE(NULLIF(?, ''), ticker),
-              status = 'active'
-          WHERE id = ?
-        `).bind(newTvl, newTotalDeposited, bundleId || 'simulated', ticker, recentCheck.id).run();
-        
-        // デプロイXP（更新時も付与）
-        await addXP(c.env.axis_db, owner, 500, 'STRATEGY_DEPLOY', 'Deployed on-chain strategy');
-        
-        return c.json({ 
-          success: true, 
-          bundleId, 
-          strategyId: recentCheck.id, 
-          updated: true,
-          tvl: newTvl
-        });
-      }
-      
-      // 新規INSERT
-      const id = body.strategyId || crypto.randomUUID();
-      
-      await c.env.axis_db.prepare(`
+    const { 
+      ownerPubkey, 
+      name, 
+      ticker, 
+      description, 
+      type, 
+      tokens, 
+      config, 
+      tvl 
+    } = body.metadata || body;
+
+    const depositAmountSOL = tvl || 0;
+    const now = Math.floor(Date.now() / 1000);
+    const id = body.strategyId || crypto.randomUUID();
+
+    let mintAddress = null;
+    let serverPubkeyStr = 'server_wallet';
+    const txSignatures: Record<string, string> = {};
+
+    // -------------------------------------------------------
+    // 1. Token作成 & 10億枚発行 (Server Walletへ)
+    // -------------------------------------------------------
+    if (c.env.SERVER_PRIVATE_KEY) {
+        try {
+            const connection = new Connection(c.env.HELIUS_RPC_URL || 'https://api.devnet.solana.com', 'confirmed');
+            const serverWallet = Keypair.fromSecretKey(bs58.decode(c.env.SERVER_PRIVATE_KEY));
+            serverPubkeyStr = serverWallet.publicKey.toString();
+
+            // A. Mintアカウント作成
+            const mintKeypair = Keypair.generate();
+            mintAddress = mintKeypair.publicKey.toString();
+            
+            console.log(`[Deploy] Creating Token: ${name} ($${ticker}) - Mint: ${mintAddress}`);
+
+            const lamports = await getMinimumBalanceForRentExemptMint(connection);
+            const decimals = 9; 
+
+            // トランザクション1: Mint作成
+            const createMintTx = new Transaction().add(
+                SystemProgram.createAccount({
+                    fromPubkey: serverWallet.publicKey,
+                    newAccountPubkey: mintKeypair.publicKey,
+                    space: MINT_SIZE,
+                    lamports,
+                    programId: TOKEN_PROGRAM_ID,
+                }),
+                createInitializeMintInstruction(
+                    mintKeypair.publicKey,
+                    decimals,
+                    serverWallet.publicKey, 
+                    null, 
+                    TOKEN_PROGRAM_ID
+                )
+            );
+            
+            const createMintSig = await sendAndConfirmTransaction(connection, createMintTx, [serverWallet, mintKeypair]);
+            txSignatures.createMint = createMintSig;
+            console.log(`[Deploy] Mint created: ${mintAddress} (sig: ${createMintSig})`);
+
+            // B. サーバー用ATA作成 & 10億枚Mint
+            const serverATA = await getAssociatedTokenAddress(mintKeypair.publicKey, serverWallet.publicKey);
+            const initialSupply = 1_000_000_000n * BigInt(10 ** decimals); // 10億枚
+
+            const mintToAdminTx = new Transaction().add(
+                createAssociatedTokenAccountInstruction(
+                    serverWallet.publicKey,
+                    serverATA,
+                    serverWallet.publicKey,
+                    mintKeypair.publicKey
+                ),
+                createMintToInstruction(
+                    mintKeypair.publicKey,
+                    serverATA,
+                    serverWallet.publicKey,
+                    initialSupply
+                )
+            );
+
+            const mintToSig = await sendAndConfirmTransaction(connection, mintToAdminTx, [serverWallet]);
+            txSignatures.mintToAdmin = mintToSig;
+            console.log(`[Deploy] Minted 1,000,000,000 ${ticker} to Admin (sig: ${mintToSig})`);
+
+            // -------------------------------------------------------
+            // 2. 初期流動性提供者(Creator)への配分
+            // -------------------------------------------------------
+            if (depositAmountSOL > 0 && ownerPubkey) {
+                // レート計算 (MVP: 1 SOL = 100 Token)
+                const RATE = 100; 
+                const creatorShare = BigInt(Math.floor(depositAmountSOL * RATE * (10 ** decimals)));
+
+                if (creatorShare > 0n) {
+                    const creatorPubkey = new PublicKey(ownerPubkey);
+                    const creatorATA = await getAssociatedTokenAddress(mintKeypair.publicKey, creatorPubkey);
+
+                    const transferTx = new Transaction();
+
+                    // CreatorのATAがなければ作る
+                    const accountInfo = await connection.getAccountInfo(creatorATA);
+                    if (!accountInfo) {
+                        transferTx.add(
+                            createAssociatedTokenAccountInstruction(
+                                serverWallet.publicKey, // Rentはサーバー持ち
+                                creatorATA,
+                                creatorPubkey,
+                                mintKeypair.publicKey
+                            )
+                        );
+                    }
+
+                    // AdminからCreatorへ転送
+                    transferTx.add(
+                        createTransferInstruction(
+                            serverATA,
+                            creatorATA,
+                            serverWallet.publicKey,
+                            creatorShare
+                        )
+                    );
+
+                    const transferSig = await sendAndConfirmTransaction(connection, transferTx, [serverWallet]);
+                    txSignatures.creatorTransfer = transferSig;
+                    console.log(`[Deploy] Transferred ${depositAmountSOL * RATE} ${ticker} to Creator (sig: ${transferSig})`);
+                }
+            }
+
+            // ▼▼▼ 4. メタデータ登録 (Metaplex v2 raw instruction) ▼▼▼
+            try {
+                console.log(`[Deploy] Registering Metadata for ${ticker}...`);
+
+                const API_BASE = 'https://axis-api.yusukekikuta-05.workers.dev';
+                const metadataUri = `${API_BASE}/metadata/${ticker}?name=${encodeURIComponent(name)}`;
+
+                const [metadataPDA] = PublicKey.findProgramAddressSync(
+                    [
+                        new TextEncoder().encode('metadata'),
+                        METADATA_PROGRAM_ID.toBuffer(),
+                        mintKeypair.publicKey.toBuffer(),
+                    ],
+                    METADATA_PROGRAM_ID
+                );
+
+                const metadataIx = createCreateMetadataAccountV3Instruction(
+                    {
+                        metadata: metadataPDA,
+                        mint: mintKeypair.publicKey,
+                        mintAuthority: serverWallet.publicKey,
+                        payer: serverWallet.publicKey,
+                        updateAuthority: serverWallet.publicKey,
+                    },
+                    {
+                        createMetadataAccountArgsV3: {
+                            data: {
+                                name: name,
+                                symbol: ticker,
+                                uri: metadataUri,
+                                sellerFeeBasisPoints: 0,
+                                creators: null,
+                                collection: null,
+                                uses: null,
+                            },
+                            isMutable: true,
+                            collectionDetails: null,
+                        },
+                    }
+                );
+
+                const metaTx = new Transaction().add(metadataIx);
+                const metaSig = await sendAndConfirmTransaction(connection, metaTx, [serverWallet]);
+                console.log(`[Deploy] Metadata Registered: ${metadataUri} (sig: ${metaSig})`);
+            } catch (metaError) {
+                console.error("[Deploy] Metadata registration failed:", metaError);
+                // メタデータ失敗でもトークン機能自体は継続
+            }
+            // ▲▲▲ メタデータ登録終了 ▲▲▲
+
+        } catch (e) {
+            console.error("[Deploy] Token creation failed:", e);
+        }
+    }
+
+    // -------------------------------------------------------
+    // 3. DBへの保存
+    // -------------------------------------------------------
+    if (!mintAddress) {
+        return c.json({ success: false, error: 'Token creation failed — mintAddress is null', txSignatures }, 500);
+    }
+
+    await c.env.axis_db.prepare(`
         INSERT INTO strategies (
-          id, owner_pubkey, name, ticker, type, composition, config, description,
-          jito_bundle_id, status, created_at, tvl, total_deposited, roi
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, 0)
-      `).bind(
+          id, owner_pubkey, name, ticker, description, type, 
+          composition, config, status, created_at, 
+          tvl, total_deposited, roi, 
+          mint_address, vault_address
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, 0, ?, ?)
+    `).bind(
         id,
-        owner,
+        ownerPubkey,
         name,
-        ticker,
-        strategyType,
+        ticker, 
+        description || '',
+        type || 'MANUAL',
         JSON.stringify(tokens),
-        JSON.stringify(config),
-        description,
-        bundleId || 'simulated',
+        JSON.stringify(config || {}),
         now,
-        depositAmount,
-        depositAmount
-      ).run();
+        depositAmountSOL,
+        depositAmountSOL,
+        mintAddress, // ★Mintアドレス保存
+        serverPubkeyStr // 入金先(Vault)
+    ).run();
 
-      await addXP(c.env.axis_db, owner, 500, 'STRATEGY_DEPLOY', 'Deployed on-chain strategy');
-      
-      console.log(`[Deploy] Created new strategy ${id} with TVL ${depositAmount}`);
-      
-      return c.json({ 
-        success: true, 
-        bundleId, 
+    await addXP(c.env.axis_db, ownerPubkey, 500, 'STRATEGY_DEPLOY', 'Deployed on-chain strategy');
+
+    return c.json({
+        success: true,
         strategyId: id,
-        tvl: depositAmount
-      });
-    }
+        mintAddress,
+        ticker,
+        txSignatures,
+        message: `Deployed ${name} ($${ticker})`
+    });
 
-    return c.json({ success: true, bundleId });
   } catch (error: any) {
     console.error('[Deploy] Error:', error);
     return c.json({ success: false, error: error.message }, 500);
@@ -294,10 +433,11 @@ app.get('/strategies/:pubkey', async (c) => {
       tokens: s.composition ? JSON.parse(s.composition) : (s.config ? JSON.parse(s.config) : []),
       config: s.config ? JSON.parse(s.config) : {},
       description: s.description || '',
-      // ★修正: tvl と total_deposited の両方を返す
       tvl: s.tvl || s.total_deposited || 0,
       totalDeposited: s.total_deposited || 0,
       status: s.status,
+      mintAddress: s.mint_address,
+      vaultAddress: s.vault_address,
       createdAt: s.created_at,
     }));
     
@@ -330,6 +470,8 @@ app.get('/discover', async (c) => {
       tokens: s.composition ? JSON.parse(s.composition) : (s.config ? JSON.parse(s.config) : []),
       config: s.config ? JSON.parse(s.config) : {},
       tvl: s.tvl || s.total_deposited || 0,
+      mintAddress: s.mint_address,
+      vaultAddress: s.vault_address,
       createdAt: s.created_at,
     }));
     
@@ -339,6 +481,8 @@ app.get('/discover', async (c) => {
   }
 });
 
+// ... (Charts, XP helper等は変更なし) ...
+
 // -----------------------------------------------------------
 // 📊 Charts & Helpers
 // -----------------------------------------------------------
@@ -347,7 +491,6 @@ app.get('/strategies/:id/chart', async (c) => {
   const type = c.req.query('type') === 'candle' ? 'candle' : 'line';
   const period = c.req.query('period') || '7d';
   
-  // 簡易モックチャート (本来はDBのsnapshotから取得)
   const data = [];
   const now = Math.floor(Date.now() / 1000);
   let val = 100;

@@ -17,7 +17,7 @@ interface StrategyDetailViewProps {
   initialData: Strategy;
   onBack: () => void;
 }
-type TransactionStatus = 'IDLE' | 'SIGNING' | 'CONFIRMING' | 'MINTING' | 'SUCCESS' | 'ERROR';
+type TransactionStatus = 'IDLE' | 'SIGNING' | 'CONFIRMING' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
 
 // --- Icons ---
 const XIcon = ({ className }: { className?: string }) => (
@@ -215,7 +215,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
               <div className="flex justify-between items-center mb-6">
                  <button 
                    onClick={onClose} 
-                   disabled={status === 'SIGNING' || status === 'CONFIRMING' || status === 'MINTING'}
+                   disabled={status === 'SIGNING' || status === 'CONFIRMING' || status === 'PROCESSING'}
                    className="p-2 -ml-2 rounded-full text-[#78716C] hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30"
                  >
                    <X className="w-6 h-6" />
@@ -226,71 +226,115 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                  <div className="w-8" />
               </div>
 
-              {/* Main Display: Pay & Receive */}
+              {/* Main Display: Pay & Receive / Step Indicator */}
               <div className="flex-1 flex flex-col justify-center items-center mb-8 relative">
-                 
-                 {/* Pay Section */}
-                 <div className="flex flex-col items-center z-10">
-                   <div className="flex items-baseline justify-center gap-2 mb-1">
-                     <span className={`font-serif font-bold text-white tracking-tighter transition-all duration-200 ${amount === '0' ? 'text-white/30' : 'text-white'} text-6xl`}>
-                       {amount}
-                     </span>
-                     <span className="text-xl font-bold text-[#D97706]">SOL</span>
+                 {status !== 'IDLE' && status !== 'ERROR' ? (
+                   /* Step Indicator during transaction */
+                   <div className="flex flex-col items-center gap-6 py-4">
+                     <div className="flex items-center gap-3">
+                       {(['SIGNING', 'CONFIRMING', 'PROCESSING', 'SUCCESS'] as const).map((step, i) => {
+                         const steps = ['SIGNING', 'CONFIRMING', 'PROCESSING', 'SUCCESS'];
+                         const currentIdx = steps.indexOf(status);
+                         const isActive = i <= currentIdx;
+                         const isCurrent = i === currentIdx;
+                         return (
+                           <div key={step} className="flex items-center gap-3">
+                             <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                               isActive
+                                 ? step === 'SUCCESS' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-[#D97706] shadow-[0_0_8px_rgba(217,119,6,0.6)]'
+                                 : 'bg-white/10'
+                             } ${isCurrent && status !== 'SUCCESS' ? 'animate-pulse' : ''}`} />
+                             {i < 3 && <div className={`w-8 h-0.5 transition-all duration-300 ${i < currentIdx ? 'bg-[#D97706]' : 'bg-white/10'}`} />}
+                           </div>
+                         );
+                       })}
+                     </div>
+                     <div className="text-center">
+                       <p className="text-sm font-bold text-white mb-1">
+                         {status === 'SIGNING' && 'Waiting for wallet signature...'}
+                         {status === 'CONFIRMING' && 'Confirming on Solana...'}
+                         {status === 'PROCESSING' && 'Processing token transfer...'}
+                         {status === 'SUCCESS' && 'Complete!'}
+                       </p>
+                       <p className="text-xs text-[#78716C]">
+                         {status === 'SIGNING' && 'Approve the transaction in your wallet'}
+                         {status === 'CONFIRMING' && 'This may take a few seconds'}
+                         {status === 'PROCESSING' && 'Webhook is distributing your tokens'}
+                         {status === 'SUCCESS' && `You received ${estimatedOutput} ${strategy.ticker || 'ETF'}`}
+                       </p>
+                     </div>
+                     {status === 'SUCCESS' && (
+                       <div className="text-4xl">
+                         <Check className="w-12 h-12 text-emerald-400" />
+                       </div>
+                     )}
                    </div>
-                   <div className="flex items-center gap-2 text-xs text-[#78716C] font-mono bg-white/5 py-1.5 px-3 rounded-full border border-white/5">
-                      <Wallet className="w-3 h-3" />
-                      <span>{balance.toFixed(4)} Available</span>
-                      <button 
-                        onClick={() => setAmount((balance * 0.95).toFixed(4))}
-                        className="text-[#D97706] font-bold hover:text-[#fbbf24] transition-colors"
-                        disabled={status !== 'IDLE' && status !== 'ERROR'}
-                      >
-                        MAX
-                      </button>
-                   </div>
-                 </div>
+                 ) : (
+                   /* Normal input display */
+                   <>
+                     <div className="flex flex-col items-center z-10">
+                       <div className="flex items-baseline justify-center gap-2 mb-1">
+                         <span className={`font-serif font-bold text-white tracking-tighter transition-all duration-200 ${amount === '0' ? 'text-white/30' : 'text-white'} text-6xl`}>
+                           {amount}
+                         </span>
+                         <span className="text-xl font-bold text-[#D97706]">SOL</span>
+                       </div>
+                       <div className="flex items-center gap-2 text-xs text-[#78716C] font-mono bg-white/5 py-1.5 px-3 rounded-full border border-white/5">
+                          <Wallet className="w-3 h-3" />
+                          <span>{balance.toFixed(4)} Available</span>
+                          <button
+                            onClick={() => setAmount((balance * 0.95).toFixed(4))}
+                            className="text-[#D97706] font-bold hover:text-[#fbbf24] transition-colors"
+                            disabled={status !== 'IDLE' && status !== 'ERROR'}
+                          >
+                            MAX
+                          </button>
+                       </div>
+                     </div>
 
-                 {/* Arrow Divider */}
-                 <div className="my-6 text-white/20 animate-bounce">
-                    <ArrowDown className="w-6 h-6" />
-                 </div>
+                     <div className="my-6 text-white/20 animate-bounce">
+                        <ArrowDown className="w-6 h-6" />
+                     </div>
 
-                 {/* Receive Section */}
-                 <div className="flex flex-col items-center">
-                    <div className="text-sm font-bold text-[#78716C] uppercase mb-1">You Receive (Est.)</div>
-                    <div className="flex items-center gap-2 text-3xl font-bold text-white">
-                       <span>{estimatedOutput}</span>
-                       <span className="text-emerald-400">{strategy.ticker || 'TOKEN'}</span>
-                    </div>
-                 </div>
+                     <div className="flex flex-col items-center">
+                        <div className="text-sm font-bold text-[#78716C] uppercase mb-1">You Receive (Est.)</div>
+                        <div className="flex items-center gap-2 text-3xl font-bold text-white">
+                           <span>{estimatedOutput}</span>
+                           <span className="text-emerald-400">{strategy.ticker || 'TOKEN'}</span>
+                        </div>
+                     </div>
+                   </>
+                 )}
               </div>
 
-              {/* Numpad */}
-              <div className="grid grid-cols-3 gap-3 mb-8 max-w-[280px] mx-auto w-full">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0].map((key) => (
+              {/* Numpad (hidden during transaction) */}
+              {(status === 'IDLE' || status === 'ERROR') && (
+                <div className="grid grid-cols-3 gap-3 mb-8 max-w-[280px] mx-auto w-full">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0].map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => handleNum(key.toString())}
+                      className="h-14 text-2xl font-medium text-white/90 hover:bg-white/5 active:bg-white/10 rounded-2xl transition-all flex items-center justify-center disabled:opacity-30"
+                      disabled={status !== 'IDLE' && status !== 'ERROR'}
+                    >
+                      {key}
+                    </button>
+                  ))}
                   <button
-                    key={key}
-                    onClick={() => handleNum(key.toString())}
-                    className="h-14 text-2xl font-medium text-white/90 hover:bg-white/5 active:bg-white/10 rounded-2xl transition-all flex items-center justify-center disabled:opacity-30"
+                    onClick={handleBackspace}
+                    className="h-14 text-[#78716C] hover:text-white hover:bg-white/5 active:bg-white/10 rounded-2xl transition-all flex items-center justify-center disabled:opacity-30"
                     disabled={status !== 'IDLE' && status !== 'ERROR'}
                   >
-                    {key}
+                    <ArrowLeft className="w-6 h-6" />
                   </button>
-                ))}
-                <button
-                  onClick={handleBackspace}
-                  className="h-14 text-[#78716C] hover:text-white hover:bg-white/5 active:bg-white/10 rounded-2xl transition-all flex items-center justify-center disabled:opacity-30"
-                  disabled={status !== 'IDLE' && status !== 'ERROR'}
-                >
-                  <ArrowLeft className="w-6 h-6" />
-                </button>
-              </div>
+                </div>
+              )}
 
               {/* Slider */}
               <div className="max-w-[320px] mx-auto w-full">
-                 <SwipeToConfirm 
-                   onConfirm={handleExecute} 
-                   isLoading={status === 'SIGNING' || status === 'CONFIRMING' || status === 'MINTING'} 
+                 <SwipeToConfirm
+                   onConfirm={handleExecute}
+                   isLoading={status === 'SIGNING' || status === 'CONFIRMING' || status === 'PROCESSING'}
                    isSuccess={status === 'SUCCESS'}
                    label={`BUY ${strategy.ticker || 'ETF'}`}
                  />
@@ -418,10 +462,10 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       if (isNaN(parsedAmount) || parsedAmount <= 0) throw new Error("Invalid amount");
 
       const strategyAny = strategy as any;
-      const targetAddressStr = strategy.address || strategy.config?.strategyPubkey || strategy.ownerPubkey || strategyAny.ownerPubkey || strategyAny.creator || strategy.owner || null;
+      const targetAddressStr = strategyAny.vaultAddress || strategy.address || strategy.config?.strategyPubkey || strategy.ownerPubkey || strategyAny.ownerPubkey || strategyAny.creator || strategy.owner || null;
 
       if (!targetAddressStr) {
-          showToast("Address not found", "error");
+          showToast("Vault address not found", "error");
           setInvestStatus('ERROR');
           setTimeout(() => setInvestStatus('IDLE'), 2000);
           return;
@@ -455,23 +499,22 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       // ----------------------------------------------------
       // ★ Modified Toast Logic for "Minted" feeling
       // ----------------------------------------------------
-      setInvestStatus('MINTING');
-      showToast(`Payment Successful! Minting ${strategy.ticker || 'ETF'}...`, "info");
+      setInvestStatus('PROCESSING');
+      showToast(`Payment confirmed! Processing token transfer...`, "info");
 
-      // Mock delay for Minting (Backend Webhook processing)
       setTimeout(() => {
         setInvestStatus('SUCCESS');
-        const estimatedReceived = (parsedAmount * 100).toFixed(2); // Mock: 1 SOL = 100 ETF
-        showToast(`Mint Complete! You received ${estimatedReceived} ${strategy.ticker || 'ETF'}`, "success");
+        const estimatedReceived = (parsedAmount * 100).toFixed(2);
+        showToast(`Complete! You received ${estimatedReceived} ${strategy.ticker || 'ETF'}`, "success");
 
         setTimeout(() => {
           setIsInvestOpen(false);
           setTimeout(() => setInvestStatus('IDLE'), 500);
-        }, 2000); // Wait a bit to show success state
+        }, 2000);
 
         void api.syncUserStats(wallet.publicKey!.toBase58(), 0, parsedAmount, strategy.id).catch(console.error);
 
-      }, 3000);
+      }, 1500);
 
     } catch (e: any) {
       console.error(e);

@@ -303,21 +303,36 @@ export const api = {
     return res.json();
   },
 
-  async deploy(txSignature: string, strategyData: any) {
+  /**
+   * サーバーへのデプロイリクエスト (Mint発行依頼)
+   * @param signature SOL送金のトランザクション署名
+   * @param metadata Strategyのメタデータ (name, ticker, tokens, tvl...)
+   */
+  async deploy(signature: string, metadata: any) {
     try {
+      console.log("[API] Deploying strategy...", { signature, metadata });
+
       const response = await fetch(`${API_BASE}/deploy`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signature: txSignature, ...strategyData }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          signature, // バックエンドはこれを 'signedTransaction' or 'signature' として受け取る
+          metadata,  // 作成するETFの中身
+        }),
       });
 
-      const responseText = await response.text();
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error(`Server Error: ${response.status} - ${responseText}`);
+        throw new Error(data.error || `Deployment failed: ${response.status}`);
       }
-      return JSON.parse(responseText);
+
+      console.log("[API] Deploy Success:", data);
+      return data;
     } catch (error) {
-      console.error("API Deploy Error:", error);
+      console.error('[API] Deploy Error:', error);
       throw error;
     }
   },

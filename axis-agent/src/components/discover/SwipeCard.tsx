@@ -25,6 +25,8 @@ interface StrategyCardData {
   description?: string;
   createdAt: number;
   rebalanceType?: string;
+  mintAddress?: string;
+  vaultAddress?: string;
 }
 
 interface SwipeCardProps {
@@ -335,14 +337,14 @@ export const SwipeCard = ({
 
         {/* --- Footer --- */}
         <div className="p-3 border-t border-white/5 bg-[#0C0A09] flex justify-center">
-           <a 
-              href={`https://explorer.solana.com/address/${strategy.id}?cluster=devnet`}
-              target="_blank" 
+           <a
+              href={`https://solscan.io/token/${strategy.mintAddress || strategy.id}?cluster=devnet`}
+              target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()} 
+              onClick={(e) => e.stopPropagation()}
               className="text-[10px] text-white/20 font-mono hover:text-white/50 flex items-center gap-1 transition-colors"
            >
-              Contract: {strategy.id.slice(0, 8)}... <ExternalLink className="w-2.5 h-2.5" />
+              Address: {(strategy.mintAddress || strategy.id).slice(0, 8)}... <ExternalLink className="w-2.5 h-2.5" />
            </a>
         </div>
 

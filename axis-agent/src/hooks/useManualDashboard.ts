@@ -167,22 +167,27 @@ export const useManualDashboard = ({
   }, []);
 
   const handleDeploy = useCallback(() => {
+    console.log("🟡 [Hook] handleDeploy called", { config, connected, publicKey: publicKey?.toBase58(), portfolioLength: portfolio.length });
     triggerHaptic();
     if (!config.name || !config.ticker) {
+      console.warn("🟡 [Hook] Missing name or ticker, aborting");
       toast.error("Required Fields", { description: "Please enter a Name and Ticker." });
       return;
     }
     if (!connected || !publicKey) {
+      console.warn("🟡 [Hook] Wallet not connected, opening modal");
       setVisible(true);
       return;
     }
+    const mappedTokens = portfolio.map(p => ({
+      symbol: p.token.symbol,
+      weight: p.weight,
+      mint: p.token.address,
+      logoURI: p.token.logoURI,
+    }));
+    console.log("🟡 [Hook] Calling onDeploySuccess with", { tokens: mappedTokens, config });
     onDeploySuccess({
-      tokens: portfolio.map(p => ({
-        symbol: p.token.symbol,
-        weight: p.weight,
-        mint: p.token.address,
-        logoURI: p.token.logoURI,
-      })),
+      tokens: mappedTokens,
       config,
     });
   }, [config, connected, publicKey, setVisible, onDeploySuccess, portfolio]);
