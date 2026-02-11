@@ -170,29 +170,70 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const handleFaucet = async () => {
     if (!publicKey) return;
     setFaucetLoading(true);
-    try {
-      // 1 SOL (Devnet) をリクエスト
-      const airdropSignature = await connection.requestAirdrop(
-        publicKey,
-        1 * LAMPORTS_PER_SOL
-      );
+    const walletAddress = publicKey.toBase58();
 
-      // トランザクションの確認待ち
-      const latestBlockHash = await connection.getLatestBlockhash();
-      await connection.confirmTransaction({
-        blockhash: latestBlockHash.blockhash,
-        lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
-        signature: airdropSignature,
-      });
-      
-      showToast("💰 1 SOL Airdropped successfully!", "success");
+    // 複数のdevnet RPCエンドポイントを試す（各RPCに個別のレート制限がある）
+    const DEVNET_RPCS = [
+      "https://api.devnet.solana.com",
+      "https://devnet.helius-rpc.com/?api-key=15319bf4-5b40-4958-ac8d-6313aa55eb92",
+    ];
+
+    try {
+      // 1. バックエンドのfaucet APIを試す（サーバーサイドなのでCORS問題なし）
+      try {
+        const result = await api.requestFaucet(walletAddress);
+        if (result.success || result.tx_signature) {
+          showToast("1 SOL Airdropped successfully!", "success");
+          return;
+        }
+      } catch (e) {
+        console.warn("Backend faucet failed, trying RPC airdrops...", e);
+      }
+
+      // 2. 複数のRPCエンドポイントで順番にairdropを試す
+      let lastError: any = null;
+      for (const rpc of DEVNET_RPCS) {
+        try {
+          const res = await fetch(rpc, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: "requestAirdrop",
+              params: [walletAddress, 1 * LAMPORTS_PER_SOL],
+            }),
+          });
+          const data = await res.json();
+          if (data.result) {
+            // トランザクションの確認待ち
+            const latestBlockHash = await connection.getLatestBlockhash();
+            await connection.confirmTransaction({
+              blockhash: latestBlockHash.blockhash,
+              lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+              signature: data.result,
+            });
+            showToast("1 SOL Airdropped successfully!", "success");
+            return;
+          }
+          lastError = data.error;
+        } catch (e) {
+          lastError = e;
+          console.warn(`Airdrop via ${rpc} failed, trying next...`, e);
+        }
+      }
+
+      // すべて失敗した場合
+      throw lastError || new Error("All airdrop methods failed");
     } catch (e: any) {
-      console.error("Faucet Error:", e);
-      // レート制限(429)などのエラーハンドリング
-      if (e.message?.includes("429")) {
-        showToast("Rate limit reached. Please try again later.", "error");
+      console.error("All faucet methods failed:", e);
+      const msg = e?.message || e?.toString() || "";
+      if (msg.includes("429") || msg.includes("Too many requests") || msg.includes("rate")) {
+        showToast("Rate limit reached. Please wait a few minutes and try again.", "error");
       } else {
-        showToast("Airdrop failed. Devnet may be congested.", "error");
+        // 最終手段: Solana Faucet サイトを案内
+        showToast("Airdrop failed. Opening Solana Faucet...", "error");
+        window.open(`https://faucet.solana.com/?wallet=${walletAddress}`, "_blank");
       }
     } finally {
       setFaucetLoading(false);
