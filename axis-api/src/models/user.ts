@@ -43,14 +43,14 @@ export async function findUserByWallet(db: D1Database, wallet: string): Promise<
 // --- Create Functions ---
 
 export async function createRegisteredUser(
-    db: D1Database, 
-    id: string, 
-    email: string, 
-    wallet: string, 
-    inviteCode: string, 
-    inviteCodeUsed: string, 
-    avatarUrl?: string, 
-    name?: string, 
+    db: D1Database,
+    id: string,
+    email: string | null,
+    wallet: string,
+    inviteCode: string,
+    inviteCodeUsed: string | null,
+    avatarUrl?: string,
+    name?: string,
     bio?: string
 ): Promise<void> {
     await db.prepare(

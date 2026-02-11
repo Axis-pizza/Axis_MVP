@@ -156,27 +156,35 @@ app.get('/user', async (c) => {
       console.error('⚠️ [WARNING] whitelist_db binding is MISSING. VIP check skipped.');
     }
 
-    const userData = user || {
-      name: 'Anonymous',
-      bio: '',
-      avatar_url: '',
-      total_xp: 0,          
-      rank_tier: 'Novice',  
-      pnl_percent: 0,       
-      total_invested_usd: 0
-    };
+    if (!user) {
+      return c.json({
+        success: true,
+        is_registered: false,
+        user: {
+          username: '',
+          bio: '',
+          pfpUrl: '',
+          total_xp: 0,
+          rank_tier: 'Novice',
+          pnl_percent: 0,
+          total_invested: 0,
+          is_vip: false
+        }
+      });
+    }
 
     return c.json({
       success: true,
+      is_registered: true,
       user: {
-        username: userData.name,
-        bio: userData.bio,
-        pfpUrl: userData.avatar_url,
-        total_xp: userData.total_xp,
-        rank_tier: userData.rank_tier,
-        pnl_percent: userData.pnl_percent,
-        total_invested: userData.total_invested_usd,
-        is_vip: isVip // VIP判定結果
+        username: user.name,
+        bio: user.bio,
+        pfpUrl: user.avatar_url,
+        total_xp: user.total_xp,
+        rank_tier: user.rank_tier,
+        pnl_percent: user.pnl_percent,
+        total_invested: user.total_invested_usd,
+        is_vip: isVip
       }
     });
 
@@ -300,10 +308,10 @@ app.post('/user', async (c) => {
       await UserModel.createRegisteredUser(
         c.env.axis_db,
         id,
-        '',
+        null,
         wallet_address,
         inviteCode,
-        '',
+        null,
         avatar_url,
         name,
         bio
