@@ -26,7 +26,7 @@ export const api = {
       const userData = data.user || data;
 
       if (!userData || Object.keys(userData).length === 0) {
-        return { success: false, user: null };
+        return { success: false, user: null, is_registered: false };
       }
 
       const user = {
@@ -38,7 +38,7 @@ export const api = {
         rank_tier: userData.rank_tier || 'Novice'
       };
 
-      return { success: true, user };
+      return { success: true, user, is_registered: data.is_registered ?? true };
     } catch (e) {
       console.error("Fetch User Error:", e);
       return { success: false, user: null };

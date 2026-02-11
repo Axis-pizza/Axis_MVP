@@ -102,7 +102,9 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     try {
       const res = await api.getUser(publicKey.toBase58());
       if (res.success || res.user) {
-        setUserData(res.user || res);
+        const user = res.user || res;
+        user.is_registered = res.is_registered ?? true;
+        setUserData(user);
       }
     } catch (e) {
       console.error("Failed to fetch user", e);
@@ -374,12 +376,12 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       </AnimatePresence>
 
       {publicKey && (
-        <ProfileEditModal 
-          isOpen={isEditOpen} 
+        <ProfileEditModal
+          isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
           currentProfile={{
             pubkey: publicKey.toBase58(),
-            username: userData?.username,
+            username: userData?.is_registered ? userData?.username : undefined,
             bio: userData?.bio,
             avatar_url: userData?.avatar_url,
           }}
