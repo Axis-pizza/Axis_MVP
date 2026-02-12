@@ -199,7 +199,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   }
 
   return (
-    <div className="max-w-md mx-auto h-full flex flex-col pt-4 px-4 pb-32 safe-area-top relative">
+    <div className="max-w-md mx-auto h-full flex flex-col pt-4 md:pt-28 px-4 pb-32 safe-area-top relative">
       {/* Net Worth Card */}
       <div className="mb-8 relative group perspective-1000">
         <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#0C0A09] shadow-2xl" style={{ aspectRatio: '1.58/1' }}>
@@ -246,7 +246,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white/10 mb-6 sticky top-0 bg-[#0C0A09] z-20 pt-2">
+      <div className="flex border-b border-white/10 mb-6 sticky top-0 md:top-20 bg-[#0C0A09] z-20 pt-2">
          {['portfolio', 'leaderboard'].map(t => (
              <button
                 key={t}
