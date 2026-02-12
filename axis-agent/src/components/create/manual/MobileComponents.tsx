@@ -177,18 +177,40 @@ export const MobileTokenListItem = ({
     </div>
 
     <div className="flex-1 min-w-0 text-left">
-      <div className="flex items-center gap-2">
-        <span className={`font-semibold text-base ${isSelected ? 'text-amber-500' : 'text-white'}`}>
-          {token.symbol}
-        </span>
-        {token.tags?.includes('meme') && <Sparkles size={12} className="text-pink-400" />}
-        {token.tags?.includes('stable') && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">Stable</span>
-        )}
-      </div>
-      <div className={`text-sm truncate mt-0.5 ${isSelected ? 'text-amber-600/60' : 'text-white/40'}`}>
-        {token.name}
-      </div>
+      {token.source === 'dflow' && token.predictionMeta ? (
+        <>
+          <div className="flex items-center gap-2">
+            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+              token.predictionMeta.side === 'YES'
+                ? 'bg-emerald-500/20 text-emerald-400'
+                : 'bg-red-500/20 text-red-400'
+            }`}>
+              {token.predictionMeta.side}
+            </span>
+            <span className={`text-xs ${isSelected ? 'text-amber-600/50' : 'text-white/40'}`}>
+              {token.predictionMeta.eventId}
+            </span>
+          </div>
+          <div className={`text-sm font-medium truncate mt-0.5 ${isSelected ? 'text-amber-500' : 'text-white/80'}`}>
+            {token.predictionMeta.marketQuestion}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center gap-2">
+            <span className={`font-semibold text-base ${isSelected ? 'text-amber-500' : 'text-white'}`}>
+              {token.symbol}
+            </span>
+            {token.tags?.includes('meme') && <Sparkles size={12} className="text-pink-400" />}
+            {token.tags?.includes('stable') && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">Stable</span>
+            )}
+          </div>
+          <div className={`text-sm truncate mt-0.5 ${isSelected ? 'text-amber-600/60' : 'text-white/40'}`}>
+            {token.name}
+          </div>
+        </>
+      )}
     </div>
 
     <div className="flex flex-col items-end gap-1">

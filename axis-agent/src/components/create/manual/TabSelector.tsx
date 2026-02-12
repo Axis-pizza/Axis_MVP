@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Search, Flame, Sparkles, Wallet } from 'lucide-react';
+import { Search, Flame, Sparkles, Wallet, BarChart3 } from 'lucide-react';
 import type { TabType } from './types';
 
 interface TabSelectorProps {
@@ -8,14 +8,15 @@ interface TabSelectorProps {
   isWalletConnected: boolean;
 }
 
-export const TabSelector = ({ 
-  activeTab, 
-  setActiveTab, 
-  isWalletConnected 
+export const TabSelector = ({
+  activeTab,
+  setActiveTab,
+  isWalletConnected
 }: TabSelectorProps) => {
   const tabs = [
     { id: 'trending', label: 'Trending', icon: Flame },
     { id: 'meme', label: 'Meme', icon: Sparkles },
+    { id: 'prediction', label: 'Prediction', icon: BarChart3 },
     { id: 'all', label: 'All tokens', icon: Search },
   ] as const;
 

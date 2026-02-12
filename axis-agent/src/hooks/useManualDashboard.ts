@@ -20,7 +20,7 @@ export const useManualDashboard = ({
   const [step, setStep] = useState<'builder' | 'identity'>('builder');
   
   // Tabs State
-  const [activeTab, setActiveTab] = useState<'all' | 'your_tokens' | 'trending' | 'meme'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'your_tokens' | 'trending' | 'meme' | 'prediction'>('all');
   
   const [allTokens, setAllTokens] = useState<JupiterToken[]>([]);
   // NOTE: displayTokens state definition removed to fix duplicate declaration error.
@@ -77,6 +77,8 @@ export const useManualDashboard = ({
         if (trendingIds.size > 0) {
             baseList = [...baseList].sort((a, b) => (trendingIds.has(b.address) ? 1 : 0) - (trendingIds.has(a.address) ? 1 : 0));
         }
+    } else if (activeTab === 'prediction') {
+        baseList = allTokens.filter(t => t.source === 'dflow');
     } else if (activeTab === 'trending') {
         if (trendingIds.size > 0) {
             const trending = allTokens.filter(t => trendingIds.has(t.address));
