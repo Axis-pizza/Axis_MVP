@@ -2,7 +2,7 @@ import "./global.css"; // ★必須
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, Text } from 'react-native';
-import { ToastProvider } from './context/ToastContext';
+import { ToastProvider } from './src/components/common/context/ToastContext';
 
 const HomeScreen = () => (
   <View className="flex-1 justify-center items-center bg-[#0a0a0a]">
