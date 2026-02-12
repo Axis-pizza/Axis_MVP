@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx wrangler deploy:*)"
+      "Bash(npx wrangler deploy:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build)",
+      "Bash(curl:*)",
+      "Bash(python3:*)"
     ]
   }
 }

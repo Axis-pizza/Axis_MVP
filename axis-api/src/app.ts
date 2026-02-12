@@ -14,6 +14,7 @@ import shareRoutes from './routes/share';
 // @ts-ignore
 import { EmailMessage } from "cloudflare:email";
 import { createMimeMessage } from "mimetext";
+import dflowRoutes from './routes/dflow';
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -60,6 +61,7 @@ app.route('/', miscRoutes);
 app.route('/', kagemushaRoutes);
 app.route('/upload', uploadRoutes);
 app.route('/share', shareRoutes);
+app.route('/api/dflow', dflowRoutes);
 
 app.post('/report', async (c) => {
   try {

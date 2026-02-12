@@ -28,6 +28,9 @@ export interface JupiterToken {
 const UTL_API_URL = "https://token-list-api.solana.cloud/v1/list";
 const DEX_TOKENS_API = "https://api.dexscreener.com/latest/dex/tokens";
 const DEX_SEARCH_API = "https://api.dexscreener.com/latest/dex/search";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const DFLOW_PROXY_API = `${API_BASE}/api/dflow/markets`;
+
 
 // 緊急用フォールバック
 const CRITICAL_FALLBACK: JupiterToken[] = [

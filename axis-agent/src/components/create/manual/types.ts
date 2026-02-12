@@ -31,7 +31,7 @@ export interface ManualDashboardProps {
 }
 
 // Tab型
-export type TabType = 'all' | 'your_tokens' | 'trending' | 'meme';
+export type TabType = 'all' | 'your_tokens' | 'trending' | 'meme' | 'prediction';
 
 // フックの型 (Mobile/Desktop Builderで使用)
 import type { ManualDashboardHook } from '../../../hooks/useManualDashboard';

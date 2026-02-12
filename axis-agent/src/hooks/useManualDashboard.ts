@@ -77,6 +77,8 @@ export const useManualDashboard = ({
         if (trendingIds.size > 0) {
             baseList = [...baseList].sort((a, b) => (trendingIds.has(b.address) ? 1 : 0) - (trendingIds.has(a.address) ? 1 : 0));
         }
+    } else if (activeTab === 'prediction') {
+        baseList = allTokens.filter(t => t.source === 'dflow');
     } else if (activeTab === 'trending') {
         if (trendingIds.size > 0) {
             const trending = allTokens.filter(t => trendingIds.has(t.address));
