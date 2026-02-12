@@ -40,8 +40,7 @@ export const StrategyChart = ({ strategyId, refreshTrigger }: StrategyChartProps
         } else {
           setError(true);
         }
-      } catch (e) {
-        console.error("Chart fetch error", e);
+      } catch {
         setError(true);
       } finally {
         setLoading(false);

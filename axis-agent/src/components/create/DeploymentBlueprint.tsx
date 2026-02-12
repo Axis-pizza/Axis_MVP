@@ -39,7 +39,6 @@ export const DeploymentBlueprint = ({
   onDeploySuccess 
 }: DeploymentBlueprintProps) => {
   if (!tokens) {
-      console.error("🔴 [Blueprint] Critical: Tokens is undefined!");
   }
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -123,7 +122,6 @@ export const DeploymentBlueprint = ({
         }
 
     } catch (e: any) {
-        console.error("Deploy Error:", e);
         showToast(`Failed: ${e.message}`, "error");
         setIsDeploying(false);
     }

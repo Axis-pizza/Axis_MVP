@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { AnimatePresence, motion, useMotionValue, useTransform as useMotionTransform } from 'framer-motion';
 import { RefreshCw, Loader2, Sparkles, Rocket, X, Wallet, ArrowDown, ArrowLeft, ChevronRight, Check, ShoppingCart } from 'lucide-react';
 import { SwipeCard } from './SwipeCard';
@@ -31,8 +31,8 @@ interface SwipeDiscoverViewProps {
 /**
  * ★追加: リアルなカード型のスケルトンローダー
  */
-const SwipeCardSkeleton = ({ index }: { index: number }) => (
-  <div 
+const SwipeCardSkeleton = memo(({ index }: { index: number }) => (
+  <div
     className="absolute inset-0 w-full h-full bg-[#121212] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col p-5 select-none pointer-events-none"
     style={{
       // スタック表示のシミュレーション
@@ -86,7 +86,7 @@ const SwipeCardSkeleton = ({ index }: { index: number }) => (
        ))}
     </div>
   </div>
-);
+));
 
 /**
  * CosmicLaunchEffect
@@ -159,7 +159,7 @@ const CosmicLaunchEffect = () => {
 };
 
 // --- SwipeToConfirm (Reused from StrategyDetailView) ---
-const SwipeToConfirm = ({
+const SwipeToConfirm = memo(({
   onConfirm,
   isLoading,
   isSuccess,
@@ -257,7 +257,7 @@ const SwipeToConfirm = ({
       </motion.div>
     </div>
   );
-};
+});
 
 // --- InvestSheet (Reused from StrategyDetailView) ---
 interface InvestSheetProps {
@@ -285,8 +285,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
       try {
         const bal = await connection.getBalance(publicKey);
         setBalance(bal / LAMPORTS_PER_SOL);
-      } catch (e) {
-        console.error("Failed to fetch balance", e);
+      } catch {
       }
     };
     fetchBalance();
@@ -730,8 +729,7 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
           setTickerMap(newTickerMap);
         }
 
-      } catch (e) {
-        console.error("Load Error:", e);
+      } catch {
       } finally {
         setLoading(false);
       }
@@ -883,11 +881,10 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
           }, 500);
         }, 2000);
 
-        void api.syncUserStats(wallet.publicKey!.toBase58(), 0, parsedAmount, investTarget.id).catch(console.error);
+        void api.syncUserStats(wallet.publicKey!.toBase58(), 0, parsedAmount, investTarget.id).catch(() => {});
       }, 1500);
 
     } catch (e: any) {
-      console.error(e);
       showToast(e.message || "Transaction Failed", "error");
       setInvestStatus('ERROR');
       setTimeout(() => setInvestStatus('IDLE'), 2000);

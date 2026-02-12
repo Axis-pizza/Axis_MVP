@@ -83,7 +83,6 @@ export const RebalanceFlow = ({
       setStatus('SUCCESS');
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Rebalance failed';
-      console.error('Rebalance error:', e);
       setErrorMessage(errorMsg);
       setStatus('ERROR');
     }

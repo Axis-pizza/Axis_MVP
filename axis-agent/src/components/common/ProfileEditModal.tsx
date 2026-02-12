@@ -60,8 +60,7 @@ export const ProfileEditModal = ({
       } else {
         showToast("Upload Failed", "error");
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
       showToast("Error uploading image", "error");
     } finally {
       setUploading(false);

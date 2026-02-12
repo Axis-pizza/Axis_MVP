@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { Bindings } from './config/env';
-
+import jupiterRouter from './routes/jupiter';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import vaultRoutes from './routes/vault';
@@ -34,6 +34,8 @@ app.onError((err, c) => {
   return c.json({ success: false, error: 'Internal Server Error' }, 500);
 });
 
+
+
 app.get('/init-db', async (c) => {
   try {
     await c.env.axis_db.prepare(`
@@ -60,7 +62,7 @@ app.route('/', miscRoutes);
 app.route('/', kagemushaRoutes);
 app.route('/upload', uploadRoutes);
 app.route('/share', shareRoutes);
-
+app.route('/api/jupiter', jupiterRouter);
 app.post('/report', async (c) => {
   try {
    

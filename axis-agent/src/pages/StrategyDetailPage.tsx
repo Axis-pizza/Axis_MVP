@@ -65,8 +65,7 @@ export const StrategyDetailPage = () => {
           setError("Strategy not found.");
         }
 
-      } catch (e) {
-        console.error(e);
+      } catch {
         setError("Failed to load strategy.");
       } finally {
         setLoading(false);

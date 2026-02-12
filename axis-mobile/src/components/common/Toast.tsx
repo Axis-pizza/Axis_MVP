@@ -1,48 +1,45 @@
-import { View, Text, TouchableOpacity, ScrollView, Image } from "react-native";
-import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, CheckCircle, Info } from 'lucide-react';
+import React from 'react';
+import { View, Text } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { AlertCircle, CheckCircle, Info } from 'lucide-react-native';
+import { colors } from '../../config/theme';
 
 interface ToastProps {
   message: string;
   type: 'success' | 'error' | 'info';
 }
 
-export const Toast = ({ message, type }: ToastProps) => {
-  const icons = {
-    success: <CheckCircle className="w-5 h-5 text-green-500" />,
-    error: <AlertCircle className="w-5 h-5 text-red-500" />,
-    info: <Info className="w-5 h-5 text-blue-500" />,
-  };
+const iconMap = {
+  success: CheckCircle,
+  error: AlertCircle,
+  info: Info,
+};
 
-  const bgColors = {
-    success: 'bg-[#0C0A09] border-green-500/30',
-    error: 'bg-[#0C0A09] border-red-500/30',
-    info: 'bg-[#0C0A09] border-blue-500/30',
-  };
+const colorMap = {
+  success: colors.positive,
+  error: colors.negative,
+  info: colors.info,
+};
 
-  const shakeIntensity = type === 'error' ? 15 : 4;
-  const rotateIntensity = type === 'error' ? 6 : 2;
+export const Toast: React.FC<ToastProps> = ({ message, type }) => {
+  const Icon = iconMap[type];
+  const color = colorMap[type];
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ x: -100, opacity: 0 }}
-        animate={{ 
-          x: [0, -shakeIntensity, shakeIntensity, -shakeIntensity, shakeIntensity, -shakeIntensity, 0],
-          rotate: [0, -rotateIntensity, rotateIntensity, -rotateIntensity, rotateIntensity, 0],
-          opacity: 1,
-        }}
-        transition={{ 
-          x: { duration: 0.4, times: [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1] },
-          rotate: { duration: 0.4, times: [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1] },
-          opacity: { duration: 0.2 }
-        }}
-        exit={{ x: -100, opacity: 0 }}
-        className={`fixed top-4 left-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl border ${bgColors[type]} shadow-2xl backdrop-blur-md min-w-[300px]`}
-      >
-        {icons[type]}
-        <Text className="font-medium text-white text-sm">{message}</Text>
-      </motion.div>
-    </AnimatePresence>
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(200)}
+      className="flex-row items-center px-4 py-3 rounded-xl max-w-[90%]"
+      style={{
+        backgroundColor: 'rgba(28, 25, 23, 0.95)',
+        borderWidth: 1,
+        borderColor: color,
+      }}
+    >
+      <Icon size={18} color={color} />
+      <Text className="text-stone-200 text-sm ml-2 flex-1" numberOfLines={2}>
+        {message}
+      </Text>
+    </Animated.View>
   );
 };

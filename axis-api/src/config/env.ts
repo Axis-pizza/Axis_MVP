@@ -16,7 +16,8 @@ export type Bindings = {
   // Environment Variables
   FAUCET_PRIVATE_KEY: string
   SOLANA_RPC_URL?: string
-  
+  JUPITER_API_KEY: string;
+
   TWITTER_CLIENT_ID: string
   TWITTER_CLIENT_SECRET: string
   FRONTEND_URL: string

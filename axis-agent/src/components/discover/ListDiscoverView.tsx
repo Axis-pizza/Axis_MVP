@@ -85,8 +85,7 @@ export const ListDiscoverView = ({ onToggleView, onStrategySelect }: ListDiscove
 
         setStrategies(finalStrategies);
 
-      } catch (e) {
-        console.error('Failed to fetch strategies:', e);
+      } catch {
         setStrategies([]);
       } finally {
         setLoading(false);

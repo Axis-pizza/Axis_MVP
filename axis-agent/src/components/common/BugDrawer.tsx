@@ -85,8 +85,7 @@ export const BugDrawer = ({ isOpen, onClose }: BugDrawerProps) => {
         clearFile();
       }, 2000);
 
-    } catch (error) {
-      console.error('Error submitting report:', error);
+    } catch {
       setStatus('error');
       alert('Transmission failed. Please check your connection.');
     } finally {

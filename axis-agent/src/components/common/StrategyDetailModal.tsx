@@ -48,8 +48,7 @@ export const StrategyDetailModal = ({ isOpen, onClose, strategy }: StrategyDetai
       
       showToast("Deposit Successful!", "success");
       onClose();
-    } catch (e: any) {
-      console.error(e);
+    } catch {
       showToast("Deposit Failed", "error");
     } finally {
       setLoading(false);

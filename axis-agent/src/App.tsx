@@ -2,11 +2,26 @@ import { RouterProvider } from "react-router-dom";
 import router from "./router";
 import { useEffect } from 'react';
 import { ToastProvider } from './context/ToastContext';
-// import {PrivyProvider} from '@privy-io/react-auth'; // 不要なので消す
-// import {toSolanaWalletConnectors} from '@privy-io/react-auth/solana'; // 不要なので消す
+import ReactGA from "react-ga4";
+const GA_MEASUREMENT_ID = "G-328WNRDGNW";
+const CLARITY_PROJECT_ID = "t0od4wxooa";
 
 function App() {
   useEffect(() => {
+    if (GA_MEASUREMENT_ID) {
+      ReactGA.initialize(GA_MEASUREMENT_ID);
+      ReactGA.send({ hitType: "pageview", page: window.location.pathname });
+    }
+
+    if (CLARITY_PROJECT_ID) {
+      // 型エラー回避のため any を使用
+      (function(c: any, l: any, a: any, r: any, i: any){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        const t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        const y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      })(window, document, "clarity", "script", CLARITY_PROJECT_ID);
+    }
+
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) {
@@ -17,7 +32,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white selection:bg-orange-500/30">
-      {/* PrivyProvider は Providers.tsx に任せるので、ここでは ToastProvider 以降を書く */}
       <ToastProvider>
         <RouterProvider router={router} />
       </ToastProvider>

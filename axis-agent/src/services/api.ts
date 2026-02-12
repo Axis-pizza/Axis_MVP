@@ -4,8 +4,55 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://axis-api.yusukekikuta-05.workers.dev';
 
+const API_URL = API_BASE.replace(/\/$/, '').endsWith('/api') 
+  ? API_BASE.replace(/\/$/, '') 
+  : `${API_BASE.replace(/\/$/, '')}/api`;
+
+// In-memory cache
+const _cache: Record<string, { data: any; ts: number }> = {};
+const _getCached = (key: string, ttl: number) => {
+  const c = _cache[key];
+  return c && Date.now() - c.ts < ttl ? c.data : null;
+};
+const _setCache = (key: string, data: any) => {
+  _cache[key] = { data, ts: Date.now() };
+};
+const _invalidate = (prefix: string) => {
+  for (const key of Object.keys(_cache)) {
+    if (key.startsWith(prefix)) delete _cache[key];
+  }
+};
+
+
+
 export const api = {
+
+  get: async (endpoint: string) => {
+    const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    
+    console.log(`Requesting: ${url}`); // デバッグ用ログ
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      // エラーレスポンスの内容もログに出す
+      const text = await response.text();
+      console.error(`API Error ${response.status}: ${text}`);
+      throw new Error(`API Error: ${response.status}`);
+    }
+
+    return response.json();
+  },
   getUser: async (pubkey: string) => {
+    const cacheKey = `user_${pubkey}`;
+    const cached = _getCached(cacheKey, 2 * 60 * 1000);
+    if (cached) return cached;
+
     try {
       const ref = localStorage.getItem('axis_referrer');
       let url = `${API_BASE}/user?wallet=${pubkey}`;
@@ -22,7 +69,6 @@ export const api = {
 
       const data = await res.json();
 
-      // Handle both { user: {...} } and direct {...} response formats
       const userData = data.user || data;
 
       if (!userData || Object.keys(userData).length === 0) {
@@ -38,9 +84,12 @@ export const api = {
         rank_tier: userData.rank_tier || 'Novice'
       };
 
-      return { success: true, user, is_registered: data.is_registered ?? true };
-    } catch (e) {
-      console.error("Fetch User Error:", e);
+      
+
+      const result = { success: true, user, is_registered: data.is_registered ?? true };
+      _setCache(cacheKey, result);
+      return result;
+    } catch {
       return { success: false, user: null };
     }
   },
@@ -63,14 +112,13 @@ export const api = {
 
       if (!res.ok) {
         const text = await res.text();
-        console.error('[updateProfile] Error response:', text);
         return { success: false, error: text || `Error: ${res.status}` };
       }
 
       const result = await res.json();
+      _invalidate('user_');
       return result;
-    } catch (e) {
-      console.error("Update Profile Error:", e);
+    } catch {
       return { success: false, error: 'Network Error' };
     }
   },
@@ -87,8 +135,7 @@ export const api = {
         body: formData,
       });
       return await res.json();
-    } catch (e) {
-      console.error("Upload Error:", e);
+    } catch {
       return { success: false, error: 'Upload Failed' };
     }
   },
@@ -160,7 +207,6 @@ export const api = {
     const data = await res.json();
 
     if (!res.ok) {
-      console.error('[toggleWatchlist] Error:', data);
       throw new Error(data.error || `Error: ${res.status}`);
     }
 
@@ -205,9 +251,7 @@ export const api = {
           strategy_id: strategyId // ★追加
         }),
       });
-    } catch (e) {
-      console.error("Sync stats failed", e);
-    }
+    } catch {}
   },
   
   // 投資済みリスト取得APIを新規追加
@@ -215,28 +259,36 @@ export const api = {
     try {
       const res = await fetch(`${API_BASE}/users/${pubkey}/invested`);
       return await res.json();
-    } catch (e) {
-      console.error("Fetch invested error:", e);
+    } catch {
       return { success: false, strategies: [] };
     }
   },
 
   async getLeaderboard(sort: 'points' | 'volume' | 'created' = 'points') {
+    const cacheKey = `lb_${sort}`;
+    const cached = _getCached(cacheKey, 60 * 1000);
+    if (cached) return cached;
+
     try {
       const res = await fetch(`${API_BASE}/leaderboard?sort=${sort}`);
-      return await res.json();
-    } catch (e) {
-      console.error("Leaderboard fetch error:", e);
+      const result = await res.json();
+      _setCache(cacheKey, result);
+      return result;
+    } catch {
       return { success: false, leaderboard: [] };
     }
   },
+
   async getSolPrice() {
+    const cached = _getCached('sol_price', 30 * 1000);
+    if (cached !== null) return cached;
+
     try {
-      const res = await fetch(`${API_BASE}/price/sol`); 
+      const res = await fetch(`${API_BASE}/price/sol`);
       const data = await res.json();
+      _setCache('sol_price', data.price);
       return data.price;
-    } catch (e) {
-      console.error("Price fetch failed", e);
+    } catch {
       return 0;
     }
   },
@@ -260,21 +312,26 @@ export const api = {
       
       if (!res.ok) {
         const err = await res.text();
-        console.error("Create Strategy Failed:", err);
         return { success: false, error: err };
       }
 
-      return await res.json();
-    } catch (e) {
-      console.error("Network Error:", e);
+      const result = await res.json();
+      _invalidate('strats_');
+      _invalidate('discover_');
+      return result;
+    } catch {
       return { success: false, error: 'Network Error' };
     }
   },
-  
 
   async getTokens() {
+    const cached = _getCached('tokens', 5 * 60 * 1000);
+    if (cached) return cached;
+
     const res = await fetch(`${API_BASE}/tokens`);
-    return res.json();
+    const result = await res.json();
+    _setCache('tokens', result);
+    return result;
   },
 
   async searchTokens(query: string, limit = 20) {
@@ -318,7 +375,6 @@ export const api = {
 
       return data;
     } catch (error) {
-      console.error('[API] Deploy Error:', error);
       throw error;
     }
   },
@@ -347,8 +403,14 @@ export const api = {
   },
 
   async getUserStrategies(pubkey: string) {
+    const cacheKey = `strats_${pubkey}`;
+    const cached = _getCached(cacheKey, 60 * 1000);
+    if (cached) return cached;
+
     const res = await fetch(`${API_BASE}/strategies/${pubkey}`);
-    return res.json();
+    const result = await res.json();
+    _setCache(cacheKey, result);
+    return result;
   },
 
   async getUserWatchlist(pubkey: string) {
@@ -359,15 +421,20 @@ export const api = {
         return { success: false, strategies: [] };
       }
       return await res.json();
-    } catch (e) {
-      console.error("Fetch Watchlist Error:", e);
+    } catch {
       return { success: false, strategies: [] };
     }
   },
 
   async discoverStrategies(limit = 50, offset = 0) {
+    const cacheKey = `discover_${limit}_${offset}`;
+    const cached = _getCached(cacheKey, 60 * 1000);
+    if (cached) return cached;
+
     const res = await fetch(`${API_BASE}/discover?limit=${limit}&offset=${offset}`);
-    return res.json();
+    const result = await res.json();
+    _setCache(cacheKey, result);
+    return result;
   },
 
   async uploadImage(file: Blob, walletAddress: string, type: 'strategy' | 'profile' = 'strategy') {

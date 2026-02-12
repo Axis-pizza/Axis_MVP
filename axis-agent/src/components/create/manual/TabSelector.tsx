@@ -13,10 +13,12 @@ export const TabSelector = ({
   setActiveTab, 
   isWalletConnected 
 }: TabSelectorProps) => {
+  // "Your tokens" を配列の先頭に追加し、disabled判定を入れる
   const tabs = [
-    { id: 'trending', label: 'Trending', icon: Flame },
-    { id: 'meme', label: 'Meme', icon: Sparkles },
-    { id: 'all', label: 'All tokens', icon: Search },
+    { id: 'your_tokens', label: 'Your tokens', icon: Wallet, disabled: !isWalletConnected },
+    { id: 'trending', label: 'Trending', icon: Flame, disabled: false },
+    { id: 'meme', label: 'Meme', icon: Sparkles, disabled: false },
+    { id: 'all', label: 'All tokens', icon: Search, disabled: false },
   ] as const;
 
   return (
@@ -28,11 +30,13 @@ export const TabSelector = ({
         return (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            // disabledの場合はクリック無効にする
+            onClick={() => !tab.disabled && setActiveTab(tab.id)}
+            disabled={tab.disabled}
             className={`
               relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shrink-0
               ${isActive ? 'text-black' : 'text-white/40 hover:text-white/60 bg-white/5'}
-              cursor-pointer active:scale-95
+              ${tab.disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
             `}
           >
             {isActive && (

@@ -1,26 +1,25 @@
-import "./global.css"; // ★必須
+import "./global.css";
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { ToastProvider } from './src/components/common/context/ToastContext';
-
-const HomeScreen = () => (
-  <View className="flex-1 justify-center items-center bg-[#0a0a0a]">
-    <Text className="text-white text-xl font-bold">Axis Mobile</Text>
-    <Text className="text-orange-500 mt-2">NativeWind v4 Ready</Text>
-  </View>
-);
-
-const Stack = createNativeStackNavigator();
+import { WalletProvider } from './src/context/WalletContext';
+import { RootNavigator } from './src/navigation/RootNavigator';
 
 export default function App() {
   return (
-    <ToastProvider>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Home" component={HomeScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </ToastProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <WalletProvider>
+          <NavigationContainer>
+            <ToastProvider>
+              <StatusBar style="light" />
+              <RootNavigator />
+            </ToastProvider>
+          </NavigationContainer>
+        </WalletProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

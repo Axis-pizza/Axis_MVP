@@ -7,7 +7,8 @@
       "Bash(curl:*)",
       "Bash(python3:*)",
       "Bash(echo:*)",
-      "Bash(npx wrangler:*)"
+      "Bash(npx wrangler:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
