@@ -20,7 +20,7 @@ export const useManualDashboard = ({
   const [step, setStep] = useState<'builder' | 'identity'>('builder');
   
   // Tabs State
-  const [activeTab, setActiveTab] = useState<'all' | 'your_tokens' | 'trending' | 'meme'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'your_tokens' | 'trending' | 'meme' | 'prediction'>('all');
   
   const [allTokens, setAllTokens] = useState<JupiterToken[]>([]);
   // NOTE: displayTokens state definition removed to fix duplicate declaration error.
