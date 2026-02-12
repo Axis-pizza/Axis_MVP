@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import {
   Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight,
   TrendingUp, Star, LayoutGrid
@@ -74,6 +74,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   // --- 1. Init (Price & Balance) ---
   useEffect(() => {
     const fetchPrice = async () => {
+      if (document.hidden) return;
       try {
         const price = await api.getSolPrice();
         if (price) setSolPrice(price);
@@ -85,18 +86,24 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
       } catch { setSolPrice(150); }
     };
     fetchPrice();
-    
+
     if (!publicKey || !connection) return;
     const getBalance = async () => {
+      if (document.hidden) return;
       try {
         const lamports = await connection.getBalance(publicKey);
         setSolBalance(lamports / LAMPORTS_PER_SOL);
-      } catch (e) { console.error(e); }
+      } catch {}
     };
     getBalance();
-    
+
     const interval = setInterval(() => { fetchPrice(); getBalance(); }, 60000);
-    return () => clearInterval(interval);
+    const handleVisibility = () => { if (!document.hidden) { fetchPrice(); getBalance(); } };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [publicKey, connection]);
 
   // --- 2. Load User Profile & Portfolio ---
@@ -144,8 +151,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
           setInvestedStrategies(investedRes.strategies);
         }
         
-      } catch (e) {
-        console.error("Profile load error", e);
+      } catch {
       } finally {
         setIsLoading(false);
       }
@@ -167,17 +173,25 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
             isMe: u.pubkey === publicKey?.toBase58()
           })));
         }
-      } catch (e) {
-        console.error("Leaderboard load error", e);
+      } catch {
       }
     };
     loadLeaderboard();
   }, [activeTab, publicKey]);
 
   // --- Logic & Display Values ---
-  const investedAmountUSD = myStrategies.reduce((sum, s) => sum + ((s.tvl || 0) * solPrice), 0);
-  const totalNetWorthUSD = (solBalance * solPrice) + investedAmountUSD;
-  const displayValue = currencyMode === 'USD' ? totalNetWorthUSD : (solPrice > 0 ? totalNetWorthUSD / solPrice : 0);
+  const investedAmountUSD = useMemo(() =>
+    myStrategies.reduce((sum, s) => sum + ((s.tvl || 0) * solPrice), 0),
+    [myStrategies, solPrice]
+  );
+  const totalNetWorthUSD = useMemo(() =>
+    (solBalance * solPrice) + investedAmountUSD,
+    [solBalance, solPrice, investedAmountUSD]
+  );
+  const displayValue = useMemo(() =>
+    currencyMode === 'USD' ? totalNetWorthUSD : (solPrice > 0 ? totalNetWorthUSD / solPrice : 0),
+    [currencyMode, totalNetWorthUSD, solPrice]
+  );
   const pnlVal = userProfile?.pnlPercent || 0;
   const isPos = pnlVal >= 0;
 
@@ -323,24 +337,24 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
 
 // --- Sub Components ---
 
-const FilterChip = ({ label, active, onClick, icon }: any) => (
+const FilterChip = memo(({ label, active, onClick, icon }: any) => (
   <button 
     onClick={onClick}
     className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${active ? 'bg-[#D97706] text-black' : 'bg-[#1C1917] border border-white/5 text-white/50 hover:bg-white/5'}`}
   >
     {icon} {label}
   </button>
-);
+));
 
-const EmptyState = ({ icon: Icon, title, sub }: any) => (
+const EmptyState = memo(({ icon: Icon, title, sub }: any) => (
   <div className="flex flex-col items-center justify-center py-12 text-white/20 border border-dashed border-white/5 rounded-2xl">
     <Icon className="w-10 h-10 mb-3 opacity-20" />
     <p className="text-sm font-bold text-white/40">{title}</p>
     <p className="text-xs">{sub}</p>
   </div>
-);
+));
 
-const StrategyCard = ({ strategy, solPrice, onSelect }: { strategy: Strategy; solPrice: number; onSelect?: (strategy: any) => void }) => {
+const StrategyCard = memo(({ strategy, solPrice, onSelect }: { strategy: Strategy; solPrice: number; onSelect?: (strategy: any) => void }) => {
   const tvlUSD = (strategy.tvl || 0) * solPrice;
   const tokens = Array.isArray(strategy.tokens) ? strategy.tokens : [];
   const displayTokens = tokens.slice(0, 5);
@@ -383,4 +397,4 @@ const StrategyCard = ({ strategy, solPrice, onSelect }: { strategy: Strategy; so
       </div>
     </button>
   );
-};
+});

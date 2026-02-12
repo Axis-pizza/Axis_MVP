@@ -13,9 +13,11 @@ export const useManualDashboard = ({
   initialConfig,
   initialTokens,
 }: Pick<ManualDashboardProps, 'onDeploySuccess' | 'initialConfig' | 'initialTokens'>) => {
-  const triggerHaptic = () => {
+  
+  // Haptic feedback helper
+  const triggerHaptic = useCallback(() => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
-  };
+  }, []);
 
   const [step, setStep] = useState<'builder' | 'identity'>('builder');
   
@@ -23,7 +25,6 @@ export const useManualDashboard = ({
   const [activeTab, setActiveTab] = useState<'all' | 'your_tokens' | 'trending' | 'meme'>('all');
   
   const [allTokens, setAllTokens] = useState<JupiterToken[]>([]);
-  // NOTE: displayTokens state definition removed to fix duplicate declaration error.
   
   // Data specific to tabs
   const [userTokens, setUserTokens] = useState<JupiterToken[]>([]);
@@ -45,7 +46,9 @@ export const useManualDashboard = ({
   });
 
   const [focusedField, setFocusedField] = useState<'ticker' | 'name' | 'desc' | null>('ticker');
-  const [flyingToken, setFlyingToken] = useState<{ token: JupiterToken; x: number; y: number } | null>(null);
+  const [flyingToken, setFlyingToken] = useState<JupiterToken | null>(null); // Type check fix
+  const [flyingCoords, setFlyingCoords] = useState<{x: number, y: number} | null>(null);
+
   const [tokenFilter, setTokenFilter] = useState<'all' | 'crypto' | 'stock' | 'commodity' | 'prediction'>('all');
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -64,7 +67,19 @@ export const useManualDashboard = ({
 
   // --- Logic for displaying tokens based on Tabs & Filters ---
   const sortedVisibleTokens = useMemo(() => {
-    let baseList = allTokens;
+    // 【修正】検索クエリがある場合は、タブに関係なく「全トークン」から検索する
+    if (searchQuery.trim()) {
+        const lowerQ = searchQuery.toLowerCase();
+        // allTokens 全体から検索
+        return allTokens.filter(t => 
+            t.symbol.toLowerCase().includes(lowerQ) || 
+            t.name.toLowerCase().includes(lowerQ) ||
+            t.address.toLowerCase() === lowerQ
+        ).slice(0, 100);
+    }
+
+    // --- 以下、検索クエリがない場合のタブごとの表示ロジック ---
+    let baseList: JupiterToken[] = [];
 
     // 1. Tab Filtering
     if (activeTab === 'your_tokens') {
@@ -85,19 +100,12 @@ export const useManualDashboard = ({
         } else {
             baseList = allTokens.filter(t => t.tags.includes('birdeye-trending') || (t.dailyVolume && t.dailyVolume > 1000000));
         }
+    } else {
+        // 'all' tab
+        baseList = allTokens;
     }
 
-    // 2. Search Filter
-    if (searchQuery) {
-        const lowerQ = searchQuery.toLowerCase();
-        baseList = baseList.filter(t => 
-            t.symbol.toLowerCase().includes(lowerQ) || 
-            t.name.toLowerCase().includes(lowerQ) ||
-            t.address.toLowerCase() === lowerQ
-        );
-    }
-    
-    // 3. Category Filter (Allタブの時のみ有効)
+    // 2. Category Filter (Allタブかつ検索なしの時のみ有効)
     if (activeTab === 'all' && tokenFilter !== 'all') {
         if (tokenFilter === 'crypto') baseList = baseList.filter(t => !t.source || t.source === 'jupiter');
         else if (tokenFilter === 'stock') baseList = baseList.filter(t => t.source === 'stock');
@@ -108,7 +116,7 @@ export const useManualDashboard = ({
     return baseList.slice(0, 100);
   }, [allTokens, userTokens, activeTab, searchQuery, tokenFilter, trendingIds]);
 
-  // エイリアスとして定義 (stateではない)
+  // エイリアス (互換性のため)
   const displayTokens = sortedVisibleTokens;
 
   // --- Effects ---
@@ -125,42 +133,67 @@ export const useManualDashboard = ({
           fetchCommodityTokens().catch(() => []),
         ]);
 
+        // 人気トークンを上位に表示するための並び替え
         const popular = POPULAR_SYMBOLS
           .map(sym => list.find(t => t.symbol === sym))
           .filter((t): t is JupiterToken => t !== undefined);
-        const others = list.filter(t => !POPULAR_SYMBOLS.includes(t.symbol));
+        
+        // 重複排除のためのSet
+        const popularIds = new Set(popular.map(t => t.address));
+        const others = list.filter(t => !popularIds.has(t.address));
 
-        const merged = [...popular, ...predictionTokens, ...stockTokens, ...commodityTokens, ...others];
+        // 全トークンをマージ (Source情報を付与したトークンも含む)
+        // Note: fetchXxxTokens で取得したトークンには既に source プロパティがついている前提
+        const merged = [
+            ...popular, 
+            ...predictionTokens, 
+            ...stockTokens, 
+            ...commodityTokens, 
+            ...others
+        ];
+        
         setAllTokens(merged);
         
-        if (initialTokens) {
+        // 初期トークン設定 (もしあれば)
+        if (initialTokens && initialTokens.length > 0) {
           const initialAssets: AssetItem[] = [];
           initialTokens.forEach(p => {
-            const t = merged.find(x => x.symbol === p.symbol);
-            if (t) initialAssets.push({ token: t, weight: p.weight, locked: true, id: t.address });
+            const t = merged.find(x => x.symbol === p.symbol); // symbolマッチは少し危険だが簡易的
+            if (t) {
+                initialAssets.push({ 
+                    token: t, 
+                    weight: p.weight, 
+                    locked: true, 
+                    id: t.address 
+                });
+            }
           });
-          setPortfolio(initialAssets);
+          // 重複排除してセット
+          const uniqueAssets = Array.from(new Map(initialAssets.map(item => [item.token.address, item])).values());
+          setPortfolio(uniqueAssets);
         }
       } catch (e) {
-        console.error('Failed to load tokens:', e);
+        console.error("Failed to load tokens:", e);
         toast.error('Failed to load tokens');
       } finally {
         setIsLoading(false);
       }
     };
     init();
-  }, [initialTokens]);
+  }, []); // initialTokens 依存を外して初回のみ実行にするのが一般的だが、要件による
 
   // Fetch User Tokens
   useEffect(() => {
-    if (activeTab === 'your_tokens' && publicKey) {
+    if (activeTab === 'your_tokens' && publicKey && connected) {
       setIsLoading(true);
-      WalletService.getUserTokens(connection, publicKey).then(tokens => {
-          setUserTokens(tokens);
-          setIsLoading(false);
-      });
+      WalletService.getUserTokens(connection, publicKey)
+        .then(tokens => {
+            setUserTokens(tokens);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false));
     }
-  }, [activeTab, publicKey, connection]);
+  }, [activeTab, publicKey, connected, connection]);
 
   // Fetch Trending
   useEffect(() => {
@@ -171,7 +204,7 @@ export const useManualDashboard = ({
     }
   }, [activeTab, trendingIds.size]);
 
-  // Search API (Fallback)
+  // Search Debounce (UI表示用)
   useEffect(() => {
     if (!searchQuery.trim()) {
       setIsSearching(false);
@@ -180,7 +213,7 @@ export const useManualDashboard = ({
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     setIsSearching(true);
 
-    searchTimeoutRef.current = setTimeout(async () => {
+    searchTimeoutRef.current = setTimeout(() => {
       setIsSearching(false);
     }, 300);
 
@@ -199,13 +232,13 @@ export const useManualDashboard = ({
     triggerHaptic();
     setStep('identity');
     setFocusedField('ticker');
-  }, []);
+  }, [triggerHaptic]);
 
   const handleBackToBuilder = useCallback(() => {
     setStep('builder');
   }, []);
 
-  const handleDeploy = useCallback(() => {
+  const handleDeploy = useCallback(async () => {
     triggerHaptic();
     if (!config.name || !config.ticker) {
       toast.error("Required Fields", { description: "Please enter a Name and Ticker." });
@@ -215,48 +248,69 @@ export const useManualDashboard = ({
       setVisible(true);
       return;
     }
+    
+    // Deployment Logic here (usually passing data up)
     const mappedTokens = portfolio.map(p => ({
       symbol: p.token.symbol,
       weight: p.weight,
       mint: p.token.address,
       logoURI: p.token.logoURI,
     }));
+    
     onDeploySuccess({
       tokens: mappedTokens,
       config,
     });
-  }, [config, connected, publicKey, setVisible, onDeploySuccess, portfolio]);
+  }, [config, connected, publicKey, setVisible, onDeploySuccess, portfolio, triggerHaptic]);
 
   const generateRandomTicker = useCallback(() => {
     triggerHaptic();
     const prefixes = ['MOON', 'CHAD', 'PEPE', 'SOL', 'DEGEN', 'ALPHA'];
     const suffix = Math.floor(Math.random() * 100);
     setConfig(prev => ({ ...prev, ticker: `${prefixes[Math.floor(Math.random() * prefixes.length)]}${suffix}` }));
-  }, []);
+  }, [triggerHaptic]);
 
   const triggerAddAnimation = useCallback((token: JupiterToken, rect: DOMRect) => {
     triggerHaptic();
     if (portfolio.some(p => p.token.address === token.address)) return;
-    setFlyingToken({ token, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-  }, [portfolio]);
+    setFlyingToken(token);
+    setFlyingCoords({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+  }, [portfolio, triggerHaptic]);
 
   const handleAnimationComplete = useCallback(() => {
     if (!flyingToken) return;
+    
     setPortfolio(prev => {
+      // 既に存在する場合は追加しない
+      if (prev.some(p => p.token.address === flyingToken.address)) return prev;
+
       const currentW = prev.reduce((s, i) => s + i.weight, 0);
-      const nextW = Math.max(0, Math.min(100 - currentW, 50));
-      return [...prev, { token: flyingToken.token, weight: nextW, locked: false, id: flyingToken.token.address }];
+      // 残りパーセントの半分、または最大50%を割り当て
+      let nextW = 0;
+      if (currentW < 100) {
+          nextW = Math.max(1, Math.floor((100 - currentW) / 2));
+          if (nextW === 0 && currentW < 100) nextW = 100 - currentW; // 残り全部
+      }
+      
+      return [...prev, { token: flyingToken, weight: nextW, locked: false, id: flyingToken.address }];
     });
+    
     triggerHaptic();
     setFlyingToken(null);
+    setFlyingCoords(null);
     setSearchQuery('');
-  }, [flyingToken]);
+  }, [flyingToken, triggerHaptic]);
 
   const addTokenDirect = useCallback((token: JupiterToken) => {
     if (portfolio.some(p => p.token.address === token.address)) return;
+    
     setPortfolio(prev => {
       const currentW = prev.reduce((s, i) => s + i.weight, 0);
-      const nextW = Math.max(0, Math.min(100 - currentW, 50));
+      let nextW = 0;
+      if (currentW < 100) {
+          nextW = Math.max(1, Math.floor((100 - currentW) / 2));
+           if (nextW === 0 && currentW < 100) nextW = 100 - currentW;
+      }
       return [...prev, { token, weight: nextW, locked: false, id: token.address }];
     });
     setSearchQuery('');
@@ -265,7 +319,7 @@ export const useManualDashboard = ({
   const removeToken = useCallback((address: string) => {
     triggerHaptic();
     setPortfolio(prev => prev.filter(p => p.token.address !== address));
-  }, []);
+  }, [triggerHaptic]);
 
   const updateWeight = useCallback((address: string, val: number) => {
     setPortfolio(prev => prev.map(p =>
@@ -276,13 +330,15 @@ export const useManualDashboard = ({
   const distributeEvenly = useCallback(() => {
     triggerHaptic();
     if (portfolio.length === 0) return;
-    const evenWeight = Math.floor(100 / portfolio.length);
-    const remainder = 100 - (evenWeight * portfolio.length);
+    const count = portfolio.length;
+    const evenWeight = Math.floor(100 / count);
+    const remainder = 100 - (evenWeight * count);
+    
     setPortfolio(prev => prev.map((p, i) => ({
       ...p,
       weight: evenWeight + (i === 0 ? remainder : 0),
     })));
-  }, [portfolio.length]);
+  }, [portfolio.length, triggerHaptic]);
 
   return {
     step, setStep,
@@ -291,7 +347,7 @@ export const useManualDashboard = ({
     isSearching, isLoading,
     config, setConfig,
     focusedField, setFocusedField,
-    flyingToken,
+    flyingToken, flyingCoords,
     activeTab, setActiveTab,
     totalWeight, selectedIds, hasSelection, isValidAllocation,
     sortedVisibleTokens, filterCounts,

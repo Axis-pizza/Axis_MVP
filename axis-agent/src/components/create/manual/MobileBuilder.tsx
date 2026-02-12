@@ -34,6 +34,7 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
     sortedVisibleTokens,
     displayTokens,
     flyingToken,
+    flyingCoords,
     activeTab,
     setActiveTab,
     triggerAddAnimation,
@@ -317,14 +318,14 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
       <AnimatePresence>
         {flyingToken && (
           <motion.div
-            initial={{ position: 'fixed', left: flyingToken.x, top: flyingToken.y, x: "-50%", y: "-50%", scale: 1, opacity: 1 }}
+            initial={{ position: 'fixed', left: flyingCoords?.x, top: flyingCoords?.y, x: "-50%", y: "-50%", scale: 1, opacity: 1 }}
             animate={{ left: "50%", top: "20%", scale: 0.3, opacity: 0 }}
             transition={{ duration: 0.4, ease: "backIn" }}
             onAnimationComplete={handleAnimationComplete}
             className="z-50 pointer-events-none"
           >
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-900 to-amber-950 border-2 border-amber-700 flex items-center justify-center overflow-hidden shadow-xl shadow-amber-900/50">
-              <TokenImage src={flyingToken.token.logoURI} className="w-full h-full object-cover" />
+              <TokenImage src={flyingToken.logoURI} className="w-full h-full object-cover" />
             </div>
           </motion.div>
         )}

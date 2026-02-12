@@ -1,16 +1,22 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Compass, Plus, User, MessageSquareText } from 'lucide-react';
 import { BugDrawer } from './BugDrawer';
 
 export type ViewState = 'DISCOVER' | 'CREATE' | 'PROFILE';
 
+const NAV_ITEMS = [
+  { id: 'DISCOVER' as const, icon: Compass, label: 'Discover' },
+  { id: 'CREATE' as const, icon: Plus, label: 'Create' },
+  { id: 'PROFILE' as const, icon: User, label: 'Profile' },
+];
+
 interface FloatingNavProps {
   currentView: ViewState;
   onNavigate: (view: ViewState) => void;
 }
 
-export const FloatingNav = ({ currentView, onNavigate }: FloatingNavProps) => {
+export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) => {
   const [isBugDrawerOpen, setIsBugDrawerOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false); 
@@ -61,11 +67,7 @@ export const FloatingNav = ({ currentView, onNavigate }: FloatingNavProps) => {
     if (!isDesktop) handleActivity();
   };
 
-  const navItems = [
-    { id: 'DISCOVER', icon: Compass, label: 'Discover' },
-    { id: 'CREATE', icon: Plus, label: 'Create' },
-    { id: 'PROFILE', icon: User, label: 'Profile' },
-  ];
+  const navItems = NAV_ITEMS;
 
   return (
     <>
@@ -160,4 +162,4 @@ export const FloatingNav = ({ currentView, onNavigate }: FloatingNavProps) => {
       />
     </>
   );
-};
+});

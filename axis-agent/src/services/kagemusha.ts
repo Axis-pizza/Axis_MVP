@@ -213,8 +213,7 @@ export async function withdraw(
       const signature = await connection.sendRawTransaction(signedTx.serialize());
       await connection.confirmTransaction(signature, 'confirmed');
       return signature;
-  } catch (e) {
-      console.warn("Withdraw instruction might not be implemented in IDL yet", e);
+  } catch {
       throw new Error("Withdraw not implemented on-chain yet");
   }
 }
@@ -246,8 +245,7 @@ export async function getUserStrategies(
           tokens: [] 
       }));
 
-  } catch (error) {
-      console.error('Failed to fetch user strategies:', error);
+  } catch {
       return [];
   }
 }

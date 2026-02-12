@@ -45,7 +45,6 @@ export const RedeemModal = ({
       onSuccess();
       onClose();
     } catch (e: unknown) {
-      console.error('Redeem failed:', e);
       setError(e instanceof Error ? e.message : 'Failed to redeem shares');
     } finally {
       setIsLoading(false);

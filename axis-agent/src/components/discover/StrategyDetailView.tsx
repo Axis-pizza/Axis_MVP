@@ -162,8 +162,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
       try {
         const bal = await connection.getBalance(publicKey);
         setSolBalance(bal / LAMPORTS_PER_SOL);
-      } catch (e) {
-        console.error("Failed to fetch balance", e);
+      } catch {
       }
     };
     fetchBalance();
@@ -544,8 +543,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
                   strategyId: strategy.id
               })
           });
-      } catch (apiErr) {
-          console.error("API Call Failed:", apiErr);
+      } catch {
       }
       
       setTimeout(() => {
@@ -560,7 +558,6 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       }, 1500);
 
     } catch (e: any) {
-      console.error(e);
       showToast(e.message || "Transaction Failed", "error");
       setInvestStatus('ERROR');
       setTimeout(() => setInvestStatus('IDLE'), 2000);

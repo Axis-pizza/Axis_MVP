@@ -24,8 +24,7 @@ class SimpleErrorBoundary extends React.Component<{ children: React.ReactNode },
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("Uncaught error:", error, errorInfo);
+  componentDidCatch() {
   }
 
   render() {
@@ -74,8 +73,7 @@ export const KagemushaFlow = ({ onStepChange }: KagemushaFlowProps) => {
     try {
       const strategies = await getUserStrategies(connection, publicKey);
       setUserStrategies(strategies);
-    } catch (e) {
-      console.error('Failed to load strategies:', e);
+    } catch {
     } finally {
       setIsDashboardLoading(false);
     }
@@ -100,15 +98,12 @@ export const KagemushaFlow = ({ onStepChange }: KagemushaFlowProps) => {
   const handleBuilderComplete = (data: ManualData) => {
     // データ構造のチェック
     if (!data) {
-      console.error("❌ [Flow] Data is null/undefined");
       return;
     }
     if (!data.config) {
-      console.error("❌ [Flow] data.config is missing", data);
       return;
     }
     if (!data.tokens || data.tokens.length === 0) {
-      console.error("❌ [Flow] data.tokens is missing or empty", data);
       return;
     }
 

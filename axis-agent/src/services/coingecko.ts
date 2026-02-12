@@ -15,7 +15,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Cache for specific mint prices
 const priceCache: Record<string, { price: number; change24h: number; timestamp: number }> = {};
-const PRICE_CACHE_TTL = 60 * 1000; // 1 minute
+const PRICE_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 
 // ✅ 追加: Solanaアドレスのバリデーション用正規表現 (Base58, 32-44文字)
 const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -73,7 +73,6 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
     cacheTime = Date.now();
     return tokenCache;
   } catch (error) {
-    console.error('[CoinGecko] Failed to fetch tokens:', error);
     return tokenCache.length > 0 ? tokenCache : [];
   }
 }
@@ -118,7 +117,7 @@ export async function getMarketData(mints: string[]): Promise<Record<string, { p
   }
 
   // APIコール (チャンク分割)
-  const chunks = chunkArray(uncachedMints, 10); 
+  const chunks = chunkArray(uncachedMints, 50);
   const fetchPromises = chunks.map(async (chunk) => {
     try {
       const ids = chunk.join(',');
@@ -127,12 +126,10 @@ export async function getMarketData(mints: string[]): Promise<Record<string, { p
       
       const res = await fetch(url);
       if (!res.ok) {
-        console.warn(`CoinGecko Error (${res.status}). Skipping chunk.`);
         return null;
       }
       return await res.json();
     } catch (e) {
-      console.error("CoinGecko Batch Fetch Error:", e);
       return null;
     }
   });

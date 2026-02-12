@@ -37,8 +37,7 @@ export default function Home() {
     try {
       const bal = await connection.getBalance(publicKey);
       return bal / LAMPORTS_PER_SOL;
-    } catch (e) {
-      console.error("Failed to get balance", e);
+    } catch {
       return 0;
     }
   }, [publicKey, connection]);

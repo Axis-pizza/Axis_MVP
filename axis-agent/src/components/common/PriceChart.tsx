@@ -26,8 +26,7 @@ export const PriceChart = ({ tokenAddress, height = 120, showControls = true, co
         if (res.success && res.history?.data) {
           setData(res.history.data);
         }
-      } catch (e) {
-        console.error('Failed to fetch price history:', e);
+      } catch {
       } finally {
         setLoading(false);
       }

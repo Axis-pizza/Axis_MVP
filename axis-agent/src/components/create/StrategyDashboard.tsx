@@ -58,8 +58,7 @@ export const StrategyDashboard = ({
       try {
         const bal = await connection.getBalance(publicKey);
         setSolBalance(bal / LAMPORTS_PER_SOL);
-      } catch (e) {
-        console.error('Failed to fetch balance:', e);
+      } catch {
       }
     };
     fetchBalance();

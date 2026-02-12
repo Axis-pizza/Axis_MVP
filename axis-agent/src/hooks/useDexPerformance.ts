@@ -9,13 +9,15 @@ export const useDexPerformance = (tokens: any[]) => {
 
   useEffect(() => {
     const fetchPrices = async () => {
+      if (document.hidden) return;
+
       const addresses = tokens.map(t => t.address).filter(Boolean);
       if (addresses.length === 0) return;
 
       try {
         const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${addresses.join(',')}`);
         const data = await res.json();
-        
+
         const priceMap: Record<string, number> = {};
         const changeMap: Record<string, number> = {};
 
@@ -38,14 +40,18 @@ export const useDexPerformance = (tokens: any[]) => {
         });
 
         setLiveData({ nav: currentNav, roi24h: weightedChange, isLoading: false });
-      } catch (e) {
-        console.error("DexScreener Error:", e);
-      }
+      } catch {}
     };
 
+    const handleVisibility = () => { if (!document.hidden) fetchPrices(); };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     fetchPrices();
-    const interval = setInterval(fetchPrices, 15000); // 15秒更新
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchPrices, 15000);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [tokens]);
 
   return liveData;

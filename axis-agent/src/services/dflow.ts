@@ -212,8 +212,7 @@ export async function fetchCommodityTokens(): Promise<JupiterToken[]> {
     const withPrices = tokens.map(t => ({ ...t, price: prices[t.address] ?? t.price }));
 
     return withPrices;
-  } catch (e) {
-    console.warn("[Remora] fetchCommodityTokens failed:", e);
+  } catch {
     // UIが落ちないように最低限返す
     return REMORA_METALS.map(fallbackToken);
   }

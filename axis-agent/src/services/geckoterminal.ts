@@ -18,7 +18,6 @@ export const GeckoTerminalService = {
       const poolsData = await poolsRes.json();
       
       if (!poolsData.data || poolsData.data.length === 0) {
-        // console.warn(`[GeckoTerminal] No pool found for ${tokenAddress}`);
         return [];
       }
       
@@ -42,8 +41,7 @@ export const GeckoTerminalService = {
       })).reverse(); // Oldest first for the chart
 
       return formatted;
-    } catch (e) {
-      console.error("[GeckoTerminal] Fetch Error:", e);
+    } catch {
       return [];
     }
   }

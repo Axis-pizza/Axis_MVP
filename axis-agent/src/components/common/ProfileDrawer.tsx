@@ -106,8 +106,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
         user.is_registered = res.is_registered ?? true;
         setUserData(user);
       }
-    } catch (e) {
-      console.error("Failed to fetch user", e);
+    } catch {
     } finally {
     }
   }, [publicKey, resetUserData]);
@@ -186,8 +185,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
           showToast("1 SOL Airdropped successfully!", "success");
           return;
         }
-      } catch (e) {
-        console.warn("Backend faucet failed, trying RPC airdrops...", e);
+      } catch {
       }
 
       // 2. 複数のRPCエンドポイントで順番にairdropを試す
@@ -219,14 +217,12 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
           lastError = data.error;
         } catch (e) {
           lastError = e;
-          console.warn(`Airdrop via ${rpc} failed, trying next...`, e);
         }
       }
 
       // すべて失敗した場合
       throw lastError || new Error("All airdrop methods failed");
     } catch (e: any) {
-      console.error("All faucet methods failed:", e);
       const msg = e?.message || e?.toString() || "";
       if (msg.includes("429") || msg.includes("Too many requests") || msg.includes("rate")) {
         showToast("Rate limit reached. Please wait a few minutes and try again.", "error");
@@ -247,8 +243,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       await disconnect();
       onClose();
       showToast("Disconnected successfully", "success");
-    } catch (e) {
-      console.error("Disconnect failed:", e);
+    } catch {
       showToast("Disconnect failed", "error");
     } finally {
       setIsDisconnecting(false);

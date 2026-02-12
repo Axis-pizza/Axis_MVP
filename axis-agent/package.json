@@ -39,6 +39,7 @@
     "buffer": "^6.0.3",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.4",
+    "expo": "~54.0.33",
     "framer-motion": "^11.18.2",
     "html2canvas": "^1.4.1",
     "lightweight-charts": "^4.1.1",
@@ -46,13 +47,13 @@
     "radix-ui": "^1.4.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-ga4": "^2.1.0",
+    "react-native": "0.81.5",
     "react-router-dom": "^7.12.0",
     "recharts": "^3.6.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "zustand": "^5.0.9",
-    "expo": "~54.0.33",
-    "react-native": "0.81.5"
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

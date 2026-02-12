@@ -64,8 +64,7 @@ export const DepositFlow = ({
       try {
         const bal = await connection.getBalance(publicKey);
         setBalance(bal / LAMPORTS_PER_SOL);
-      } catch (e) {
-        console.error('Failed to fetch balance:', e);
+      } catch {
       }
     };
     fetchBalance();
@@ -152,8 +151,7 @@ export const DepositFlow = ({
 
       try {
         await api.deploy(signature, payload);
-      } catch (apiError: any) {
-        console.error("🔥 API Error (Saving failed but tx successful):", apiError);
+      } catch {
       }
 
       // ticker を確実に保存するため createStrategy も呼ぶ
@@ -173,15 +171,13 @@ export const DepositFlow = ({
             })),
             address: strategyAddress || publicKey.toBase58(),
           });
-        } catch (e) {
-          console.error("createStrategy (ticker save) failed:", e);
+        } catch {
         }
       }
 
       setStatus('SUCCESS');
 
     } catch (e: any) {
-      console.error('Deposit error:', e);
       setErrorMessage(e.message || 'Deposit failed');
       setStatus('ERROR');
     }
