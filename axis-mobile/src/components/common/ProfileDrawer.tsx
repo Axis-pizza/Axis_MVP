@@ -1,0 +1,446 @@
+import { View, Text, TouchableOpacity, ScrollView, Image } from "react-native";
+import { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Copy, Trophy, LogOut, CheckCircle, Sparkles, Edit, User, Droplets, Wallet, QrCode, Share2 } from 'lucide-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { useWallet } from '../../hooks/useWallet';
+import { api } from '../../services/api';
+import { useToast } from '../../context/ToastContext';
+import { ProfileEditModal } from './ProfileEditModal';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+
+const InviteModal = ({ isOpen, onClose, pubkey }: { isOpen: boolean; onClose: () => void; pubkey: string }) => {
+  const { showToast } = useToast();
+  const inviteLink = `${window.location.origin}/?ref=${pubkey}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(inviteLink)}&color=D97706&bgcolor=0C0A09&margin=10`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(inviteLink);
+    showToast("✅ Invite Link Copied!", "success");
+  };
+
+  const handleShareX = () => {
+    const text = `Join me on Axis! 🚀\nCreating my own crypto ETF on Solana.\n\n#Axis #Solana #DeFi`;
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(inviteLink)}`;
+    window.open(url, '_blank');
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <View className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onPress={onClose} className="absolute inset-0 bg-black/90 backdrop-blur-md" 
+      />
+      
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+        animate={{ scale: 1, opacity: 1, y: 0 }} 
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-[#D97706]/20 bg-gradient-to-b from-[#1C1917] to-black p-8 text-center shadow-2xl shadow-orange-900/20"
+      >
+        <View className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-[#D97706]/10 blur-3xl pointer-events-none" />
+        <View className="absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-[#D97706]/10 blur-3xl pointer-events-none" />
+
+        <button onPress={onClose} className="absolute top-4 right-4 text-white/30 hover:text-white transition-colors">
+          <X className="w-6 h-6" />
+        </button>
+
+        <h3 className="mb-2 text-2xl font-serif font-bold text-white tracking-tight">Invite & Earn</h3>
+        <Text className="mb-8 text-sm text-[#78716C]">Share your link to earn referral XP.</Text>
+
+        <View className="mx-auto mb-8 w-fit rounded-2xl border border-[#D97706]/20 bg-[#0C0A09] p-4 shadow-inner">
+          <img src={qrUrl} alt="Invite QR" className="h-48 w-48 rounded-lg opacity-90" />
+        </View>
+
+        <View className="grid grid-cols-2 gap-3">
+          <button 
+            onPress={handleCopy}
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#292524] py-3.5 text-sm font-bold text-white transition-all hover:bg-[#44403c] active:scale-95 border border-white/5"
+          >
+            <Copy className="w-4 h-4" /> Copy Link
+          </button>
+          
+          <button 
+            onPress={handleShareX}
+            className="group flex items-center justify-center gap-2 rounded-xl bg-black py-3.5 text-sm font-bold text-white transition-all hover:border-[#D97706]/50 border border-[#D97706]/20 active:scale-95"
+          >
+            <Share2 className="w-4 h-4 group-hover:text-[#D97706] transition-colors" /> Post on X
+          </button>
+        </View>
+      </motion.div>
+    </View>
+  );
+};
+
+export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+  const { showToast } = useToast();
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [faucetLoading, setFaucetLoading] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isWalletModalPending, setIsWalletModalPending] = useState(false);
+  const { connection } = useConnection();
+  const { setVisible, visible: walletModalVisible } = useWalletModal();
+  const { publicKey, disconnect, ready, connected } = useWallet();
+
+  const resetUserData = useCallback(() => {
+    setUserData(null);
+  }, []);
+
+  const fetchUser = useCallback(async () => {
+    if (!publicKey) {
+      resetUserData();
+      return;
+    }
+     
+    
+    try {
+      const res = await api.getUser(publicKey.toBase58());
+      if (res.success || res.user) {
+        const user = res.user || res;
+        user.is_registered = res.is_registered ?? true;
+        setUserData(user);
+      }
+    } catch (e) {
+      console.error("Failed to fetch user", e);
+    } finally {
+    }
+  }, [publicKey, resetUserData]);
+
+  useEffect(() => {
+    if (!publicKey || !connected) {
+      resetUserData();
+    }
+  }, [publicKey, connected, resetUserData]);
+
+  useEffect(() => {
+    if (publicKey && connected) {
+      fetchUser();
+    }
+  }, [publicKey, connected, fetchUser]);
+
+
+  useEffect(() => {
+    if (isOpen && publicKey && connected) {
+      fetchUser();
+    }
+  }, [isOpen, publicKey, connected, fetchUser]);
+
+
+  useEffect(() => {
+    if (isWalletModalPending && !walletModalVisible) {
+      setIsWalletModalPending(false);
+    }
+  }, [walletModalVisible, isWalletModalPending]);
+
+  const handleCheckIn = async () => {
+    if (!publicKey) return;
+    setLoading(true);
+    try {
+      const res = await api.dailyCheckIn(publicKey.toBase58());
+
+      if (res.success) {
+        // Update XP from response if available
+        const newXp = res.user?.total_xp ?? res.user?.xp ?? res.total_xp ?? res.xp;
+        if (newXp !== undefined) {
+          setUserData((prev: any) => ({
+            ...prev,
+            total_xp: newXp,
+            ...(res.user || {})
+          }));
+        }
+
+        // Also fetch fresh data from server
+        await fetchUser();
+        showToast("✅ +10 XP Claimed!", "success");
+      } else {
+        showToast(res.error || res.message || "Check-in failed", "error");
+      }
+    } catch (e: any) {
+      showToast(`Error: ${e.message}`, "error");
+    }
+    setLoading(false);
+  };
+
+  const handleFaucet = async () => {
+    if (!publicKey) return;
+    setFaucetLoading(true);
+    const walletAddress = publicKey.toBase58();
+
+    // 複数のdevnet RPCエンドポイントを試す（各RPCに個別のレート制限がある）
+    const DEVNET_RPCS = [
+      "https://api.devnet.solana.com",
+      "https://devnet.helius-rpc.com/?api-key=15319bf4-5b40-4958-ac8d-6313aa55eb92",
+    ];
+
+    try {
+      // 1. バックエンドのfaucet APIを試す（サーバーサイドなのでCORS問題なし）
+      try {
+        const result = await api.requestFaucet(walletAddress);
+        if (result.success || result.tx_signature) {
+          showToast("1 SOL Airdropped successfully!", "success");
+          return;
+        }
+      } catch (e) {
+        console.warn("Backend faucet failed, trying RPC airdrops...", e);
+      }
+
+      // 2. 複数のRPCエンドポイントで順番にairdropを試す
+      let lastError: any = null;
+      for (const rpc of DEVNET_RPCS) {
+        try {
+          const res = await fetch(rpc, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: "requestAirdrop",
+              params: [walletAddress, 1 * LAMPORTS_PER_SOL],
+            }),
+          });
+          const data = await res.json();
+          if (data.result) {
+            // トランザクションの確認待ち
+            const latestBlockHash = await connection.getLatestBlockhash();
+            await connection.confirmTransaction({
+              blockhash: latestBlockHash.blockhash,
+              lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+              signature: data.result,
+            });
+            showToast("1 SOL Airdropped successfully!", "success");
+            return;
+          }
+          lastError = data.error;
+        } catch (e) {
+          lastError = e;
+          console.warn(`Airdrop via ${rpc} failed, trying next...`, e);
+        }
+      }
+
+      // すべて失敗した場合
+      throw lastError || new Error("All airdrop methods failed");
+    } catch (e: any) {
+      console.error("All faucet methods failed:", e);
+      const msg = e?.message || e?.toString() || "";
+      if (msg.includes("429") || msg.includes("Too many requests") || msg.includes("rate")) {
+        showToast("Rate limit reached. Please wait a few minutes and try again.", "error");
+      } else {
+        // 最終手段: Solana Faucet サイトを案内
+        showToast("Airdrop failed. Opening Solana Faucet...", "error");
+        window.open(`https://faucet.solana.com/?wallet=${walletAddress}`, "_blank");
+      }
+    } finally {
+      setFaucetLoading(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      resetUserData();
+      await disconnect();
+      onClose();
+      showToast("Disconnected successfully", "success");
+    } catch (e) {
+      console.error("Disconnect failed:", e);
+      showToast("Disconnect failed", "error");
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  const handleConnect = () => {
+    setIsWalletModalPending(true);
+    onClose();
+    setTimeout(() => {
+      setVisible(true);
+    }, 150);
+  };
+
+  const showConnectView = !connected || !publicKey;
+  const drawerZIndex = walletModalVisible ? 'z-[100]' : 'z-[9999]';
+  const backdropZIndex = walletModalVisible ? 'z-[99]' : 'z-[9998]';
+
+  return createPortal(
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <motion.div 
+              initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} 
+              onPress={onClose} 
+              className={`fixed inset-0 bg-black/60 backdrop-blur-sm ${backdropZIndex}`}
+            />
+            
+            <motion.div 
+              initial={{x:'100%'}} animate={{x:0}} exit={{x:'100%'}} 
+              transition={{type:'spring', damping:25, stiffness: 200}} 
+              className={`fixed top-0 right-0 bottom-0 w-[90%] max-w-sm bg-[#0C0A09] border-l border-white/10 ${drawerZIndex} flex flex-col safe-area-top shadow-2xl`}
+            >
+              
+              <View className="flex justify-between items-center p-6 pb-2 shrink-0">
+                <h2 className="font-serif font-bold text-xl text-white">
+                    {showConnectView ? "Connect Wallet" : "My Profile"}
+                </h2>
+                <button onPress={onClose} className="p-2 hover:bg-white/10 rounded-full text-[#78716C] transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </View>
+
+              <View className="flex-1 overflow-y-auto p-6 pt-2 custom-scrollbar">
+
+                {showConnectView && (
+                  <View className="flex flex-col items-center justify-center h-full text-center py-10">
+                    <View className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
+                      <Wallet className="w-10 h-10 text-white/30" />
+                    </View>
+                    <Text className="text-white/60 mb-8 px-4">
+                      Connect your Solana wallet to claim XP and manage your portfolio.
+                    </Text>
+                    <button
+                      onPress={handleConnect}
+                      className="w-full py-4 bg-[#D97706] hover:bg-[#b45309] text-black font-bold rounded-xl active:scale-95 transition-all"
+                    >
+                      Connect Wallet
+                    </button>
+                  </View>
+                )}
+                {!showConnectView && publicKey && (
+                  <>
+                    <View className="flex flex-col items-center mb-8">
+                      <View className="relative group cursor-pointer" onPress={() => setIsEditOpen(true)}>
+                        <View className="w-24 h-24 rounded-full border-2 border-[#D97706]/30 p-1">
+                          <View className="w-full h-full rounded-full bg-[#1C1917] overflow-hidden flex items-center justify-center relative">
+                            {userData?.avatar_url ? (
+                              <img src={api.getProxyUrl(userData.avatar_url)} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                              <User className="w-10 h-10 text-white/20" />
+                            )}
+                          </View>
+                        </View>
+                        <View className="absolute bottom-1 right-1 bg-[#D97706] text-black p-1.5 rounded-full border border-black shadow-lg group-hover:scale-110 transition-transform">
+                          <Edit className="w-3.5 h-3.5" />
+                        </View>
+                      </View>
+
+                      <h3 className="mt-4 text-xl font-bold text-white">
+                        {userData?.username || `${publicKey.toBase58().slice(0,4)}...${publicKey.toBase58().slice(-4)}`}
+                      </h3>
+                      {userData?.bio ? (
+                        <Text className="text-sm text-[#78716C] text-center mt-1 max-w-[200px] leading-relaxed">
+                          {userData.bio}
+                        </Text>
+                      ) : (
+                        <button onPress={() => setIsEditOpen(true)} className="text-xs text-[#78716C]/50 mt-1 hover:text-[#D97706] transition-colors">
+                          + Add Bio
+                        </button>
+                      )}
+                    </View>
+
+                    <View className="relative mb-6 overflow-hidden rounded-2xl border border-[#D97706]/20 bg-gradient-to-br from-[#0C0A09] via-[#1c1917] to-[#451a03] p-6 text-center shadow-lg">
+                      <View className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
+                      <View className="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-[#D97706]/10 blur-3xl" />
+                      
+                      <Trophy className="absolute -right-4 -bottom-4 h-24 w-24 rotate-12 text-[#D97706]/5 transition-transform duration-500 group-hover:rotate-6" />
+                      
+                      <View className="relative z-10">
+                        <Text className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#D97706]">Season 0 Rank</Text>
+                        <h3 className="mb-1 font-serif text-5xl font-bold tracking-tight text-white drop-shadow-sm">
+                          {userData?.total_xp?.toLocaleString() || 0}
+                        </h3>
+                        <View className="flex items-center justify-center gap-2">
+                          <Text className="text-sm text-[#78716C]">Current XP</Text>
+                          <Text className="rounded border border-white/5 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/50">
+                            {userData?.rank_tier || 'Novice'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View className="space-y-3">
+                      <button 
+                        onPress={handleCheckIn}
+                        disabled={loading}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#D97706] py-3.5 font-bold text-black shadow-lg shadow-orange-900/20 transition-all active:scale-95 hover:bg-[#b45309] disabled:opacity-50"
+                      >
+                        {loading ? <Sparkles className="h-5 w-5 animate-spin" /> : <CheckCircle className="h-5 w-5" />}
+                        <Text>Daily Check-in</Text>
+                        <Text className="rounded bg-black/20 px-1.5 py-0.5 text-xs">+10 XP</Text>
+                      </button>
+
+                      <button 
+                        onPress={handleFaucet}
+                        disabled={faucetLoading}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-500/20 bg-[#1C1917] py-3.5 font-bold text-purple-400 transition-all active:scale-95 hover:bg-[#292524] disabled:opacity-50"
+                      >
+                        {faucetLoading ? <Sparkles className="h-5 w-5 animate-spin" /> : <Droplets className="h-5 w-5" />}
+                        Get 1 SOL (Devnet)
+                      </button>
+                      <button 
+                        onPress={() => setIsInviteOpen(true)}
+                        className="group flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#1C1917] py-3.5 font-bold text-[#E7E5E4] transition-all active:scale-95 hover:bg-[#292524]"
+                      >
+                        <QrCode className="h-5 w-5 text-[#78716C] transition-colors group-hover:text-white" /> 
+                        Invite & Earn
+                      </button>
+                      
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {!showConnectView && publicKey && (
+                <View className="mt-auto shrink-0 p-6 pt-0">
+                  <button
+                    onPress={handleDisconnect}
+                    disabled={isDisconnecting}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg py-2 text-sm font-bold text-red-500/80 transition-colors hover:bg-red-500/5 hover:text-red-500 disabled:opacity-50"
+                  >
+                    {isDisconnecting ? (
+                      <Sparkles className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <LogOut className="h-4 w-4" />
+                    )}
+                    {isDisconnecting ? "Disconnecting..." : "Disconnect Wallet"}
+                  </button>
+                </View>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {publicKey && (
+        <ProfileEditModal
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+          currentProfile={{
+            pubkey: publicKey.toBase58(),
+            username: userData?.is_registered ? userData?.username : undefined,
+            bio: userData?.bio,
+            avatar_url: userData?.avatar_url,
+          }}
+          onUpdate={fetchUser}
+        />
+      )}
+
+      <AnimatePresence>
+        {isInviteOpen && publicKey && (
+          <InviteModal 
+            isOpen={isInviteOpen} 
+            onClose={() => setIsInviteOpen(false)} 
+            pubkey={publicKey.toBase58()} 
+          />
+        )}
+      </AnimatePresence>
+    </>,
+    document.body
+  );
+};

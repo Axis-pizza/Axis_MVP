@@ -1,15 +1,14 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Search, Plus, ArrowLeft, ChevronRight,
-  Check, TrendingUp, Loader2, AlertCircle, Percent, X,
-} from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { Search, ArrowLeft, ChevronRight, Check, Loader2, AlertCircle, Percent, X, Sparkles, TrendingUp, Plus } from 'lucide-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { TokenImage } from '../../common/TokenImage';
 import { WeightControl } from './WeightControl';
+import { TabSelector } from './TabSelector';
 import type { JupiterToken } from '../../../services/jupiter';
-import type { AssetItem } from './types';
-import type { ManualDashboardHook } from '../../../hooks/useManualDashboard';
+import type { AssetItem, ExtendedDashboardHook } from './types';
 
-// --- Desktop Token List Item ---
+// --- Desktop Sub Components ---
+
 const DesktopTokenListItem = ({
   token,
   isSelected,
@@ -47,29 +46,34 @@ const DesktopTokenListItem = ({
         <span className={`font-semibold text-sm ${isSelected ? 'text-amber-500' : 'text-white'}`}>
           {token.symbol}
         </span>
+        {token.tags?.includes('meme') && <Sparkles size={12} className="text-pink-400" />}
         {token.tags?.includes('birdeye-trending') && <TrendingUp size={12} className="text-green-400" />}
-        {token.tags?.includes('stable') && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400">Stable</span>
-        )}
       </div>
       <div className={`text-xs truncate ${isSelected ? 'text-amber-600/50' : 'text-white/40'}`}>
         {token.name}
       </div>
     </div>
 
-    {isSelected ? (
-      <div className="flex-none w-8 h-8 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center">
-        <Check size={14} className="text-white" />
-      </div>
+    {token.balance !== undefined && token.balance > 0 ? (
+       <div className="text-right">
+          <div className="text-sm font-mono text-white/90">
+            {token.balance < 0.001 ? '<0.001' : token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+          </div>
+       </div>
     ) : (
-      <div className="flex-none w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 group-hover:text-white/50">
-        <Plus size={14} />
-      </div>
+      isSelected ? (
+        <div className="flex-none w-8 h-8 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center">
+          <Check size={14} className="text-white" />
+        </div>
+      ) : (
+        <div className="flex-none w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 group-hover:text-white/50">
+          <Plus size={14} />
+        </div>
+      )
     )}
   </button>
 );
 
-// --- Desktop Asset Card ---
 const DesktopAssetCard = ({
   item,
   totalWeight,
@@ -81,13 +85,7 @@ const DesktopAssetCard = ({
   onUpdateWeight: (address: string, value: number) => void;
   onRemove: (address: string) => void;
 }) => (
-  <motion.div
-    layout
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, x: -30 }}
-    className="relative overflow-hidden rounded-2xl border border-amber-900/20 bg-gradient-to-br from-[#0a0a0a] via-[#111] to-amber-950/10"
-  >
+  <div className="relative overflow-hidden rounded-2xl border border-amber-900/20 bg-gradient-to-br from-[#0a0a0a] via-[#111] to-amber-950/10">
     <div className="p-4">
       <div className="flex items-center gap-3 mb-3">
         <TokenImage src={item.token.logoURI} className="w-10 h-10 rounded-full flex-none ring-1 ring-amber-900/30" />
@@ -109,12 +107,13 @@ const DesktopAssetCard = ({
         totalWeight={totalWeight}
       />
     </div>
-  </motion.div>
+  </div>
 );
 
 // --- Main DesktopBuilder ---
+
 interface DesktopBuilderProps {
-  dashboard: ManualDashboardHook;
+  dashboard: ExtendedDashboardHook;
   onBack?: () => void;
 }
 
@@ -132,6 +131,8 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
     sortedVisibleTokens,
     displayTokens,
     allTokens,
+    activeTab,
+    setActiveTab,
     tokenFilter,
     setTokenFilter,
     filterCounts,
@@ -142,9 +143,10 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
     distributeEvenly,
   } = dashboard;
 
+  const { publicKey } = useWallet();
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* Header */}
       <div className="flex-none px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black">
         <div className="flex items-center gap-4">
           <button
@@ -153,20 +155,14 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
           >
             <ArrowLeft size={18} />
           </button>
-          <h1
-            className="text-xl text-white"
-            style={{ fontFamily: '"Times New Roman", serif' }}
-          >
+          <h1 className="text-xl text-white" style={{ fontFamily: '"Times New Roman", serif' }}>
             Build Strategy
           </h1>
         </div>
       </div>
 
-      {/* Two-Column Layout */}
       <div className="flex-1 flex min-h-0">
-        {/* Left Column - Selected Tokens (~55%) */}
         <div className="w-[55%] flex flex-col min-h-0 border-r border-white/5">
-          {/* Stats Header */}
           <div className="px-6 py-4 flex justify-between items-center border-b border-amber-900/10 bg-gradient-to-r from-[#050505] to-amber-950/5">
             <div className="flex items-center gap-4">
               <div className={`relative w-16 h-16 rounded-2xl flex flex-col items-center justify-center overflow-hidden ${
@@ -214,42 +210,31 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
                   Equal
                 </button>
               )}
-              <div
-                className="text-sm text-amber-700/50"
-                style={{ fontFamily: '"Times New Roman", serif' }}
-              >
+              <div className="text-sm text-amber-700/50" style={{ fontFamily: '"Times New Roman", serif' }}>
                 {portfolio.length} asset{portfolio.length !== 1 ? 's' : ''}
               </div>
             </div>
           </div>
 
-          {/* Portfolio List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
             <AnimatePresence>
               {totalWeight > 100 && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-950/30 border border-red-900/30 text-red-400 text-sm"
-                >
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-950/30 border border-red-900/30 text-red-400 text-sm">
                   <AlertCircle size={18} />
                   <span>Total exceeds 100%</span>
-                </motion.div>
+                </div>
               )}
             </AnimatePresence>
 
-            <AnimatePresence mode="popLayout">
-              {portfolio.map(item => (
-                <DesktopAssetCard
-                  key={item.token.address}
-                  item={item}
-                  totalWeight={totalWeight}
-                  onUpdateWeight={updateWeight}
-                  onRemove={removeToken}
-                />
-              ))}
-            </AnimatePresence>
+            {portfolio.map(item => (
+              <DesktopAssetCard
+                key={item.token.address}
+                item={item}
+                totalWeight={totalWeight}
+                onUpdateWeight={updateWeight}
+                onRemove={removeToken}
+              />
+            ))}
 
             {portfolio.length === 0 && (
               <div className="h-48 flex flex-col items-center justify-center gap-4">
@@ -261,7 +246,6 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
             )}
           </div>
 
-          {/* Next Button */}
           <div className="p-4 border-t border-white/5">
             <button
               onClick={handleToIdentity}
@@ -277,11 +261,9 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
           </div>
         </div>
 
-        {/* Right Column - Token Browser (~45%) */}
         <div className="w-[45%] flex flex-col min-h-0 bg-[#0a0a0a]">
-          {/* Search */}
           <div className="px-4 py-4 border-b border-white/5">
-            <div className="relative">
+            <div className="relative mb-4">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-800/50" size={18} />
               <input
                 value={searchQuery}
@@ -300,6 +282,12 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
               {isSearching && <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 text-amber-600 animate-spin" size={16} />}
             </div>
 
+            <TabSelector 
+               activeTab={activeTab} 
+               setActiveTab={setActiveTab} 
+               isWalletConnected={!!publicKey} 
+            />
+
             <div className="flex justify-between items-center mt-2 px-1">
               <span className="text-xs text-amber-800/40">
                 {searchQuery ? `${displayTokens.length} results` : `${allTokens.length.toLocaleString()} tokens`}
@@ -312,33 +300,33 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
               )}
             </div>
 
-            {/* Filter Tabs */}
-            <div className="flex gap-1.5 mt-3 overflow-x-auto no-scrollbar">
-              {([
-                { key: 'all', label: 'All', count: 1 },
-                { key: 'crypto', label: 'Crypto', count: filterCounts.crypto },
-                { key: 'stock', label: 'Stock', count: filterCounts.stock },
-                { key: 'commodity', label: 'Commodities', count: filterCounts.commodity },
-                { key: 'prediction', label: 'Prediction', count: filterCounts.prediction },
-              ] as const).map(({ key, label, count }) => (
-                count === undefined || count > 0 ? (
-                  <button
-                    key={key}
-                    onClick={() => setTokenFilter(key)}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      tokenFilter === key
-                        ? 'bg-amber-600 text-black'
-                        : 'bg-white/5 text-white/40 hover:bg-white/10'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ) : null
-              ))}
-            </div>
+            {/* Sub Filters - All removed to prevent duplication */}
+            {activeTab === 'all' && (
+              <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar">
+                {([
+                  { key: 'crypto', label: 'Crypto', count: filterCounts.crypto },
+                  { key: 'stock', label: 'Stock', count: filterCounts.stock },
+                  { key: 'commodity', label: 'Commodities', count: filterCounts.commodity },
+                  { key: 'prediction', label: 'Prediction', count: filterCounts.prediction },
+                ] as const).map(({ key, label, count }) => (
+                  count === undefined || count > 0 ? (
+                    <button
+                      key={key}
+                      onClick={() => setTokenFilter(prev => prev === key ? 'all' : key)}
+                      className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        tokenFilter === key
+                          ? 'bg-amber-600 text-black'
+                          : 'bg-white/5 text-white/40 hover:bg-white/10'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ) : null
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Token List */}
           <div className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3">
@@ -352,34 +340,15 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
               </div>
             ) : (
               <div className="space-y-0.5 pt-1">
-                {hasSelection && !searchQuery && (
-                  <div className="px-3 pt-2 pb-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-amber-700/50">
-                      Selected
-                    </span>
-                  </div>
-                )}
-
                 {sortedVisibleTokens.map((token, index) => {
                   const isSelected = selectedIds.has(token.address);
-                  const showDivider = hasSelection && !searchQuery && index === portfolio.length && index > 0;
-
                   return (
-                    <div key={token.address}>
-                      {showDivider && (
-                        <div className="px-3 pt-4 pb-1 flex items-center gap-3">
-                          <span className="text-[10px] font-medium uppercase tracking-wider text-white/20">
-                            Available
-                          </span>
-                          <div className="flex-1 h-px bg-gradient-to-r from-amber-900/20 to-transparent" />
-                        </div>
-                      )}
-                      <DesktopTokenListItem
+                    <DesktopTokenListItem
+                        key={token.address}
                         token={token}
                         isSelected={isSelected}
                         onSelect={() => addTokenDirect(token)}
-                      />
-                    </div>
+                    />
                   );
                 })}
               </div>

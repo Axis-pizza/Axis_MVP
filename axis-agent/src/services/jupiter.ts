@@ -1,4 +1,5 @@
-
+import { Connection, PublicKey } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 export interface JupiterToken {
   address: string;
@@ -9,9 +10,11 @@ export interface JupiterToken {
   logoURI: string;
   tags: string[];
   isVerified?: boolean;
-  source?: 'jupiter' | 'dflow' | 'stock' | 'commodity';
-  isMock?: boolean;
   price?: number;
+  balance?: number; // ウォレット残高
+  source?: string;
+  dailyVolume?: number;
+  isMock?: boolean;
   predictionMeta?: {
     eventId: string;
     eventTitle: string;
@@ -22,373 +25,207 @@ export interface JupiterToken {
   };
 }
 
-const CHAIN_ID = 101;
+const UTL_API_URL = "https://token-list-api.solana.cloud/v1/list";
+const DEX_TOKENS_API = "https://api.dexscreener.com/latest/dex/tokens";
+const DEX_SEARCH_API = "https://api.dexscreener.com/latest/dex/search";
 
-// ✅ 動的APIのエンドポイント
-const BASE = "https://api.jup.ag";
-const TOKEN_LIST_URL = `${BASE}/tokens/v2/tag?query=verified`; // 動的リスト取得
-const SEARCH_URL = `${BASE}/tokens/v2/search`;
-const PRICE_API_URL = `${BASE}/price/v3`;
-
-// バックアップ: Solana Token List (古いがまだ動く)
-const BACKUP_LIST_URL = "https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json";
-
-// --- Critical Fallback (Offline/Emergency) ---
+// 緊急用フォールバック
 const CRITICAL_FALLBACK: JupiterToken[] = [
   { address: "So11111111111111111111111111111111111111112", chainId: 101, decimals: 9, name: "Wrapped SOL", symbol: "SOL", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", tags: ["verified"], isVerified: true },
   { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", chainId: 101, decimals: 6, name: "USD Coin", symbol: "USDC", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", tags: ["verified"], isVerified: true },
   { address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", chainId: 101, decimals: 6, name: "USDT", symbol: "USDT", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png", tags: ["verified"], isVerified: true },
-  { address: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", chainId: 101, decimals: 6, name: "Jupiter", symbol: "JUP", logoURI: "https://static.jup.ag/jup/icon.png", tags: ["verified"], isVerified: true },
-  { address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", chainId: 101, decimals: 5, name: "Bonk", symbol: "BONK", logoURI: "https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I", tags: ["verified"], isVerified: true },
-  { address: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", chainId: 101, decimals: 6, name: "dogwifhat", symbol: "WIF", logoURI: "https://bafkreibk3covs5ltyqxa272uodhculbr6kea6betidfwy3ajsav2vjzyum.ipfs.nftstorage.link", tags: ["verified"], isVerified: true },
-  { address: "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4", chainId: 101, decimals: 6, name: "Jupiter Perps LP", symbol: "JLP", logoURI: "https://static.jup.ag/jlp/icon.png", tags: ["verified"], isVerified: true },
 ];
 
-const CACHE_KEY = "jup_tokens_v3_dynamic"; // キャッシュキーを変更して古いキャッシュをクリア
-const CACHE_TTL = 1000 * 60 * 60 * 6; // 6時間
+const CACHE_KEY = "utl_tokens_v2";
+const CACHE_TTL = 1000 * 60 * 60 * 12; // 12時間
 
 let liteCache: JupiterToken[] | null = null;
 let refreshPromise: Promise<void> | null = null;
+const priceCache: Record<string, { price: number; timestamp: number }> = {};
 
-// --- Helper: Get API Key safely ---
-const getApiKey = () => {
-  return typeof import.meta !== 'undefined' 
-    ? import.meta.env?.VITE_JUPITER_API_KEY 
-    : undefined;
-};
-
-function loadLocalCache(): JupiterToken[] | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const { tokens, ts } = JSON.parse(raw);
-    
-    // キャッシュの有効期限をチェック
-    if (ts && Date.now() - ts > CACHE_TTL) {
-      return null;
-    }
-    
-    return Array.isArray(tokens) && tokens.length > 0 ? tokens : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveLocalCache(tokens: JupiterToken[]) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ tokens, ts: Date.now() }));
-  } catch (e) {
-    console.warn("[Jupiter] Failed to save cache:", e);
-  }
-}
-
-/**
- * 古いキャッシュをクリアする
- */
-function clearOldCache() {
-  try {
-    const oldKeys = ["jup_lite_tokens_v2_strict", "jup_lite_tokens", "jup_tokens_v2", "jup_tokens_v3_lite"];
-    oldKeys.forEach(key => localStorage.removeItem(key));
-  } catch {}
-}
-
-/**
- * Jupiter API V2のレスポンスをJupiterToken形式に変換
- */
-function mapJupTokenV2(t: any): JupiterToken {
+function mapUtlToken(t: any): JupiterToken {
   return {
-    address: t.id || t.address || t.mint,
-    chainId: CHAIN_ID,
-    decimals: t.decimals ?? 6,
-    name: t.name || "Unknown",
-    symbol: t.symbol || "???",
-    logoURI: t.icon || t.logoURI || t.logo_uri || "",
+    address: t.address,
+    chainId: t.chainId,
+    decimals: t.decimals,
+    name: t.name,
+    symbol: t.symbol,
+    logoURI: t.logoURI,
     tags: t.tags || [],
-    isVerified: t.isVerified ?? t.tags?.includes("verified") ?? false,
+    isVerified: t.verified ?? true,
   };
 }
 
-/**
- * トークンリストを取得（動的API + API Key対応）
- */
-async function fetchTokenList(): Promise<JupiterToken[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000); // タイムアウトを少し長めに
-
-  try {
-    // ✅ 重要: API Keyをヘッダーに付与
-    const apiKey = getApiKey();
-    const headers: HeadersInit = { "Accept": "application/json" };
-    if (apiKey) {
-      headers["x-api-key"] = apiKey;
-    }
-
-    const res = await fetch(TOKEN_LIST_URL, { 
-      signal: controller.signal,
-      headers: headers 
-    });
-    
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status}: ${res.statusText} - ${errText}`);
-    }
-
-    const data = await res.json();
-    
-    // API V2のレスポンス形式: 配列で返ってくる
-    const list = Array.isArray(data) ? data.map(mapJupTokenV2) : [];
-    
-    if (list.length > 0) {
-      return list;
-    }
-    
-    throw new Error("Empty token list received");
-
-  } catch (e: any) {
-    console.warn("[Jupiter] Primary API failed:", e.message);
-    
-    // バックアップ: jsdelivr経由のSolana Token List (静的ファイルなのでAPIキー不要)
-    try {
-      const resBackup = await fetch(BACKUP_LIST_URL, { signal: controller.signal });
-      
-      if (resBackup.ok) {
-        const data = await resBackup.json();
-        const tokens = data.tokens || [];
-        // mainnet-betaのトークンのみ、最初の300件
-        const filtered = tokens
-          .filter((t: any) => t.chainId === 101)
-          .slice(0, 300)
-          .map(mapJupTokenV2);
-        
-        return filtered.length > 0 ? filtered : CRITICAL_FALLBACK;
-      }
-    } catch (backupErr) {
-      console.warn("[Jupiter] Backup also failed:", backupErr);
-    }
-
-    return CRITICAL_FALLBACK;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-const priceCache: Record<string, { price: number; timestamp: number }> = {};
-const PRICE_CACHE_DURATION = 30 * 1000;
-
 export const JupiterService = {
-  /**
-   * キャッシュをクリアして再取得
-   */
-  clearCache: () => {
-    liteCache = null;
-    clearOldCache();
-    localStorage.removeItem(CACHE_KEY);
-  },
-
-  /**
-   * トークンリストを取得
-   */
+  // リスト取得 (UTL)
   getLiteList: async (): Promise<JupiterToken[]> => {
-    // 古いキャッシュをクリア（初回のみ）
-    clearOldCache();
-    
-    // メモリキャッシュがあればそれを返す
-    if (liteCache && liteCache.length > 0) {
-      return liteCache;
-    }
-
-    // ローカルストレージからロード
-    const local = loadLocalCache();
-    if (local && local.length > 0) {
-      liteCache = local;
-      
-      // バックグラウンドで更新
-      if (!refreshPromise) {
-        refreshPromise = (async () => {
-          try {
-            const fresh = await fetchTokenList();
-            if (fresh.length > CRITICAL_FALLBACK.length) {
-              liteCache = fresh;
-              saveLocalCache(fresh);
-            }
-          } catch (e) {
-            console.warn("[Jupiter] Background refresh failed:", e);
-          } finally {
-            refreshPromise = null;
-          }
-        })();
-      }
-      
-      return local;
-    }
-
-    // キャッシュがない場合は即座にフォールバックを返し、バックグラウンドで取得
-    liteCache = CRITICAL_FALLBACK;
-    
-    refreshPromise = (async () => {
-      try {
-        const fresh = await fetchTokenList();
-        if (fresh.length > CRITICAL_FALLBACK.length) {
-          liteCache = fresh;
-          saveLocalCache(fresh);
-        }
-      } catch (e) {
-        console.warn("[Jupiter] Initial fetch failed:", e);
-      } finally {
-        refreshPromise = null;
-      }
-    })();
-
-    return CRITICAL_FALLBACK;
-  },
-
-  /**
-   * トークン検索（新API対応 + API Key）
-   */
-  searchTokens: async (query: string): Promise<JupiterToken[]> => {
-    const q = query.trim();
-    if (!q) return [];
-
-    // 短いクエリはローカルフィルタリング
-    if (q.length < 2) {
-      const list = await JupiterService.getLiteList();
-      const lower = q.toLowerCase();
-      return list.filter(t => 
-        t.symbol.toLowerCase().startsWith(lower) || 
-        t.name.toLowerCase().startsWith(lower)
-      ).slice(0, 20);
-    }
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    if (liteCache) return liteCache;
 
     try {
-      // ✅ API Keyをヘッダーに追加
-      const apiKey = getApiKey();
-      const headers: HeadersInit = { "Accept": "application/json" };
-      if (apiKey) headers["x-api-key"] = apiKey;
-
-      const url = `${SEARCH_URL}?query=${encodeURIComponent(q)}`;
-      const res = await fetch(url, { headers, signal: controller.signal });
-      
-      if (!res.ok) {
-        console.warn(`[Jupiter] Search API error: ${res.status}`);
-        // APIがエラーの場合はローカル検索にフォールバック
-        throw new Error(`Search API failed with ${res.status}`);
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const { tokens, ts } = JSON.parse(raw);
+        if (ts && Date.now() - ts < CACHE_TTL) {
+          liteCache = tokens;
+          if (!refreshPromise) refreshPromise = JupiterService.fetchAndCache();
+          return tokens;
+        }
       }
+    } catch {}
 
+    if (!refreshPromise) refreshPromise = JupiterService.fetchAndCache();
+    await refreshPromise;
+    return liteCache || CRITICAL_FALLBACK;
+  },
+
+  fetchAndCache: async () => {
+    try {
+      const res = await fetch(UTL_API_URL);
+      if (!res.ok) throw new Error("UTL API Error");
       const data = await res.json();
-      const results = Array.isArray(data) ? data.map(mapJupTokenV2) : [];
+      const content = data.content || data;
+      const list = Array.isArray(content) 
+        ? content.filter((t: any) => t.chainId === 101).map(mapUtlToken) 
+        : CRITICAL_FALLBACK;
       
-      return results;
-      
+      if (list.length > 0) {
+        liteCache = list;
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ tokens: list, ts: Date.now() }));
+        } catch {} // Quota exceeded対策
+      }
     } catch (e) {
-      console.warn("[Jupiter] Search failed, using local filter:", e);
-      
-      // フォールバック: ローカルリストでフィルタ
-      const list = await JupiterService.getLiteList();
-      const lower = q.toLowerCase();
-      return list.filter(t => 
-        t.symbol.toLowerCase().includes(lower) || 
-        t.name.toLowerCase().includes(lower) ||
-        t.address === q
-      ).slice(0, 30);
-    } finally {
-      clearTimeout(timer);
+      console.warn("UTL Fetch failed", e);
+      liteCache = CRITICAL_FALLBACK;
     }
   },
 
-  /**
-   * 価格取得（新API対応 + API Key）
-   */
+  // 動的トレンド取得 (DexScreener)
+  getTrendingTokens: async (): Promise<string[]> => {
+    try {
+      // Solanaの直近24hボリューム上位などを検索
+      const res = await fetch(`${DEX_SEARCH_API}?q=solana`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (data.pairs) {
+        // chainIdがsolanaのペアからBaseTokenのアドレスを抽出して重複排除
+        const mints = data.pairs
+            .filter((p: any) => p.chainId === 'solana')
+            .map((p: any) => p.baseToken.address);
+        return Array.from(new Set(mints)) as string[];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  },
+
+  // 価格取得
   getPrices: async (mintAddresses: string[]): Promise<Record<string, number>> => {
-    if (mintAddresses.length === 0) return {};
+    const validMints = mintAddresses.filter(m => m && m.length > 30);
+    if (validMints.length === 0) return {};
 
     const now = Date.now();
-    const uncachedMints = mintAddresses.filter((mint) => {
-      const cached = priceCache[mint];
-      return !cached || now - cached.timestamp > PRICE_CACHE_DURATION;
-    });
+    const uncached = validMints.filter(m => !priceCache[m] || (now - priceCache[m].timestamp > 60000));
 
-    // 全てキャッシュにある場合
-    if (uncachedMints.length === 0) {
-      return mintAddresses.reduce((acc, mint) => {
-        if (priceCache[mint]) acc[mint] = priceCache[mint].price;
+    if (uncached.length === 0) {
+      return validMints.reduce((acc, m) => {
+        if (priceCache[m]) acc[m] = priceCache[m].price;
         return acc;
       }, {} as Record<string, number>);
     }
 
+    const chunkSize = 30; // DexScreener limit
+    const chunks = [];
+    for (let i = 0; i < uncached.length; i += chunkSize) {
+      chunks.push(uncached.slice(i, i + chunkSize));
+    }
+
+    await Promise.all(chunks.map(async (chunk) => {
+      try {
+        const res = await fetch(`${DEX_TOKENS_API}/${chunk.join(",")}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.pairs) {
+          chunk.forEach(mint => {
+            const pair = data.pairs.find((p: any) => p.baseToken.address === mint);
+            if (pair && pair.priceUsd) {
+              priceCache[mint] = { price: parseFloat(pair.priceUsd), timestamp: now };
+            }
+          });
+        }
+      } catch {}
+    }));
+
+    return validMints.reduce((acc, m) => {
+      if (priceCache[m]) acc[m] = priceCache[m].price;
+      return acc;
+    }, {} as Record<string, number>);
+  },
+  
+  searchTokens: async (query: string): Promise<JupiterToken[]> => {
+    const q = query.trim().toLowerCase();
+    const list = await JupiterService.getLiteList();
+    if (!q) return [];
+    if (q.length > 30) {
+        const match = list.find(t => t.address === q);
+        return match ? [match] : [];
+    }
+    return list.filter(t => t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)).slice(0, 50);
+  },
+
+  getToken: async (mint: string): Promise<JupiterToken | null> => {
+    const list = await JupiterService.getLiteList();
+    return list.find(t => t.address === mint) ?? null;
+  },
+
+  getFallbackTokens: () => CRITICAL_FALLBACK,
+};
+
+export const WalletService = {
+  getUserTokens: async (connection: Connection, walletPublicKey: PublicKey): Promise<JupiterToken[]> => {
     try {
-      const ids = uncachedMints.join(",");
-      // ✅ API Keyをヘッダーに追加
-      const apiKey = getApiKey();
-      const headers: HeadersInit = { "Accept": "application/json" };
-      if (apiKey) headers["x-api-key"] = apiKey;
-
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-
-      const response = await fetch(`${PRICE_API_URL}?ids=${ids}`, { 
-        headers, 
-        signal: controller.signal 
+      const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, {
+        programId: TOKEN_PROGRAM_ID,
       });
-      clearTimeout(timer);
 
-      if (!response.ok) {
-        throw new Error(`Price API HTTP ${response.status}`);
+      const heldTokens = tokenAccounts.value
+        .map((account) => ({
+          mint: account.account.data.parsed.info.mint as string,
+          amount: account.account.data.parsed.info.tokenAmount.uiAmount as number
+        }))
+        .filter((t) => t.amount > 0);
+
+      const solBalance = await connection.getBalance(walletPublicKey);
+      if (solBalance > 0) {
+        heldTokens.push({ mint: "So11111111111111111111111111111111111111112", amount: solBalance / 1e9 });
       }
 
-      const data = await response.json();
-      const result: Record<string, number> = {};
-
-      // V3 API のレスポンス形式
-      if (data.data) {
-        Object.entries(data.data).forEach(([mint, info]: [string, any]) => {
-          const price = parseFloat(info.price);
-          if (!isNaN(price)) {
-            priceCache[mint] = { price, timestamp: now };
-            result[mint] = price;
-          }
-        });
-      }
-
-      // キャッシュ済みのものも含める
-      mintAddresses.forEach((mint) => {
-        if (priceCache[mint] && !(mint in result)) {
-          result[mint] = priceCache[mint].price;
+      const allTokens = await JupiterService.getLiteList();
+      
+      const result = heldTokens.map((held) => {
+        const meta = allTokens.find(t => t.address === held.mint);
+        if (meta) {
+          return { ...meta, balance: held.amount };
+        } else {
+          return {
+            address: held.mint,
+            chainId: 101,
+            decimals: 0,
+            name: "Unknown",
+            symbol: "UNKNOWN",
+            logoURI: "",
+            tags: ["unknown"],
+            isVerified: false,
+            balance: held.amount
+          };
         }
       });
 
-      return result;
+      return result.sort((a, b) => (b.balance || 0) - (a.balance || 0));
     } catch (e) {
-      console.warn("[Jupiter] Price fetch failed:", e);
-      
-      // キャッシュがあればそれを返す
-      return mintAddresses.reduce((acc, mint) => {
-        if (priceCache[mint]) acc[mint] = priceCache[mint].price;
-        return acc;
-      }, {} as Record<string, number>);
+      console.error("Wallet fetch error", e);
+      return [];
     }
-  },
-
-  /**
-   * フォールバックトークンを取得
-   */
-  getFallbackTokens: (): JupiterToken[] => {
-    return CRITICAL_FALLBACK;
-  },
-  
-  /**
-   * 単一トークンの情報を取得
-   */
-  getToken: async (mintAddress: string): Promise<JupiterToken | null> => {
-    // まずキャッシュから探す
-    const list = await JupiterService.getLiteList();
-    const found = list.find(t => t.address === mintAddress);
-    if (found) return found;
-    
-    // 見つからなければ検索 (検索APIにもキーが適用される)
-    const results = await JupiterService.searchTokens(mintAddress);
-    return results.find(t => t.address === mintAddress) || null;
   }
 };
