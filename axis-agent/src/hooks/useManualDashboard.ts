@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
-import { JupiterService, type JupiterToken } from '../services/jupiter';
+import { JupiterService, WalletService, type JupiterToken } from '../services/jupiter';
 import { fetchPredictionTokens, fetchStockTokens, fetchCommodityTokens } from '../services/dflow';
 import { toast } from 'sonner';
-import type { StrategyConfig, AssetItem, ManualData, ManualDashboardProps } from '../components/create/manual/types';
+import type { StrategyConfig, AssetItem, ManualDashboardProps } from '../components/create/manual/types';
 
 const POPULAR_SYMBOLS = ['SOL', 'USDC', 'USDT', 'JUP', 'JLP', 'BONK', 'WIF', 'TRUMP', 'ETH', 'JitoSOL'];
 
@@ -18,14 +18,24 @@ export const useManualDashboard = ({
   };
 
   const [step, setStep] = useState<'builder' | 'identity'>('builder');
+  
+  // Tabs State
+  const [activeTab, setActiveTab] = useState<'all' | 'your_tokens' | 'trending' | 'meme'>('all');
+  
   const [allTokens, setAllTokens] = useState<JupiterToken[]>([]);
-  const [displayTokens, setDisplayTokens] = useState<JupiterToken[]>([]);
+  // NOTE: displayTokens state definition removed to fix duplicate declaration error.
+  
+  // Data specific to tabs
+  const [userTokens, setUserTokens] = useState<JupiterToken[]>([]);
+  const [trendingIds, setTrendingIds] = useState<Set<string>>(new Set());
+
   const [portfolio, setPortfolio] = useState<AssetItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const { connected, publicKey } = useWallet();
+  const { connection } = useConnection();
   const { setVisible } = useWalletModal();
 
   const [config, setConfig] = useState<StrategyConfig>({
@@ -45,44 +55,74 @@ export const useManualDashboard = ({
   const hasSelection = portfolio.length > 0;
   const isValidAllocation = totalWeight === 100 && portfolio.length >= 2;
 
-  const visibleTokens = useMemo(() => displayTokens.slice(0, 100), [displayTokens]);
-
-  const filteredVisibleTokens = useMemo(() => {
-    if (tokenFilter === 'all') return visibleTokens;
-    if (tokenFilter === 'crypto') return visibleTokens.filter(t => !t.source || t.source === 'jupiter');
-    if (tokenFilter === 'stock') return visibleTokens.filter(t => t.source === 'stock');
-    if (tokenFilter === 'commodity') return visibleTokens.filter(t => t.source === 'commodity');
-    if (tokenFilter === 'prediction') return visibleTokens.filter(t => t.source === 'dflow');
-    return visibleTokens;
-  }, [visibleTokens, tokenFilter]);
-
-  const sortedVisibleTokens = useMemo(() => {
-    if (!hasSelection) return filteredVisibleTokens;
-    const selected = filteredVisibleTokens.filter(t => selectedIds.has(t.address));
-    const unselected = filteredVisibleTokens.filter(t => !selectedIds.has(t.address));
-    return [...selected, ...unselected];
-  }, [filteredVisibleTokens, selectedIds, hasSelection]);
-
   const filterCounts = useMemo(() => ({
-    crypto: displayTokens.filter(t => !t.source || t.source === 'jupiter').length,
-    stock: displayTokens.filter(t => t.source === 'stock').length,
-    commodity: displayTokens.filter(t => t.source === 'commodity').length,
-    prediction: displayTokens.filter(t => t.source === 'dflow').length,
-  }), [displayTokens]);
+    crypto: allTokens.filter(t => !t.source || t.source === 'jupiter').length,
+    stock: allTokens.filter(t => t.source === 'stock').length,
+    commodity: allTokens.filter(t => t.source === 'commodity').length,
+    prediction: allTokens.filter(t => t.source === 'dflow').length,
+  }), [allTokens]);
 
-  // --- Init ---
+  // --- Logic for displaying tokens based on Tabs & Filters ---
+  const sortedVisibleTokens = useMemo(() => {
+    let baseList = allTokens;
+
+    // 1. Tab Filtering
+    if (activeTab === 'your_tokens') {
+        baseList = userTokens;
+    } else if (activeTab === 'meme') {
+        baseList = allTokens.filter(t => 
+            t.tags.includes('meme') || 
+            ['WIF', 'BONK', 'POPCAT', 'MEW', 'BOME', 'PNUT', 'MOG', 'TRUMP', 'MELANIA'].includes(t.symbol.toUpperCase())
+        );
+        if (trendingIds.size > 0) {
+            baseList = [...baseList].sort((a, b) => (trendingIds.has(b.address) ? 1 : 0) - (trendingIds.has(a.address) ? 1 : 0));
+        }
+    } else if (activeTab === 'trending') {
+        if (trendingIds.size > 0) {
+            const trending = allTokens.filter(t => trendingIds.has(t.address));
+            const others = allTokens.filter(t => !trendingIds.has(t.address) && t.isVerified).slice(0, 20);
+            baseList = [...trending, ...others];
+        } else {
+            baseList = allTokens.filter(t => t.tags.includes('birdeye-trending') || (t.dailyVolume && t.dailyVolume > 1000000));
+        }
+    }
+
+    // 2. Search Filter
+    if (searchQuery) {
+        const lowerQ = searchQuery.toLowerCase();
+        baseList = baseList.filter(t => 
+            t.symbol.toLowerCase().includes(lowerQ) || 
+            t.name.toLowerCase().includes(lowerQ) ||
+            t.address.toLowerCase() === lowerQ
+        );
+    }
+    
+    // 3. Category Filter (Allタブの時のみ有効)
+    if (activeTab === 'all' && tokenFilter !== 'all') {
+        if (tokenFilter === 'crypto') baseList = baseList.filter(t => !t.source || t.source === 'jupiter');
+        else if (tokenFilter === 'stock') baseList = baseList.filter(t => t.source === 'stock');
+        else if (tokenFilter === 'commodity') baseList = baseList.filter(t => t.source === 'commodity');
+        else if (tokenFilter === 'prediction') baseList = baseList.filter(t => t.source === 'dflow');
+    }
+
+    return baseList.slice(0, 100);
+  }, [allTokens, userTokens, activeTab, searchQuery, tokenFilter, trendingIds]);
+
+  // エイリアスとして定義 (stateではない)
+  const displayTokens = sortedVisibleTokens;
+
+  // --- Effects ---
+
+  // Init Load
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
       try {
         const [list, predictionTokens, stockTokens, commodityTokens] = await Promise.all([
           JupiterService.getLiteList(),
-          fetchPredictionTokens().catch((e) => {
-            console.warn('[ManualDashboard] Failed to load prediction tokens:', e);
-            return [] as JupiterToken[];
-          }),
-          fetchStockTokens().catch(() => [] as JupiterToken[]),
-          fetchCommodityTokens().catch(() => [] as JupiterToken[]),
+          fetchPredictionTokens().catch(() => []),
+          fetchStockTokens().catch(() => []),
+          fetchCommodityTokens().catch(() => []),
         ]);
 
         const popular = POPULAR_SYMBOLS
@@ -92,19 +132,17 @@ export const useManualDashboard = ({
 
         const merged = [...popular, ...predictionTokens, ...stockTokens, ...commodityTokens, ...others];
         setAllTokens(merged);
-        setDisplayTokens(merged);
-
+        
         if (initialTokens) {
           const initialAssets: AssetItem[] = [];
-          const allList = [...list, ...predictionTokens, ...stockTokens, ...commodityTokens];
           initialTokens.forEach(p => {
-            const t = allList.find(x => x.symbol === p.symbol);
+            const t = merged.find(x => x.symbol === p.symbol);
             if (t) initialAssets.push({ token: t, weight: p.weight, locked: true, id: t.address });
           });
           setPortfolio(initialAssets);
         }
       } catch (e) {
-        console.error('[ManualDashboard] Failed to load tokens:', e);
+        console.error('Failed to load tokens:', e);
         toast.error('Failed to load tokens');
       } finally {
         setIsLoading(false);
@@ -113,10 +151,29 @@ export const useManualDashboard = ({
     init();
   }, [initialTokens]);
 
-  // --- Search ---
+  // Fetch User Tokens
+  useEffect(() => {
+    if (activeTab === 'your_tokens' && publicKey) {
+      setIsLoading(true);
+      WalletService.getUserTokens(connection, publicKey).then(tokens => {
+          setUserTokens(tokens);
+          setIsLoading(false);
+      });
+    }
+  }, [activeTab, publicKey, connection]);
+
+  // Fetch Trending
+  useEffect(() => {
+    if ((activeTab === 'trending' || activeTab === 'meme') && trendingIds.size === 0) {
+       JupiterService.getTrendingTokens().then(ids => {
+           if (ids.length > 0) setTrendingIds(new Set(ids));
+       });
+    }
+  }, [activeTab, trendingIds.size]);
+
+  // Search API (Fallback)
   useEffect(() => {
     if (!searchQuery.trim()) {
-      setDisplayTokens(allTokens);
       setIsSearching(false);
       return;
     }
@@ -124,36 +181,18 @@ export const useManualDashboard = ({
     setIsSearching(true);
 
     searchTimeoutRef.current = setTimeout(async () => {
-      const query = searchQuery.toLowerCase();
-      const localResults = allTokens.filter(t =>
-        t.symbol.toLowerCase().includes(query) ||
-        t.name.toLowerCase().includes(query) ||
-        t.address.toLowerCase() === query
-      );
-
-      if (searchQuery.length > 20 || localResults.length < 5) {
-        try {
-          const apiResults = await JupiterService.searchTokens(searchQuery);
-          if (apiResults.length > 0) {
-            const merged = [...localResults];
-            apiResults.forEach(t => {
-              if (!merged.find(m => m.address === t.address)) merged.push(t);
-            });
-            setDisplayTokens(merged);
-          } else {
-            setDisplayTokens(localResults);
-          }
-        } catch {
-          setDisplayTokens(localResults);
-        }
-      } else {
-        setDisplayTokens(localResults);
-      }
       setIsSearching(false);
-    }, 200);
+    }, 300);
 
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
-  }, [searchQuery, allTokens]);
+  }, [searchQuery]);
+
+  // Tab変更時にサブフィルタをリセット
+  useEffect(() => {
+    if (activeTab !== 'all') {
+      setTokenFilter('all');
+    }
+  }, [activeTab]);
 
   // --- Handlers ---
   const handleToIdentity = useCallback(() => {
@@ -246,51 +285,21 @@ export const useManualDashboard = ({
   }, [portfolio.length]);
 
   return {
-    // State
-    step,
-    setStep,
-    allTokens,
-    displayTokens,
-    portfolio,
-    searchQuery,
-    setSearchQuery,
-    isSearching,
-    isLoading,
-    config,
-    setConfig,
-    focusedField,
-    setFocusedField,
+    step, setStep,
+    allTokens, displayTokens,
+    portfolio, searchQuery, setSearchQuery,
+    isSearching, isLoading,
+    config, setConfig,
+    focusedField, setFocusedField,
     flyingToken,
-
-    // Computed
-    totalWeight,
-    selectedIds,
-    hasSelection,
-    isValidAllocation,
-    visibleTokens,
-    filteredVisibleTokens,
-    sortedVisibleTokens,
-    filterCounts,
-
-    // Filter
-    tokenFilter,
-    setTokenFilter,
-
-    // Wallet
+    activeTab, setActiveTab,
+    totalWeight, selectedIds, hasSelection, isValidAllocation,
+    sortedVisibleTokens, filterCounts,
+    tokenFilter, setTokenFilter,
     connected,
-
-    // Handlers
-    handleToIdentity,
-    handleBackToBuilder,
-    handleDeploy,
-    generateRandomTicker,
-    triggerAddAnimation,
-    handleAnimationComplete,
-    addTokenDirect,
-    removeToken,
-    updateWeight,
-    distributeEvenly,
-    triggerHaptic,
+    handleToIdentity, handleBackToBuilder, handleDeploy,
+    generateRandomTicker, triggerAddAnimation, handleAnimationComplete,
+    addTokenDirect, removeToken, updateWeight, distributeEvenly, triggerHaptic,
   };
 };
 
