@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(ls:*)",
+      "Bash(git log:*)",
+      "Bash(java:*)",
+      "Bash(node -e:*)",
+      "Bash(/usr/libexec/java_home:*)"
     ]
   }
 }

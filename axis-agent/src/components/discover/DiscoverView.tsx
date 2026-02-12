@@ -35,14 +35,6 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
       
       {/* --- ヘッダー部分 (修正) --- */}
       <div className="flex items-center justify-between w-full px-4 py-3 z-50 relative">
-        
-        {/* 左側：ロゴ */}
-        <img
-          src="/AxisLogoo.png"
-          alt="Axis"
-          // w-85はTailwind標準にないので、もし効いていない場合は w-auto などに調整してください
-          className="h-15 w-auto object-contain" 
-        />
 
         {/* 右側：ボタン群 */}
         <div className="flex items-center gap-3">
