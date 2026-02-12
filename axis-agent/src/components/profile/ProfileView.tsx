@@ -10,7 +10,7 @@ import { api } from '../../services/api';
 import { TokenImage } from '../common/TokenImage';
 import { OGBadge } from '../common/OGBadge';
 
-// --- Types ---
+// --- Types & Styles ---
 const FIXED_BG_STYLE = {
   background: 'radial-gradient(circle at top right, #451a03 0%, #000000 80%)'
 };
@@ -52,12 +52,11 @@ interface ProfileViewProps {
 export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
-  // const { showToast } = useToast();
   
   // --- UI State ---
   const [activeTab, setActiveTab] = useState<'portfolio' | 'leaderboard'>('portfolio');
   const [portfolioSubTab, setPortfolioSubTab] = useState<'created' | 'invested' | 'watchlist'>('created');
-  const [leaderboardTab, setLeaderboardTab] = useState<'points' | 'volume' | 'created'>('points');
+  const [leaderboardTab] = useState<'points'>('points'); // pointsに固定
   
   const [currencyMode, setCurrencyMode] = useState<'USD' | 'SOL'>('USD');
   const [isHidden, setIsHidden] = useState(false);
@@ -87,7 +86,6 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
     };
     fetchPrice();
     
-    // Balance Polling
     if (!publicKey || !connection) return;
     const getBalance = async () => {
       try {
@@ -143,7 +141,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
         }
 
         if (investedRes.success && investedRes.strategies) {
-          setInvestedStrategies(investedRes.strategies); // ★Stateを更新
+          setInvestedStrategies(investedRes.strategies);
         }
         
       } catch (e) {
@@ -155,13 +153,13 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
     loadProfile();
   }, [publicKey]);
 
-  // --- 3. Load Leaderboard (Dynamic) ---
+  // --- 3. Load Leaderboard (POINTS only) ---
   useEffect(() => {
     if (activeTab !== 'leaderboard') return;
 
     const loadLeaderboard = async () => {
       try {
-        const res = await api.getLeaderboard(leaderboardTab);
+        const res = await api.getLeaderboard('points');
         if (res.success && res.leaderboard) {
           setLeaderboardData(res.leaderboard.map((u: any, i: number) => ({
             ...u,
@@ -174,18 +172,15 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
       }
     };
     loadLeaderboard();
-  }, [activeTab, leaderboardTab, publicKey]);
-
+  }, [activeTab, publicKey]);
 
   // --- Logic & Display Values ---
   const investedAmountUSD = myStrategies.reduce((sum, s) => sum + ((s.tvl || 0) * solPrice), 0);
   const totalNetWorthUSD = (solBalance * solPrice) + investedAmountUSD;
   const displayValue = currencyMode === 'USD' ? totalNetWorthUSD : (solPrice > 0 ? totalNetWorthUSD / solPrice : 0);
-  
   const pnlVal = userProfile?.pnlPercent || 0;
   const isPos = pnlVal >= 0;
 
-  // --- View: Not Connected ---
   if (!publicKey) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center min-h-[70vh]">
@@ -205,18 +200,11 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
 
   return (
     <div className="max-w-md mx-auto h-full flex flex-col pt-4 px-4 pb-32 safe-area-top relative">
-      
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 relative z-10">
-        <h1 className="text-2xl font-serif font-bold text-white">Profile</h1>
-      </div>
-
-      {/* --- Net Worth Card --- */}
+      {/* Net Worth Card */}
       <div className="mb-8 relative group perspective-1000">
         <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#0C0A09] shadow-2xl" style={{ aspectRatio: '1.58/1' }}>
             <div className="absolute inset-0 z-0" style={FIXED_BG_STYLE} />
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
-            
             <div className="relative z-10 h-full p-6 flex flex-col justify-between bg-black/10 backdrop-blur-[1px]">
             <div className="flex justify-between items-start">
                     <div className="flex flex-col gap-2">
@@ -224,21 +212,13 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
                             <Wallet className="w-3 h-3 text-[#D97706]" />
                             <span className="font-bold text-white text-sm font-serif">{formatAddress(publicKey.toBase58())}</span>
                         </div>
-                        
-                        {/* VIPバッジの表示 */}
-                        {userProfile?.is_vip && (
-                           <div className="ml-1">
-                             <OGBadge size="sm" />
-                           </div>
-                        )}
+                        {userProfile?.is_vip && <div className="ml-1"><OGBadge size="sm" /></div>}
                     </div>
-
                     <div className="flex gap-2">
                          <button onClick={() => setCurrencyMode(m => m === 'USD' ? 'SOL' : 'USD')} className="text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white/70 border border-white/10">{currencyMode}</button>
                          <button onClick={() => setIsHidden(!isHidden)} className="text-white/50">{isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
                     </div>
                  </div>
-
                  <div className="py-2">
                     <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest mb-1">Total Net Worth</p>
                     <h2 className="text-4xl sm:text-5xl font-bold text-white tracking-tight font-serif">
@@ -251,7 +231,6 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
                       </div>
                     )}
                  </div>
-
                  <div className="flex justify-between items-end">
                     <div>
                         <p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Points</p>
@@ -266,7 +245,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
         </div>
       </div>
 
-      {/* --- Tabs --- */}
+      {/* Tabs */}
       <div className="flex border-b border-white/10 mb-6 sticky top-0 bg-[#0C0A09] z-20 pt-2">
          {['portfolio', 'leaderboard'].map(t => (
              <button
@@ -279,9 +258,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
          ))}
       </div>
 
-      {/* ================================================================================= */}
-      {/* 1. PORTFOLIO TAB */}
-      {/* ================================================================================= */}
+      {/* Tab Content */}
       {activeTab === 'portfolio' && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -289,18 +266,14 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
             <FilterChip label={`Invested (${investedStrategies.length})`} active={portfolioSubTab === 'invested'} onClick={() => setPortfolioSubTab('invested')} />
             <FilterChip label={`Watchlist (${watchlist.length})`} active={portfolioSubTab === 'watchlist'} onClick={() => setPortfolioSubTab('watchlist')} icon={<Star className="w-3 h-3" />} />
           </div>
-
           <div className="space-y-3 pb-20">
             {portfolioSubTab === 'created' && (
                myStrategies.length > 0 ? myStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
                : <EmptyState icon={LayoutGrid} title="No strategies yet" sub="Create your first index fund." />
             )}
             {portfolioSubTab === 'invested' && (
-              investedStrategies.length > 0 ? (
-                investedStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
-              ) : (
-                <EmptyState icon={TrendingUp} title="No investments" sub="Explore strategies to grow wealth." />
-              )
+              investedStrategies.length > 0 ? investedStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
+              : <EmptyState icon={TrendingUp} title="No investments" sub="Explore strategies to grow wealth." />
             )}
             {portfolioSubTab === 'watchlist' && (
                watchlist.length > 0 ? watchlist.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
@@ -310,35 +283,13 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
         </div>
       )}
 
-
-      {/* ================================================================================= */}
-      {/* 3. LEADERBOARD TAB */}
-      {/* ================================================================================= */}
       {activeTab === 'leaderboard' && (
         <div className="space-y-4 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* Metric Selector */}
-            <div className="flex p-1 bg-[#1C1917] rounded-xl">
-                {['points', 'volume', 'created'].map(t => (
-                    <button 
-                        key={t}
-                        onClick={() => setLeaderboardTab(t as any)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${leaderboardTab === t ? 'bg-[#D97706] text-black shadow-md' : 'text-white/40 hover:text-white'}`}
-                    >
-                        {t === 'points' ? 'XP' : t === 'volume' ? 'Volume' : 'Creator'}
-                    </button>
-                ))}
-            </div>
-
-            {/* Header */}
             <div className="flex items-center px-4 pb-2 text-[10px] text-white/30 font-bold uppercase tracking-wider">
                 <div className="w-8 text-center">#</div>
                 <div className="flex-1 pl-2">User</div>
-                <div className="w-24 text-right">
-                    {leaderboardTab === 'points' ? 'XP' : leaderboardTab === 'volume' ? 'Vol ($)' : 'Count'}
-                </div>
+                <div className="w-24 text-right">XP</div>
             </div>
-
-            {/* List */}
             <div className="space-y-2">
                 {leaderboardData.length === 0 ? (
                     <div className="py-20 text-center text-white/30 text-xs">
@@ -358,7 +309,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
                                 </div>
                             </div>
                             <div className="w-24 text-right font-mono font-bold text-white">
-                                {leaderboardTab === 'volume' ? '$' : ''}{user.value.toLocaleString()}
+                                {user.value.toLocaleString()}
                             </div>
                         </div>
                     ))
@@ -366,7 +317,6 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
             </div>
         </div>
       )}
-
     </div>
   );
 };

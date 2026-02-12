@@ -6,7 +6,13 @@
       "Bash(git log:*)",
       "Bash(java:*)",
       "Bash(node -e:*)",
-      "Bash(/usr/libexec/java_home:*)"
+      "Bash(/usr/libexec/java_home:*)",
+      "Bash(npx expo start:*)",
+      "Bash(npm install:*)",
+      "Bash(npx expo export:*)",
+      "Bash(node --print:*)",
+      "Bash(npx expo install:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
