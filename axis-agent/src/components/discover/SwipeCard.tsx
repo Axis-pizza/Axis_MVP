@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
+import { motion, useMotionValue, useTransform, animate, type PanInfo } from 'framer-motion';
 import { TrendingUp, TrendingDown, Clock, Copy, ExternalLink, Wallet } from 'lucide-react';
 
 // --- Types (変更なし) ---
@@ -38,8 +38,8 @@ interface SwipeCardProps {
   index: number;
 }
 
-const SWIPE_THRESHOLD = 100;
-const ROTATION_RANGE = 15;
+const SWIPE_THRESHOLD = 80;
+const ROTATION_RANGE = 12;
 
 // --- Helpers (変更なし) ---
 const formatPrice = (price: any) => {
@@ -112,19 +112,40 @@ export const SwipeCard = ({
 }: SwipeCardProps) => {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-ROTATION_RANGE, ROTATION_RANGE]);
-  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
+  const cardOpacity = useTransform(x, [-400, -200, 0, 200, 400], [0, 1, 1, 1, 0]);
   const nopeOpacity = useTransform(x, [-100, -20], [1, 0]);
   const likeOpacity = useTransform(x, [20, 100], [0, 1]);
 
   const isDragging = useRef(false);
+  const swiped = useRef(false);
 
   const handleDragStart = () => { isDragging.current = true; };
+
   const handleDragEnd = (_: any, info: PanInfo) => {
-    if (info.offset.x > SWIPE_THRESHOLD) onSwipeRight();
-    else if (info.offset.x < -SWIPE_THRESHOLD) onSwipeLeft();
-    setTimeout(() => { isDragging.current = false; }, 200);
+    if (swiped.current) return;
+
+    const { offset, velocity } = info;
+    const swipeRight = offset.x > SWIPE_THRESHOLD || velocity.x > 600;
+    const swipeLeft = offset.x < -SWIPE_THRESHOLD || velocity.x < -600;
+
+    if (swipeRight) {
+      swiped.current = true;
+      const flyTo = Math.max(window.innerWidth, 500);
+      animate(x, flyTo, { type: 'spring', stiffness: 600, damping: 40, velocity: velocity.x })
+        .then(() => onSwipeRight());
+    } else if (swipeLeft) {
+      swiped.current = true;
+      const flyTo = -Math.max(window.innerWidth, 500);
+      animate(x, flyTo, { type: 'spring', stiffness: 600, damping: 40, velocity: velocity.x })
+        .then(() => onSwipeLeft());
+    } else {
+      // Snap back to center
+      animate(x, 0, { type: 'spring', stiffness: 500, damping: 28 });
+    }
+    setTimeout(() => { isDragging.current = false; }, 150);
   };
-  const handleClick = () => { if (!isDragging.current && isTop) onTap(); };
+
+  const handleClick = () => { if (!isDragging.current && !swiped.current && isTop) onTap(); };
 
   // 金色ベースのリキッド感のあるバッジスタイル
   const typeColors = {
@@ -135,34 +156,33 @@ export const SwipeCard = ({
 
   return (
     <motion.div
-      className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing perspective-1000"
+      className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
       style={{
         x: isTop ? x : 0,
         rotate: isTop ? rotate : 0,
-        opacity: isTop ? opacity : 1,
+        opacity: isTop ? cardOpacity : 1,
         scale: 1 - index * 0.05,
         zIndex: 100 - index,
         y: index * 12,
+        willChange: 'transform',
       }}
       drag={isTop ? 'x' : false}
-      dragConstraints={{ left: 0, right: 0 }}
-      dragElastic={0.6}
+      dragMomentum={false}
       onDragStart={isTop ? handleDragStart : undefined}
       onDragEnd={isTop ? handleDragEnd : undefined}
       onClick={handleClick}
-      initial={{ scale: 0.95, opacity: 0 }}
-      animate={{ scale: 1 - index * 0.05, opacity: 1, y: index * 12 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+      initial={false}
+      animate={{ scale: 1 - index * 0.05, y: index * 12 }}
+      exit={{ opacity: 0, transition: { duration: 0.1 } }}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
     >
-      {/* Glass Container: 暗いガラスに変更 */}
-      <div 
-        className="w-full h-full rounded-[32px] overflow-hidden flex flex-col relative select-none transition-all duration-300"
+      {/* Card Container */}
+      <div
+        className="w-full h-full rounded-[32px] overflow-hidden flex flex-col relative select-none"
         style={{
-          background: 'linear-gradient(145deg, rgba(10,10,10,0.6) 0%, rgba(5,5,5,0.4) 100%)',
-          backdropFilter: 'blur(16px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08)',
-          border: '1px solid rgba(255,255,255,0.05)'
+          background: 'linear-gradient(145deg, #0e0e0e 0%, #080808 100%)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.06)',
+          border: '1px solid rgba(255,255,255,0.05)',
         }}
       >
         {/* Glossy Reflection: 暗い背景に合わせた反射 */}
@@ -171,14 +191,14 @@ export const SwipeCard = ({
         {/* Swipe Indicators (変更なし) */}
         {isTop && (
           <>
-            <motion.div 
-              className="absolute top-12 left-8 z-50 border-[3px] border-[#34D399] text-[#34D399] font-black text-3xl px-4 py-2 rounded-2xl transform -rotate-12 bg-black/40 backdrop-blur-md shadow-[0_0_20px_rgba(52,211,153,0.3)] pointer-events-none"
+            <motion.div
+              className="absolute top-12 left-8 z-50 border-[3px] border-[#34D399] text-[#34D399] font-black text-3xl px-4 py-2 rounded-2xl transform -rotate-12 bg-black/80 pointer-events-none"
               style={{ opacity: likeOpacity }}
             >
               LIKE
             </motion.div>
-            <motion.div 
-              className="absolute top-12 right-8 z-50 border-[3px] border-[#F87171] text-[#F87171] font-black text-3xl px-4 py-2 rounded-2xl transform rotate-12 bg-black/40 backdrop-blur-md shadow-[0_0_20px_rgba(248,113,113,0.3)] pointer-events-none"
+            <motion.div
+              className="absolute top-12 right-8 z-50 border-[3px] border-[#F87171] text-[#F87171] font-black text-3xl px-4 py-2 rounded-2xl transform rotate-12 bg-black/80 pointer-events-none"
               style={{ opacity: nopeOpacity }}
             >
               PASS
@@ -190,7 +210,7 @@ export const SwipeCard = ({
         <div className="p-6 pb-2 relative z-10">
           <div className="flex justify-between items-start mb-3">
             <div>
-              <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border backdrop-blur-md mb-2 ${typeColors[strategy.type] || typeColors.BALANCED}`}>
+              <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border mb-2 ${typeColors[strategy.type] || typeColors.BALANCED}`}>
                 {strategy.type}
               </div>
               <h2 className="text-[26px] font-bold text-white leading-none tracking-tight drop-shadow-md">
@@ -219,7 +239,7 @@ export const SwipeCard = ({
           </p>
           
           <div className="flex items-center gap-3 mt-4">
-             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/30 border border-white/10 backdrop-blur-sm transition-colors hover:bg-black/40">
+             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/10">
                 <span className="text-[10px] text-white/60 font-mono tracking-wider">
                   {strategy.id.slice(0, 4)}...{strategy.id.slice(-4)}
                 </span>
@@ -235,7 +255,7 @@ export const SwipeCard = ({
         {/* --- Stats (Floating Pills with Golden/Dark Theme) --- */}
         <div className="px-6 py-2 grid grid-cols-2 gap-3 relative z-10">
            {/* ROI Card */}
-           <div className="col-span-1 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-md shadow-inner flex flex-col items-center justify-center h-[100px] relative overflow-hidden group">
+           <div className="col-span-1 rounded-2xl border border-white/10 bg-[#0a0a0a] shadow-inner flex flex-col items-center justify-center h-[100px] relative overflow-hidden group">
               <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${strategy.roi >= 0 ? 'from-emerald-500/30 to-transparent' : 'from-red-500/30 to-transparent'}`} />
               <span className="text-[10px] font-bold uppercase tracking-widest mb-1 text-white/40 z-10">
                  24h Change
@@ -244,7 +264,7 @@ export const SwipeCard = ({
            </div>
 
            {/* TVL Card */}
-           <div className="col-span-1 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-md shadow-inner flex flex-col justify-center px-4 h-[100px] relative overflow-hidden">
+           <div className="col-span-1 rounded-2xl border border-white/10 bg-[#0a0a0a] shadow-inner flex flex-col justify-center px-4 h-[100px] relative overflow-hidden">
                <div className="absolute top-0 right-0 p-3 opacity-10">
                  <Wallet className="w-12 h-12 text-white" />
                </div>
@@ -266,7 +286,7 @@ export const SwipeCard = ({
            
            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar mask-image-b">
               {strategy.tokens.map((token, i) => (
-                 <div key={i} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 transition-colors group border border-transparent hover:border-white/10 bg-black/20 backdrop-blur-sm">
+                 <div key={i} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 transition-colors group border border-transparent hover:border-white/10 bg-black/30">
                     {/* Left */}
                     <div className="flex items-center gap-3">
                        <div className="w-10 h-10 rounded-full bg-black/40 shadow-inner flex items-center justify-center p-0.5 border border-white/5">

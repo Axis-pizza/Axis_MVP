@@ -93,46 +93,43 @@ const SwipeCardSkeleton = memo(({ index }: { index: number }) => (
  * CosmicLaunchEffect
  * (変更なし)
  */
-const CosmicLaunchEffect = () => {
-  const trailCount = 12;
-  const particleCount = 50;
+const CosmicLaunchEffect = memo(() => {
+  const trailCount = 6;
+  const particleCount = 18;
   const random = (min: number, max: number) => Math.random() * (max - min) + min;
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
       {Array.from({ length: trailCount }).map((_, i) => {
-        const delay = random(0, 0.4);
-        const duration = random(0.6, 1.2);
+        const delay = random(0, 0.3);
+        const duration = random(0.6, 1.0);
         const startX = -10;
-        const endX = 120; 
+        const endX = 120;
         const startY = 110;
-        const endY = -20; 
-        const width = random(2, 8); 
-        const angle = 45; 
+        const endY = -20;
+        const width = random(2, 6);
 
         return (
           <motion.div
             key={`trail-${i}`}
-            initial={{ opacity: 0, scaleY: 0, x: `${startX}vw`, y: `${startY}vh`, rotate: angle }}
-            animate={{ opacity: [0, 1, 0], scaleY: [1, 2, 1], x: [`${startX}vw`, `${endX}vw`], y: [`${startY}vh`, `${endY}vh`] }}
-            transition={{ duration: duration, delay: delay, ease: [0.1, 0, 0.3, 1] }}
+            initial={{ opacity: 0, x: `${startX}vw`, y: `${startY}vh`, rotate: 45 }}
+            animate={{ opacity: [0, 0.8, 0], x: [`${startX}vw`, `${endX}vw`], y: [`${startY}vh`, `${endY}vh`] }}
+            transition={{ duration, delay, ease: [0.1, 0, 0.3, 1] }}
             style={{
               position: 'absolute',
               width: `${width}px`,
               height: '30vh',
               background: 'linear-gradient(to top, transparent, #D4A261, #f97316, #22d3ee, transparent)',
-              filter: 'blur(4px) brightness(2)',
-              transformOrigin: 'center',
-              boxShadow: '0 0 20px rgba(249, 115, 22, 0.6)'
+              willChange: 'transform, opacity',
             }}
           />
         );
       })}
       {Array.from({ length: particleCount }).map((_, i) => {
-        const delay = random(0, 0.6);
-        const duration = random(0.8, 2.0);
+        const delay = random(0, 0.5);
+        const duration = random(0.8, 1.6);
         const size = random(2, 5);
-        const startX = random(-10, 40); 
+        const startX = random(-10, 40);
         const startY = random(80, 120);
         const moveX = random(50, 150);
         const moveY = random(-50, -150);
@@ -143,21 +140,30 @@ const CosmicLaunchEffect = () => {
           <motion.div
             key={`particle-${i}`}
             initial={{ opacity: 0, x: `${startX}vw`, y: `${startY}vh`, scale: 0 }}
-            animate={{ opacity: [0, 1, 0], x: `${startX + moveX}vw`, y: `${startY + moveY}vh`, scale: [0, random(1, 2), 0] }}
-            transition={{ duration: duration, delay: delay, ease: "easeOut" }}
-            style={{ position: 'absolute', width: `${size}px`, height: `${size}px`, backgroundColor: color, borderRadius: '50%', boxShadow: `0 0 ${size * 2}px ${color}` }}
+            animate={{ opacity: [0, 1, 0], x: `${startX + moveX}vw`, y: `${startY + moveY}vh`, scale: [0, random(1, 1.5), 0] }}
+            transition={{ duration, delay, ease: "easeOut" }}
+            style={{
+              position: 'absolute',
+              width: `${size}px`,
+              height: `${size}px`,
+              backgroundColor: color,
+              borderRadius: '50%',
+              willChange: 'transform, opacity',
+            }}
           />
         );
       })}
-       <motion.div
-          initial={{ opacity: 0, scale: 0 }}
-          animate={{ opacity: [0, 0.6, 0], scale: [1, 3] }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
-          className="absolute -bottom-20 -left-20 w-96 h-96 rounded-full bg-gradient-to-tr from-orange-500 to-cyan-500 blur-[100px] z-[-1]"
-       />
+      {/* Ambient glow — static gradient, no blur */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.4, 0] }}
+        transition={{ duration: 1.5, ease: "easeOut" }}
+        className="absolute -bottom-20 -left-20 w-96 h-96 rounded-full z-[-1]"
+        style={{ background: 'radial-gradient(circle, rgba(249,115,22,0.3) 0%, rgba(34,211,238,0.15) 40%, transparent 70%)' }}
+      />
     </div>
   );
-};
+});
 
 // --- SwipeToConfirm (Reused from StrategyDetailView) ---
 const SwipeToConfirm = memo(({
@@ -324,7 +330,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
           <motion.div
             key="backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[300]"
+            className="fixed inset-0 bg-black/90 z-[300]"
             onClick={status === 'IDLE' || status === 'ERROR' || status === 'SUCCESS' ? onClose : undefined}
           />
           <motion.div
@@ -480,7 +486,7 @@ const SuccessOverlay = ({ strategy, onClose, onGoToStrategy, onBuy }: { strategy
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 touch-none overflow-hidden"
+      className="absolute inset-0 z-[200] flex flex-col items-center justify-center bg-black/[0.97] p-6 touch-none overflow-hidden"
     >
       <CosmicLaunchEffect />
       <div className="absolute inset-0 bg-gradient-to-tr from-orange-900/20 via-transparent to-blue-900/20 pointer-events-none" />
@@ -494,23 +500,13 @@ const SuccessOverlay = ({ strategy, onClose, onGoToStrategy, onBuy }: { strategy
         <h1 className="text-5xl md:text-7xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-yellow-200 to-orange-500 drop-shadow-[0_0_30px_rgba(234,88,12,0.8)] transform -rotate-3 leading-none tracking-tight">
           READY FOR<br/>TAKEOFF
         </h1>
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="flex items-center justify-center gap-2 mt-4"
-        >
-          <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
-          <p className="text-cyan-400 font-mono text-sm tracking-[0.2em] uppercase font-bold">Gem Discovered</p>
-          <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
-        </motion.div>
       </motion.div>
 
       <motion.div 
         initial={{ opacity: 0, y: 50, rotateX: 20 }}
         animate={{ opacity: 1, y: 0, rotateX: 0 }}
         transition={{ delay: 0.3, type: "spring" }}
-        className="w-full max-w-xs bg-[#140E08]/90 rounded-3xl border border-[rgba(184,134,63,0.25)] p-5 mb-8 relative overflow-hidden shadow-2xl z-20 backdrop-blur-xl"
+        className="w-full max-w-xs bg-[#140E08] rounded-3xl border border-[rgba(184,134,63,0.25)] p-5 mb-8 relative overflow-hidden shadow-2xl z-20"
       >
          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-500 via-yellow-400 to-cyan-500" />
          <div className="flex items-center gap-4 mb-5 pt-2">
@@ -793,13 +789,12 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
   const handleSwipe = useCallback((direction: 'left' | 'right', strategy: any) => {
     if (isSwiping || matchedStrategy) return;
     setIsSwiping(true);
-    setTimeout(() => {
-      setCurrentIndex(prev => prev + 1);
-      if (direction === 'right') {
-        setMatchedStrategy(strategy);
-      }
-      setIsSwiping(false);
-    }, 200);
+    setCurrentIndex(prev => prev + 1);
+    if (direction === 'right') {
+      setMatchedStrategy(strategy);
+    }
+    // Brief cooldown to prevent double-swipe
+    setTimeout(() => setIsSwiping(false), 100);
   }, [isSwiping, matchedStrategy]);
 
   const handleGoToStrategy = () => {
