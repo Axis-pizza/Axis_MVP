@@ -5,8 +5,8 @@ import {
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { api } from '../../services/api';
+import { getUsdcBalance } from '../../services/usdc';
 import { TokenImage } from '../common/TokenImage';
 import { OGBadge } from '../common/OGBadge';
 
@@ -38,8 +38,8 @@ interface UserProfile {
 }
 
 // --- Helper Functions ---
-const formatCurrency = (val: number, currency: 'USD' | 'SOL') => {
-  if (currency === 'SOL') return `${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} SOL`;
+const formatCurrency = (val: number, currency: 'USD' | 'USDC') => {
+  if (currency === 'USDC') return `${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
   return `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
@@ -58,10 +58,9 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   const [portfolioSubTab, setPortfolioSubTab] = useState<'created' | 'invested' | 'watchlist'>('created');
   const [leaderboardTab] = useState<'points'>('points'); // pointsに固定
   
-  const [currencyMode, setCurrencyMode] = useState<'USD' | 'SOL'>('USD');
+  const [currencyMode, setCurrencyMode] = useState<'USD' | 'USDC'>('USD');
   const [isHidden, setIsHidden] = useState(false);
-  const [solPrice, setSolPrice] = useState<number>(0);
-  const [solBalance, setSolBalance] = useState<number>(0);
+  const [usdcBalance, setUsdcBalance] = useState<number>(0);
 
   // --- Data State ---
   const [isLoading, setIsLoading] = useState(false);
@@ -71,34 +70,21 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   const [watchlist, setWatchlist] = useState<Strategy[]>([]);
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
 
-  // --- 1. Init (Price & Balance) ---
+  // --- 1. Init (USDC Balance) ---
+  // USDC ≈ $1 fixed, no price fetching needed
   useEffect(() => {
-    const fetchPrice = async () => {
-      if (document.hidden) return;
-      try {
-        const price = await api.getSolPrice();
-        if (price) setSolPrice(price);
-        else {
-           const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-           const data = await res.json();
-           setSolPrice(data.solana?.usd || 150);
-        }
-      } catch { setSolPrice(150); }
-    };
-    fetchPrice();
-
     if (!publicKey || !connection) return;
-    const getBalance = async () => {
+    const fetchBalance = async () => {
       if (document.hidden) return;
       try {
-        const lamports = await connection.getBalance(publicKey);
-        setSolBalance(lamports / LAMPORTS_PER_SOL);
+        const bal = await getUsdcBalance(connection, publicKey);
+        setUsdcBalance(bal);
       } catch {}
     };
-    getBalance();
+    fetchBalance();
 
-    const interval = setInterval(() => { fetchPrice(); getBalance(); }, 60000);
-    const handleVisibility = () => { if (!document.hidden) { fetchPrice(); getBalance(); } };
+    const interval = setInterval(fetchBalance, 60000);
+    const handleVisibility = () => { if (!document.hidden) fetchBalance(); };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       clearInterval(interval);
@@ -180,17 +166,18 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   }, [activeTab, publicKey]);
 
   // --- Logic & Display Values ---
+  // USDC ≈ $1, so USD value = USDC value
   const investedAmountUSD = useMemo(() =>
-    myStrategies.reduce((sum, s) => sum + ((s.tvl || 0) * solPrice), 0),
-    [myStrategies, solPrice]
+    myStrategies.reduce((sum, s) => sum + (s.tvl || 0), 0),
+    [myStrategies]
   );
   const totalNetWorthUSD = useMemo(() =>
-    (solBalance * solPrice) + investedAmountUSD,
-    [solBalance, solPrice, investedAmountUSD]
+    usdcBalance + investedAmountUSD,
+    [usdcBalance, investedAmountUSD]
   );
   const displayValue = useMemo(() =>
-    currencyMode === 'USD' ? totalNetWorthUSD : (solPrice > 0 ? totalNetWorthUSD / solPrice : 0),
-    [currencyMode, totalNetWorthUSD, solPrice]
+    totalNetWorthUSD,
+    [totalNetWorthUSD]
   );
   const pnlVal = userProfile?.pnlPercent || 0;
   const isPos = pnlVal >= 0;
@@ -229,7 +216,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
                         {userProfile?.is_vip && <div className="ml-1"><OGBadge size="sm" /></div>}
                     </div>
                     <div className="flex gap-2">
-                         <button onClick={() => setCurrencyMode(m => m === 'USD' ? 'SOL' : 'USD')} className="text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white/70 border border-white/10">{currencyMode}</button>
+                         <button onClick={() => setCurrencyMode(m => m === 'USD' ? 'USDC' : 'USD')} className="text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white/70 border border-white/10">{currencyMode}</button>
                          <button onClick={() => setIsHidden(!isHidden)} className="text-white/50">{isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
                     </div>
                  </div>
@@ -282,15 +269,15 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
           </div>
           <div className="space-y-3 pb-20">
             {portfolioSubTab === 'created' && (
-               myStrategies.length > 0 ? myStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
+               myStrategies.length > 0 ? myStrategies.map(s => <StrategyCard key={s.id} strategy={s} onSelect={onStrategySelect} />)
                : <EmptyState icon={LayoutGrid} title="No strategies yet" sub="Create your first index fund." />
             )}
             {portfolioSubTab === 'invested' && (
-              investedStrategies.length > 0 ? investedStrategies.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
+              investedStrategies.length > 0 ? investedStrategies.map(s => <StrategyCard key={s.id} strategy={s} onSelect={onStrategySelect} />)
               : <EmptyState icon={TrendingUp} title="No investments" sub="Explore strategies to grow wealth." />
             )}
             {portfolioSubTab === 'watchlist' && (
-               watchlist.length > 0 ? watchlist.map(s => <StrategyCard key={s.id} strategy={s} solPrice={solPrice} onSelect={onStrategySelect} />)
+               watchlist.length > 0 ? watchlist.map(s => <StrategyCard key={s.id} strategy={s} onSelect={onStrategySelect} />)
                : <EmptyState icon={Star} title="Watchlist empty" sub="Star strategies to track them." />
             )}
           </div>
@@ -354,8 +341,8 @@ const EmptyState = memo(({ icon: Icon, title, sub }: any) => (
   </div>
 ));
 
-const StrategyCard = memo(({ strategy, solPrice, onSelect }: { strategy: Strategy; solPrice: number; onSelect?: (strategy: any) => void }) => {
-  const tvlUSD = (strategy.tvl || 0) * solPrice;
+const StrategyCard = memo(({ strategy, onSelect }: { strategy: Strategy; onSelect?: (strategy: any) => void }) => {
+  const tvlUSD = strategy.tvl || 0; // USDC ≈ $1
   const tokens = Array.isArray(strategy.tokens) ? strategy.tokens : [];
   const displayTokens = tokens.slice(0, 5);
   const extraCount = tokens.length - 5;

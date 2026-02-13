@@ -116,9 +116,9 @@ export const ListDiscoverView = ({ onToggleView, onStrategySelect }: ListDiscove
     });
 
   const formatTVL = (tvl: number) => {
-    if (!tvl) return '0 SOL';
-    if (tvl >= 1000) return `${(tvl / 1000).toFixed(1)}K SOL`;
-    return `${tvl.toFixed(2)} SOL`;
+    if (!tvl) return '0 USDC';
+    if (tvl >= 1000) return `${(tvl / 1000).toFixed(1)}K USDC`;
+    return `${tvl.toFixed(2)} USDC`;
   };
 
   const formatDate = (timestamp: number) => {

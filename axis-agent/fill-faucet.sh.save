@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# あなたのAdmin Walletアドレス
+WALLET="BTcWoRe6Z9VaCPCxrcr5dQmn8cA8KNHpFdgJEVopSBsj"
+
+# 1回あたりのAirdrop額 (公式制限は最大2 SOL)
+AMOUNT=2
+
+# 待機時間 (秒) - 制限回避のため長めに取る (60秒推奨)
+WAIT=65
+
+echo "Starting automated faucet refill for: $WALLET"
+echo "---------------------------------------------------"
+
+while true; do
+    echo "[$(date '+%H:%M:%S')] Requesting $AMOUNT SOL..."
+    
+    # solana airdrop コマンド実行 (結果を変数に格納)
+    OUTPUT=$(solana airdrop $AMOUNT $WALLET --url devnet 2>&1)
+    
+    # 成功判定
+    if [[ $OUTPUT == *"Signature"* ]]; then
+        echo "✅ Success! Balance updated."
+        solana balance $WALLET --url devnet
+    elif [[ $OUTPUT == *"Too Many Requests"* ]]; then
+        echo "⚠️  Rate limited. Waiting longer (120s)..."
+        sleep 60 # 追加で待つ
+    else
+        echo "❌ Failed: $OUTPUT"
+    fi
+
+    echo "Sleeping for $WAIT seconds..."
+    echo "---------------------------------------------------"
+    sleep $WAIT
+done
+

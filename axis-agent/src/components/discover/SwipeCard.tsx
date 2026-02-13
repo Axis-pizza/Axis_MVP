@@ -281,7 +281,7 @@ export const SwipeCard = ({
                  <div className="text-2xl font-bold text-white">
                     {strategy.tvl < 0.01 ? '< 0.01' : strategy.tvl.toFixed(2)}
                  </div>
-                 <span className="text-xs text-white/50 font-normal">SOL</span>
+                 <span className="text-xs text-white/50 font-normal">USDC</span>
               </div>
            </div>
         </div>

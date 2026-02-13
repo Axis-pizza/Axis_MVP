@@ -1,10 +1,11 @@
-import { 
-  Connection, 
-  PublicKey, 
-  SystemProgram, 
+import {
+  Connection,
+  PublicKey,
+  SystemProgram,
   Transaction,
-  LAMPORTS_PER_SOL 
+  LAMPORTS_PER_SOL
 } from '@solana/web3.js';
+import { USDC_DECIMALS } from '../config/constants';
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import type { Idl } from '@coral-xyz/anchor';
 import type { TokenAllocation } from '../types';
@@ -240,9 +241,9 @@ export async function getUserStrategies(
           owner: account.owner.toString(),
           name: account.name.toString().replace(/\0/g, ''),
           strategyType: account.strategyType === 0 ? 'AGGRESSIVE' : account.strategyType === 2 ? 'BALANCED' : 'CONSERVATIVE',
-          tvl: Number(account.tvl) / LAMPORTS_PER_SOL,
+          tvl: Number(account.tvl) / (10 ** USDC_DECIMALS),
           isActive: account.isActive,
-          tokens: [] 
+          tokens: []
       }));
 
   } catch {
@@ -260,10 +261,9 @@ export async function getStrategyInfo(connection: Connection, strategyPubkey: Pu
           address: strategyPubkey.toString(),
           owner: account.owner.toString(),
           name: account.name.toString().replace(/\0/g, ''),
-          tvl: Number(account.tvl) / LAMPORTS_PER_SOL,
+          tvl: Number(account.tvl) / (10 ** USDC_DECIMALS),
           isActive: account.isActive,
-          // ★修正: トークン情報を追加（空配列で埋める）
-          tokens: [] 
+          tokens: []
       };
   } catch {
       return null;

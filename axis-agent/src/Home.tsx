@@ -13,7 +13,7 @@ import { DiscoverView } from './components/discover/DiscoverView';
 import { ProfileView } from './components/profile/ProfileView';
 import { StrategyDetailView } from './components/discover/StrategyDetailView';
 import type { Strategy } from './types';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getUsdcBalance } from './services/usdc';
 
 type View = 'DISCOVER' | 'CREATE' | 'PROFILE' | 'STRATEGY_DETAIL';
 const TUTORIAL_KEY = 'kagemusha-onboarding-v2';
@@ -31,12 +31,11 @@ export default function Home() {
   const { setVisible: setWalletModalVisible } = useWalletModal();
   const [balance, setBalance] = useState<number | null>(null);
 
-  // ウォレット残高の取得
+  // ウォレット残高の取得（USDC）
   const getBalance = useCallback(async () => {
     if (!publicKey || !connection) return 0;
     try {
-      const bal = await connection.getBalance(publicKey);
-      return bal / LAMPORTS_PER_SOL;
+      return await getUsdcBalance(connection, publicKey);
     } catch {
       return 0;
     }
