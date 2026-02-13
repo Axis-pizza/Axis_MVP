@@ -21,12 +21,12 @@ interface PizzaChartProps {
 
 
 const SLICE_COLORS = [
-  '#D97706', // Bronze (Amber 600)
-  '#B45309', // Deep Bronze (Amber 700)
+  '#B8863F', // Bronze (Amber 600)
+  '#8B5E28', // Deep Bronze (Amber 700)
   '#9F1239', // Wine / Cured Meat (Rose 700)
   '#15803D', // Deep Basil (Green 700)
   '#854D0E', // Old Gold (Yellow 800)
-  '#78350F', // Truffle / Mushroom (Amber 900)
+  '#221509', // Truffle / Mushroom (Amber 900)
   '#BE123C', // Raspberry / Rare Meat (Rose 700)
   '#0F766E', // Deep Teal (Emerald 700)
 ];
@@ -106,9 +106,9 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
     return (
       <div
         style={{ width: size, height: size }}
-        className="rounded-full border border-dashed border-[#D97706]/30 flex items-center justify-center bg-[#0C0A09]"
+        className="rounded-full border border-dashed border-[#B8863F]/30 flex items-center justify-center bg-[#080503]"
       >
-        <span className="text-[#D97706]/50 text-sm font-serif italic">Select Assets</span>
+        <span className="text-[#B8863F]/50 text-sm font-serif italic">Select Assets</span>
       </div>
     );
   }
@@ -128,9 +128,9 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
           </filter>
           {/* ゴールドの光沢グラデーション */}
           <linearGradient id="crustGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#D97706" />
-            <stop offset="50%" stopColor="#F59E0B" />
-            <stop offset="100%" stopColor="#78350F" />
+            <stop offset="0%" stopColor="#B8863F" />
+            <stop offset="50%" stopColor="#D4A261" />
+            <stop offset="100%" stopColor="#221509" />
           </linearGradient>
         </defs>
 
@@ -151,7 +151,7 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
           cx={size / 2}
           cy={size / 2}
           r={size / 2 - 10}
-          fill="#1C1917" // Very dark warm gray
+          fill="#140E08" // Very dark warm gray
           opacity="0.5"
         />
 
@@ -161,7 +161,7 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
             key={path.symbol}
             d={path.d}
             fill={path.color}
-            stroke="#0C0A09" // 境界線を背景色にしてスライスを際立たせる
+            stroke="#080503" // 境界線を背景色にしてスライスを際立たせる
             strokeWidth="1.5"
             filter="url(#shadow-slice)"
             initial={animated ? { scale: 0.8, opacity: 0 } : false}
@@ -183,8 +183,8 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
           cx={size / 2}
           cy={size / 2}
           r={size / 2 * 0.22}
-          fill="#0C0A09"
-          stroke="#D97706"
+          fill="#080503"
+          stroke="#B8863F"
           strokeWidth="0.5"
           strokeOpacity="0.3"
         />
@@ -203,7 +203,7 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
                 y1={size/2 + (size/2 - 10) * Math.sin(Math.atan2(label.y - size/2, label.x - size/2))}
                 x2={label.x}
                 y2={label.y}
-                stroke="#D97706"
+                stroke="#B8863F"
                 strokeWidth="0.5"
                 strokeOpacity="0.3"
             />
@@ -223,7 +223,7 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
               y={label.y + 8}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-[10px] font-serif fill-[#D97706]"
+              className="text-[10px] font-serif fill-[#B8863F]"
               style={{ fontFamily: '"Times New Roman", serif' }}
             >
               {label.weight}%

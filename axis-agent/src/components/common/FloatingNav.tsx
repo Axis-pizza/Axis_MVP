@@ -82,9 +82,9 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
         }}
         // ▼▼▼ 修正: stickyをやめてfixedに戻し、背景色を追加 ▼▼▼
         className="fixed z-50 flex justify-center pointer-events-none px-4
-        bottom-8 left-0 right-0 
-        md:top-0 md:bottom-auto md:px-0 md:w-full 
-        md:bg-[#0A0A0A]/90 md:backdrop-blur-xl md:border-b md:border-white/5" 
+        bottom-8 left-0 right-0
+        md:top-0 md:bottom-auto md:px-0 md:w-full
+        md:bg-[#0A0A0A]/90 md:backdrop-blur-xl md:border-b md:border-amber-900/20"
     >
         <div 
           onMouseEnter={handleMouseEnter}
@@ -96,7 +96,7 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
             transition-all duration-300
             
             /* Mobile Styles */
-            bg-[#0A0A0A]/90 backdrop-blur-2xl border border-white/10 rounded-full pl-10 pr-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)] min-w-[320px]
+            bg-[#0A0A0A]/90 backdrop-blur-2xl border border-amber-800/25 rounded-full pl-10 pr-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.5),0_0_0_1px_rgba(184,134,63,0.08)] min-w-[320px]
             
             /* Desktop Styles */
             md:w-full md:max-w-7xl md:mx-auto md:rounded-none md:border-none md:bg-transparent md:shadow-none md:py-4 md:px-8
@@ -122,19 +122,19 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
                     {isActive && (
                       <motion.div
                         layoutId="nav-active-bg"
-                        className="absolute inset-0 bg-gradient-to-br from-orange-500 to-amber-600 rounded-full shadow-[0_0_20px_rgba(249,115,22,0.4)]"
+                        className="absolute inset-0 bg-gradient-to-br from-amber-500 to-amber-700 rounded-full shadow-[0_0_20px_rgba(184,134,63,0.4)]"
                         transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                       />
                     )}
                     <div className="relative z-10 flex items-center gap-2">
-                      <item.icon 
+                      <item.icon
                         className={`w-6 h-6 transition-colors duration-300 ${
-                          isActive ? 'text-black fill-black/10' : 'text-white/40 group-hover:text-white'
-                        }`} 
+                          isActive ? 'text-black fill-black/10' : 'text-amber-700/50 group-hover:text-amber-400'
+                        }`}
                         strokeWidth={isActive ? 2.5 : 2}
                       />
                       <span className={`hidden md:block text-sm font-medium ${
-                         isActive ? 'text-black' : 'text-white/60 group-hover:text-white'
+                         isActive ? 'text-black' : 'text-amber-700/60 group-hover:text-amber-400'
                       }`}>
                         {item.label}
                       </span>
@@ -143,13 +143,13 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
                 );
               })}
             </div>
-            <div className="w-px h-8 bg-white/10" />
+            <div className="w-px h-8 bg-amber-900/20" />
             <button
               onClick={() => setIsBugDrawerOpen(true)}
-              className="relative w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-orange-500/30 transition-all group"
+              className="relative w-10 h-10 flex items-center justify-center rounded-full bg-amber-900/10 hover:bg-amber-900/20 border border-amber-800/15 hover:border-amber-600/30 transition-all group"
             >
-               <MessageSquareText 
-                 className="w-4 h-4 text-orange-400/70 group-hover:text-orange-400 group-hover:scale-110 transition-all duration-500" 
+               <MessageSquareText
+                 className="w-4 h-4 text-amber-600/70 group-hover:text-amber-400 group-hover:scale-110 transition-all duration-500"
                />
             </button>
           </div>

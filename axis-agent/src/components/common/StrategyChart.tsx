@@ -62,7 +62,7 @@ export const StrategyChart = ({ strategyId, refreshTrigger }: StrategyChartProps
       const pnl = val - 100;
       
       return (
-        <div className="bg-[#1C1917]/90 backdrop-blur-md border border-white/10 p-2 rounded-lg shadow-xl text-xs">
+        <div className="bg-[#140E08]/90 backdrop-blur-md border border-[rgba(184,134,63,0.15)] p-2 rounded-lg shadow-xl text-xs">
           <p className="text-white/50 mb-1">
             {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </p>
@@ -80,15 +80,15 @@ export const StrategyChart = ({ strategyId, refreshTrigger }: StrategyChartProps
 
   if (loading && data.length === 0) {
     return (
-      <div className="h-64 w-full flex items-center justify-center bg-white/5 rounded-2xl border border-white/5">
-        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      <div className="h-64 w-full flex items-center justify-center bg-white/5 rounded-2xl border border-[rgba(184,134,63,0.08)]">
+        <Loader2 className="w-8 h-8 text-[#B8863F] animate-spin" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="h-64 w-full flex flex-col items-center justify-center bg-white/5 rounded-2xl border border-white/5 text-white/30">
+      <div className="h-64 w-full flex flex-col items-center justify-center bg-white/5 rounded-2xl border border-[rgba(184,134,63,0.08)] text-white/30">
         <TrendingDown className="w-8 h-8 mb-2" />
         <p className="text-xs">Chart data unavailable</p>
       </div>
@@ -110,7 +110,7 @@ export const StrategyChart = ({ strategyId, refreshTrigger }: StrategyChartProps
           </div>
         </div>
         
-        <div className="flex bg-white/5 rounded-lg p-0.5 border border-white/10">
+        <div className="flex bg-white/5 rounded-lg p-0.5 border border-[rgba(184,134,63,0.15)]">
           {TIMEFRAMES.map((tf) => (
             <button
               key={tf.value}

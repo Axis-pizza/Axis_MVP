@@ -8,7 +8,13 @@
       "Bash(python3:*)",
       "Bash(echo:*)",
       "Bash(npx wrangler:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(perl -i -pe 's/#D97706/#C9975B/g; s/#0C0A09/#0F0B07/g; s/#1C1917/#1A120A/g; s/#F59E0B/#E0B37A/g; s/#B45309/#945A2E/g; s/#451a03/#0F0B07/g; s/#78350F/#2A1B0F/g' src/components/common/PizzaChart.tsx)",
+      "Bash(perl -i -pe 's/#D97706/#C9975B/g; s/#0C0A09/#0F0B07/g; s/#1C1917/#1A120A/g; s/#F59E0B/#E0B37A/g; s/#B45309/#945A2E/g' src/components/discover/ShareCard.tsx)",
+      "Bash(perl -i -pe 's/#D97706/#C9975B/g; s/#0C0A09/#0F0B07/g; s/#1C1917/#1A120A/g; s/#F59E0B/#E0B37A/g; s/#B45309/#945A2E/g; s/#fbbf24/#E0B37A/g; s/border-white\\\\/10/border-[rgba\\(201,151,91,0.15\\)]/g; s/border-white\\\\/5/border-[rgba\\(201,151,91,0.08\\)]/g; s/rgba\\\\\\(217, 119, 6/rgba\\(201, 151, 91/g; s/rgba\\\\\\(217,119,6/rgba\\(201,151,91/g; s/border-orange-500\\\\/30/border-[rgba\\(201,151,91,0.25\\)]/g' src/components/discover/StrategyDetailView.tsx)",
+      "Bash(perl -i -pe 's/#D97706/#C9975B/g; s/#0C0A09/#0F0B07/g; s/#1C1917/#1A120A/g; s/#F59E0B/#E0B37A/g; s/#B45309/#945A2E/g; s/#fbbf24/#E0B37A/g; s/border-white\\\\/10/border-[rgba\\(201,151,91,0.15\\)]/g; s/border-white\\\\/5\\([^0]\\)/border-[rgba\\(201,151,91,0.08\\)]$1/g; s/rgba\\\\\\(217, 119, 6/rgba\\(201, 151, 91/g; s/rgba\\\\\\(217,119,6/rgba\\(201,151,91/g; s/border-orange-500\\\\/30/border-[rgba\\(201,151,91,0.25\\)]/g' src/components/discover/SwipeDiscoverView.tsx)",
+      "Bash(perl -i -pe 's/#D97706/#C9975B/g; s/#0C0A09/#0F0B07/g; s/#1C1917/#1A120A/g; s/#F59E0B/#E0B37A/g; s/#B45309/#945A2E/g; s/#fbbf24/#E0B37A/g; s/rgba\\\\\\(217, 119, 6/rgba\\(201, 151, 91/g' src/components/common/ProfileDrawer.tsx)",
+      "Bash(perl -i -pe 's/#D97706/#C9975B/g; s/#0C0A09/#0F0B07/g; s/#1C1917/#1A120A/g; s/#F59E0B/#E0B37A/g; s/#B45309/#945A2E/g; s/#fbbf24/#E0B37A/g; s/rgba\\\\\\(217, 119, 6/rgba\\(201, 151, 91/g' src/components/create/DepositFlow.tsx)"
     ]
   }
 }

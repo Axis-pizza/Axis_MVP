@@ -77,17 +77,17 @@ export const StrategyDetailPage = () => {
 
   if (loading) {
     return (
-      <div className="w-full h-screen bg-[#030303] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-[#D97706] animate-spin" />
+      <div className="w-full h-screen bg-[#080503] flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-[#B8863F] animate-spin" />
       </div>
     );
   }
 
   if (error || !strategy) {
     return (
-      <div className="w-full h-screen bg-[#030303] flex flex-col items-center justify-center text-white">
+      <div className="w-full h-screen bg-[#080503] flex flex-col items-center justify-center text-white">
         <h2 className="text-xl font-bold mb-2">Strategy Not Found</h2>
-        <button onClick={() => navigate(-1)} className="text-[#D97706] underline">Go Back</button>
+        <button onClick={() => navigate(-1)} className="text-[#B8863F] underline">Go Back</button>
       </div>
     );
   }

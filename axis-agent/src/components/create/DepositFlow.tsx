@@ -195,7 +195,7 @@ export const DepositFlow = ({
       case 'AGGRESSIVE': return '#F97316';
       case 'BALANCED': return '#3B82F6';
       case 'CONSERVATIVE': return '#10B981';
-      default: return '#D97706';
+      default: return '#B8863F';
     }
   };
   const themeColor = getTypeColor();
@@ -240,7 +240,7 @@ export const DepositFlow = ({
                   animate={{ rotate: 360 }}
                   transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
                 >
-                  <div className="relative z-10 p-2 bg-[#0C0A09] rounded-full border border-white/10 shadow-2xl">
+                  <div className="relative z-10 p-2 bg-[#080503] rounded-full border border-white/10 shadow-2xl">
                     <PizzaChart slices={tokens} size={140} showLabels={false} />
                   </div>
                   <div className="absolute inset-0 rounded-full blur-xl opacity-40 animate-pulse" style={{ backgroundColor: themeColor }} />
@@ -256,7 +256,7 @@ export const DepositFlow = ({
                 </div>
               </div>
 
-              <div className="bg-[#1C1917]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
+              <div className="bg-[#140E08]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
                 <div className="flex justify-between items-center mb-4 text-xs">
                   <span className="text-[#78716C] flex items-center gap-1">
                     <Wallet className="w-3 h-3" /> Balance
@@ -265,7 +265,7 @@ export const DepositFlow = ({
                     <span className="text-[#E7E5E4] font-mono">{balance.toFixed(2)} USDC</span>
                     <button 
                       onClick={() => setAmount(balance.toFixed(2))}
-                      className="text-[#D97706] hover:text-[#fbbf24] font-bold transition-colors"
+                      className="text-[#B8863F] hover:text-[#D4A261] font-bold transition-colors"
                     >
                       MAX
                     </button>
@@ -273,13 +273,13 @@ export const DepositFlow = ({
                 </div>
 
                 <div className="relative mb-6 group">
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#D97706]/0 via-[#D97706]/10 to-[#D97706]/0 opacity-0 group-focus-within:opacity-100 transition-opacity rounded-xl pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#B8863F]/0 via-[#B8863F]/10 to-[#B8863F]/0 opacity-0 group-focus-within:opacity-100 transition-opacity rounded-xl pointer-events-none" />
                   <input
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full bg-[#0C0A09] border border-white/10 rounded-2xl py-6 px-4 text-4xl font-bold text-center text-white focus:outline-none focus:border-[#D97706]/50 transition-all placeholder:text-[#292524]"
+                    className="w-full bg-[#080503] border border-white/10 rounded-2xl py-6 px-4 text-4xl font-bold text-center text-white focus:outline-none focus:border-[#B8863F]/50 transition-all placeholder:text-[#292524]"
                     disabled={status !== 'INPUT' && status !== 'ERROR'}
                   />
                   <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -309,7 +309,7 @@ export const DepositFlow = ({
                 <button
                   onClick={status === 'ERROR' ? handleRetry : handleDeposit}
                   disabled={!isValidAmount || (status !== 'INPUT' && status !== 'ERROR')}
-                  className="w-full py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] rounded-xl font-bold text-[#0C0A09] shadow-lg shadow-orange-900/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-gradient-to-r from-[#B8863F] to-[#8B5E28] rounded-xl font-bold text-[#080503] shadow-lg shadow-orange-900/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 transition-all flex items-center justify-center gap-2"
                 >
                   {status === 'INPUT' && (
                     <>
@@ -354,11 +354,11 @@ const DepositSuccess = ({
     >
       <div className="relative mb-8">
         <div className="absolute inset-0 bg-green-500 blur-2xl opacity-20" />
-        <div className="w-24 h-24 bg-[#1C1917] border-2 border-green-500 rounded-full flex items-center justify-center relative z-10 shadow-2xl">
+        <div className="w-24 h-24 bg-[#140E08] border-2 border-green-500 rounded-full flex items-center justify-center relative z-10 shadow-2xl">
           <Sparkles className="w-10 h-10 text-green-500" />
         </div>
         <motion.div 
-          className="absolute -top-2 -right-2 bg-green-500 text-[#0C0A09] text-xs font-bold px-2 py-1 rounded-full border-4 border-[#030303]"
+          className="absolute -top-2 -right-2 bg-green-500 text-[#080503] text-xs font-bold px-2 py-1 rounded-full border-4 border-[#030303]"
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.3 }}
@@ -373,7 +373,7 @@ const DepositSuccess = ({
         <span className="text-white font-bold">{strategyName}</span> is now active on-chain.
       </p>
 
-      <div className="w-full bg-[#E7E5E4] text-[#0C0A09] rounded-lg p-6 mb-8 relative overflow-hidden font-mono text-xs">
+      <div className="w-full bg-[#E7E5E4] text-[#080503] rounded-lg p-6 mb-8 relative overflow-hidden font-mono text-xs">
         <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: themeColor }} />
         <div className="flex justify-between mb-2">
           <span className="opacity-60">INITIAL DEPOSIT</span>
@@ -385,7 +385,7 @@ const DepositSuccess = ({
             <CheckCircle2 className="w-3 h-3" /> CONFIRMED
           </span>
         </div>
-        <div className="border-t border-[#0C0A09]/10 pt-3 text-center">
+        <div className="border-t border-[#080503]/10 pt-3 text-center">
           {txSignature && (
             <a
               href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
@@ -401,7 +401,7 @@ const DepositSuccess = ({
 
       <button
         onClick={onComplete}
-        className="w-full py-4 bg-[#1C1917] border border-white/10 rounded-xl font-bold text-[#E7E5E4] hover:bg-white/5 transition-all flex items-center justify-center gap-2"
+        className="w-full py-4 bg-[#140E08] border border-white/10 rounded-xl font-bold text-[#E7E5E4] hover:bg-white/5 transition-all flex items-center justify-center gap-2"
       >
         <TrendingUp className="w-4 h-4" />
         Go to Dashboard

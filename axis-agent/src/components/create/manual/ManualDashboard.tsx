@@ -1,5 +1,6 @@
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { useManualDashboard } from '../../../hooks/useManualDashboard';
+import { useTokenPreferences } from '../../../hooks/useTokenPreferences';
 import { MobileBuilder } from './MobileBuilder';
 import { DesktopBuilder } from './DesktopBuilder';
 import { IdentityStep } from './IdentityStep';
@@ -15,16 +16,20 @@ export const ManualDashboard = ({
   initialTokens,
 }: ManualDashboardProps) => {
   const isMobile = useIsMobile();
-  const dashboard = useManualDashboard({ onDeploySuccess, initialConfig, initialTokens });
-
-  // ★ フック内の handleDeploy を使用（正しいデータマッピング + ウォレットチェック付き）
+  const preferences = useTokenPreferences();
+  const dashboard = useManualDashboard({
+    onDeploySuccess,
+    initialConfig,
+    initialTokens,
+    verifiedOnly: preferences.verifiedOnly,
+  });
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col h-[100dvh] bg-black text-white overflow-hidden font-sans">
       {dashboard.step === 'builder' && (
         isMobile
-          ? <MobileBuilder dashboard={dashboard} onBack={onBack} />
-          : <DesktopBuilder dashboard={dashboard} onBack={onBack} />
+          ? <MobileBuilder dashboard={dashboard} preferences={preferences} onBack={onBack} />
+          : <DesktopBuilder dashboard={dashboard} preferences={preferences} onBack={onBack} />
       )}
 
       <IdentityStep
@@ -36,7 +41,7 @@ export const ManualDashboard = ({
         portfolioCount={dashboard.portfolio.length}
         connected={dashboard.connected}
         onBack={dashboard.handleBackToBuilder}
-        onDeploy={dashboard.handleDeploy} // ★ フック内の正しいマッピングを使用
+        onDeploy={dashboard.handleDeploy}
         onGenerateRandomTicker={dashboard.generateRandomTicker}
       />
     </div>

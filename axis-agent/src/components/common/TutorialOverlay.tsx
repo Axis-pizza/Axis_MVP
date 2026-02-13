@@ -14,28 +14,28 @@ const SLIDES = [
     title: 'Shadow Strategy',
     subtitle: 'Institutional-grade DeFi portfolios, powered by AI. Built on Solana.',
     icon: Shield,
-    accentColor: '#D97706', // Amber
+    accentColor: '#B8863F',
   },
   {
     badge: 'Discover',
     title: 'Scout Elite Alpha',
     subtitle: 'Swipe through community-built portfolios. Copy the best performers with one tap.',
     icon: Compass,
-    accentColor: '#F59E0B', // Orange
+    accentColor: '#D4A261',
   },
   {
     badge: 'Create',
     title: 'Forge Your ETF',
     subtitle: 'Select tokens, set allocations, and deploy an on-chain index fund in seconds.',
     icon: Plus,
-    accentColor: '#EA580C', // Burnt Orange
+    accentColor: '#8B5E28',
   },
   {
     badge: 'Get Started',
     title: 'Enter the Market',
     subtitle: 'The shadow market awaits. Dive in now to explore strategies.',
     icon: Rocket,
-    accentColor: '#D97706',
+    accentColor: '#B8863F',
   },
 ] as const;
 
@@ -108,7 +108,7 @@ export const TutorialOverlay = ({ onComplete, onConnectWallet }: TutorialOverlay
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[1000000] bg-[#0C0A09] text-white overflow-hidden font-sans perspective-[1000px]">
+    <div className="fixed inset-0 z-[1000000] bg-[#080503] text-[#F2E0C8] overflow-hidden font-sans perspective-[1000px]">
       
       {/* 1. Improved Background: Darker overlay to help text pop */}
       <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none" />
@@ -214,8 +214,8 @@ export const TutorialOverlay = ({ onComplete, onConnectWallet }: TutorialOverlay
                   {/* Primary Action: Just Enter (Low Friction) */}
                   <button
                     onClick={onComplete}
-                    className="w-full py-3 rounded-full font-bold text-xs tracking-wide text-black transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_-5px_rgba(217,119,6,0.5)]"
-                    style={{ backgroundColor: '#D97706' }}
+                    className="w-full py-3 rounded-full font-bold text-xs tracking-wide text-[#140D07] transition-all hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(184,134,63,0.35)]"
+                    style={{ background: 'linear-gradient(135deg, #6B4420, #B8863F, #E8C890)' }}
                   >
                     Enter Shadow Market
                   </button>

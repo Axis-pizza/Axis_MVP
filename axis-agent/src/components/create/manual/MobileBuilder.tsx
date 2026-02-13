@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence, type PanInfo, type Variants, useDragControls } from 'framer-motion';
-import { Search, ArrowLeft, ChevronRight, Check, Loader2, AlertCircle, Percent, X, Plus } from 'lucide-react';
+import { Search, ArrowLeft, ChevronRight, Check, Loader2, AlertCircle, Percent, X, Plus, ClipboardPaste } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { TokenImage } from '../../common/TokenImage';
 import { MobileAssetCard, MobileTokenListItem } from './MobileComponents';
 import { TabSelector } from './TabSelector';
 import type { JupiterToken } from '../../../services/jupiter';
-import type { ExtendedDashboardHook } from './types';
+import type { BuilderProps } from './types';
 
 const drawerVariants: Variants = {
   hidden: { y: "100%" },
@@ -15,12 +15,7 @@ const drawerVariants: Variants = {
   closed: { y: "calc(100% - 100px)", transition: { type: "spring", damping: 25, stiffness: 200 } },
 };
 
-interface MobileBuilderProps {
-  dashboard: ExtendedDashboardHook;
-  onBack?: () => void;
-}
-
-export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
+export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) => {
   const {
     portfolio,
     searchQuery,
@@ -59,6 +54,13 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
   }, [handleToIdentity]);
 
   const handleTokenSelect = useCallback((token: JupiterToken) => {
+    // Record to search history
+    preferences.addToSearchHistory({
+      address: token.address,
+      symbol: token.symbol,
+      logoURI: token.logoURI,
+    });
+
     const el = document.querySelector(`[data-token="${token.address}"]`);
     if (el) {
       const rect = el.getBoundingClientRect();
@@ -67,7 +69,30 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
       dashboard.addTokenDirect(token);
       triggerHaptic();
     }
-  }, [triggerAddAnimation, dashboard, triggerHaptic]);
+  }, [triggerAddAnimation, dashboard, triggerHaptic, preferences]);
+
+  // Esc key handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (searchQuery) setSearchQuery('');
+        else if (drawerState === 'full') setDrawerState('half');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchQuery, setSearchQuery, drawerState]);
+
+  // Paste CA handler
+  const handlePasteCA = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim().length >= 32) {
+        setSearchQuery(text.trim());
+        setDrawerState('full');
+      }
+    } catch { /* clipboard denied */ }
+  }, [setSearchQuery]);
 
   return (
     <>
@@ -227,57 +252,91 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
 
         {/* Search */}
         <div className="px-4 pb-2 shrink-0">
-          <div className="relative mb-4">
+          <div className="relative mb-3">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-amber-800/50" size={20} />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setDrawerState('full')}
-              placeholder="Search tokens..."
-              className="w-full bg-amber-950/20 border border-amber-900/20 rounded-2xl pl-14 pr-12 py-4 text-base focus:border-amber-700/50 focus:bg-amber-950/30 outline-none transition-all placeholder:text-amber-900/40 text-white"
+              placeholder="Search name, symbol, or address..."
+              className="w-full bg-amber-950/20 border border-amber-900/20 rounded-2xl pl-14 pr-28 py-4 text-base focus:border-amber-700/50 focus:bg-amber-950/30 outline-none transition-all placeholder:text-amber-900/40 text-white"
             />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full active:bg-white/10"
-              >
-                <X size={18} className="text-white/40" />
-              </button>
-            )}
-            {isSearching && <Loader2 className="absolute right-12 top-1/2 -translate-y-1/2 text-amber-600 animate-spin" size={18} />}
+            {/* Right side buttons */}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {isSearching && <Loader2 className="text-amber-600 animate-spin" size={16} />}
+              {searchQuery ? (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="w-8 h-8 flex items-center justify-center rounded-full active:bg-white/10"
+                >
+                  <X size={16} className="text-white/40" />
+                </button>
+              ) : (
+                <button
+                  onClick={handlePasteCA}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-900/30 text-amber-500 text-xs font-bold active:bg-amber-900/50 transition-colors"
+                >
+                  <ClipboardPaste size={12} />
+                  Paste
+                </button>
+              )}
+            </div>
           </div>
 
-          <TabSelector 
-             activeTab={activeTab} 
-             setActiveTab={setActiveTab} 
-             isWalletConnected={!!publicKey} 
-          />
-          
-          {/* Sub Filters for All Tab */}
-          {activeTab === 'all' && (
-            <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar">
-              {([
-                { key: 'crypto', label: 'Crypto', count: filterCounts.crypto },
-                { key: 'stock', label: 'Stock', count: filterCounts.stock },
-                { key: 'commodity', label: 'Commodities', count: filterCounts.commodity },
-                { key: 'prediction', label: 'Prediction', count: filterCounts.prediction },
-              ] as const).map(({ key, label, count }) => (
-                count === undefined || count > 0 ? (
+          {/* Search History Chips */}
+          {!searchQuery && preferences.searchHistory.length > 0 && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] text-white/25 uppercase tracking-wider font-bold">Recent</span>
+                <button
+                  onClick={preferences.clearSearchHistory}
+                  className="text-[10px] text-amber-700/50 active:text-amber-500"
+                >
+                  Clear All
+                </button>
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                {preferences.searchHistory.map(item => (
                   <button
-                    key={key}
-                    onClick={() => setTokenFilter(prev => prev === key ? 'all' : key)}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${
-                      tokenFilter === key
-                        ? 'bg-amber-600 text-black'
-                        : 'bg-white/5 text-white/40 active:bg-white/10'
-                    }`}
+                    key={item.address}
+                    onClick={() => setSearchQuery(item.symbol !== '?' ? item.symbol : item.address)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/5 shrink-0 active:bg-white/10 border border-white/5"
                   >
-                    {label}
+                    <TokenImage src={item.logoURI} className="w-4 h-4 rounded-full" />
+                    <span className="text-[11px] text-white/60 font-medium">{item.symbol}</span>
                   </button>
-                ) : null
-              ))}
+                ))}
+              </div>
             </div>
           )}
+
+          <TabSelector
+             activeTab={activeTab}
+             setActiveTab={setActiveTab}
+             isWalletConnected={!!publicKey}
+          />
+
+          {/* Verified Only Toggle + Sub Filters */}
+          <div className="flex items-center justify-between mt-2">
+            {/* Sub Filters for All Tab */}
+            
+            {/* Verified Only Toggle */}
+            <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-2">
+              <span className="text-[10px] text-white/30 font-bold">Verified</span>
+              <div
+                className={`relative w-8 h-[18px] rounded-full transition-colors ${
+                  preferences.verifiedOnly ? 'bg-amber-600' : 'bg-white/10'
+                }`}
+                onClick={() => preferences.setVerifiedOnly(!preferences.verifiedOnly)}
+              >
+                <motion.div
+                  className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm"
+                  animate={{ left: preferences.verifiedOnly ? 15 : 2 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              </div>
+            </label>
+          </div>
         </div>
 
         {/* Token List */}
@@ -285,6 +344,41 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
           className="flex-1 overflow-y-auto px-3 pb-8 custom-scrollbar overscroll-contain"
           onPointerDown={(e) => e.stopPropagation()}
         >
+          {/* Favorites Bar */}
+          {!searchQuery && preferences.favorites.size > 0 && (
+            <div className="px-1 py-2 mb-1 border-b border-white/5">
+              <span className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">Favorites</span>
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                {dashboard.allTokens.filter(t => preferences.favorites.has(t.address)).map(token => (
+                  <button
+                    key={token.address}
+                    onClick={() => handleTokenSelect(token)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0 border transition-colors ${
+                      selectedIds.has(token.address)
+                        ? 'bg-amber-900/30 border-amber-800/30 opacity-50'
+                        : 'bg-white/[0.03] border-white/5 active:bg-white/10'
+                    }`}
+                  >
+                    <TokenImage src={token.logoURI} className="w-5 h-5 rounded-full" />
+                    <span className="text-[11px] text-amber-400 font-bold">{token.symbol}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Column Headers */}
+          {!isLoading && sortedVisibleTokens.length > 0 && (
+            <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-white/20 uppercase tracking-wider">
+              <div className="w-5" />
+              <div className="w-10" />
+              <div className="flex-1">Token</div>
+              <div className="w-[52px] text-right">MC</div>
+              <div className="w-[52px] text-right">VOL</div>
+              <div className="w-8" />
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-40 gap-4">
               <Loader2 className="w-10 h-10 text-amber-600 animate-spin" />
@@ -296,7 +390,7 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
               <span className="text-base">No tokens found</span>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {sortedVisibleTokens.map((token, index) => {
                 const isSelected = selectedIds.has(token.address);
                 return (
@@ -306,6 +400,8 @@ export const MobileBuilder = ({ dashboard, onBack }: MobileBuilderProps) => {
                     isSelected={isSelected}
                     hasSelection={hasSelection}
                     onSelect={() => handleTokenSelect(token)}
+                    isFavorite={preferences.isFavorite(token.address)}
+                    onToggleFavorite={() => preferences.toggleFavorite(token.address)}
                   />
                 );
               })}
