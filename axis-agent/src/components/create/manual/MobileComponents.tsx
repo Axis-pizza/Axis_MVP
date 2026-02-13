@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Plus, Minus, X, Sparkles, TrendingUp } from 'lucide-react';
+import { Check, Plus, Minus, X, Sparkles, Star } from 'lucide-react';
 import { TokenImage } from '../../common/TokenImage';
+import { formatCompactUSD, abbreviateAddress } from '../../../utils/formatNumber';
 import type { JupiterToken } from '../../../services/jupiter';
 import type { AssetItem } from './types';
 
@@ -133,17 +134,21 @@ export const MobileWeightControl = ({
   );
 };
 
-// --- Mobile Token List Item ---
+// --- Mobile Token List Item (Jupiter-style) ---
 export const MobileTokenListItem = ({
   token,
   isSelected,
   hasSelection,
   onSelect,
+  isFavorite,
+  onToggleFavorite,
 }: {
   token: JupiterToken;
   isSelected: boolean;
   hasSelection: boolean;
   onSelect: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }) => (
   <motion.button
     disabled={isSelected}
@@ -151,67 +156,89 @@ export const MobileTokenListItem = ({
     initial={{ x: 0, opacity: 1 }}
     animate={{
       x: 0,
-      opacity: isSelected ? 1 : hasSelection ? 0.5 : 1,
+      opacity: isSelected ? 1 : hasSelection ? 0.6 : 1,
     }}
-    whileHover={{ x: 6, opacity: 1 }}
-    whileTap={{ scale: 0.98, x: 6 }}
+    whileTap={{ scale: 0.98 }}
     transition={{ type: "spring", stiffness: 400, damping: 25 }}
-    className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-colors min-h-[72px] ${
+    className={`w-full flex items-center gap-2.5 p-3 rounded-2xl transition-colors min-h-[64px] ${
       isSelected
         ? 'bg-gradient-to-r from-amber-950/60 to-amber-900/40 border border-amber-800/40'
         : 'bg-transparent active:bg-white/5'
     }`}
   >
+    {/* Star / Favorite */}
+    {onToggleFavorite && (
+      <div
+        role="button"
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+        className="flex-none w-5 flex items-center justify-center"
+      >
+        <Star
+          size={13}
+          className={`transition-colors ${isFavorite ? 'text-amber-500 fill-amber-500' : 'text-white/15'}`}
+        />
+      </div>
+    )}
+
+    {/* Icon + Verified Badge */}
     <div className="relative flex-none">
       <TokenImage
         src={token.logoURI}
-        className="w-12 h-12 rounded-full bg-white/10"
+        className="w-10 h-10 rounded-full bg-white/10"
       />
       {token.isVerified && (
-        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center ${
-          isSelected ? 'bg-gradient-to-br from-amber-600 to-amber-800' : 'bg-blue-500'
-        }`}>
-          <Check size={12} className="text-white" />
+        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center ring-2 ring-[#0a0a0a]">
+          <Check size={9} className="text-white" />
         </div>
       )}
     </div>
 
+    {/* Name Block */}
     <div className="flex-1 min-w-0 text-left">
-      <div className="flex items-center gap-2">
-        <span className={`font-semibold text-base ${isSelected ? 'text-amber-500' : 'text-white'}`}>
+      <div className="flex items-center gap-1.5">
+        <span className={`font-bold text-sm ${isSelected ? 'text-amber-400' : 'text-white'}`}>
           {token.symbol}
         </span>
-        {token.tags?.includes('meme') && <Sparkles size={12} className="text-pink-400" />}
+        {token.tags?.includes('meme') && <Sparkles size={10} className="text-pink-400" />}
         {token.tags?.includes('stable') && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">Stable</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400">Stable</span>
         )}
       </div>
-      <div className={`text-sm truncate mt-0.5 ${isSelected ? 'text-amber-600/60' : 'text-white/40'}`}>
+      <div className="text-[11px] text-white/30 truncate mt-0.5">
         {token.name}
+        <span className="text-white/15 mx-1">·</span>
+        <span className="font-mono text-white/20">{abbreviateAddress(token.address)}</span>
       </div>
     </div>
 
-    <div className="flex flex-col items-end gap-1">
-      {token.balance !== undefined && token.balance > 0 && (
-         <div className="text-right">
-            <div className="text-sm font-mono text-white/90">
-              {token.balance < 0.001 ? '<0.001' : token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
-            </div>
-            <div className="text-xs text-white/30">Balance</div>
-         </div>
-      )}
-      
-      {!token.balance && (
-        isSelected ? (
-          <div className="flex-none w-11 h-11 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center shadow-lg">
-            <Check size={20} className="text-white" />
-          </div>
-        ) : (
-          <div className="flex-none w-11 h-11 rounded-full bg-white/5 flex items-center justify-center text-white/30">
-            <Plus size={20} />
-          </div>
-        )
-      )}
+    {/* Right Side: Balance OR MC/VOL */}
+    {token.balance != null && token.balance > 0 ? (
+      <div className="text-right flex-none min-w-[60px]">
+        <div className="text-xs font-mono text-white/80">
+          {token.balance < 0.001 ? '<0.001' : token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+        </div>
+        <div className="text-[10px] text-white/25">Balance</div>
+      </div>
+    ) : (
+      <div className="flex items-center gap-2 flex-none">
+        <div className="text-right w-[52px]">
+          <div className="text-[9px] text-white/25 uppercase leading-none mb-0.5">MC</div>
+          <div className="text-[11px] text-white/50 font-mono leading-none">{formatCompactUSD(token.marketCap)}</div>
+        </div>
+        <div className="text-right w-[52px]">
+          <div className="text-[9px] text-white/25 uppercase leading-none mb-0.5">VOL</div>
+          <div className="text-[11px] text-white/50 font-mono leading-none">{formatCompactUSD(token.dailyVolume)}</div>
+        </div>
+      </div>
+    )}
+
+    {/* Add / Selected Button */}
+    <div className={`flex-none w-8 h-8 rounded-full flex items-center justify-center ${
+      isSelected
+        ? 'bg-gradient-to-br from-amber-600 to-amber-800'
+        : 'bg-white/5 text-white/30'
+    }`}>
+      {isSelected ? <Check size={14} className="text-white" /> : <Plus size={14} />}
     </div>
   </motion.button>
 );

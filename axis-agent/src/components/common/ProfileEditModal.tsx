@@ -101,10 +101,10 @@ export const ProfileEditModal = ({
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md bg-[#121212] border border-white/10 rounded-3xl overflow-hidden flex flex-col shadow-2xl"
+          className="w-full max-w-md bg-gradient-to-b from-[#140E08] to-[#080503] border border-[rgba(184,134,63,0.15)] rounded-3xl overflow-hidden flex flex-col shadow-2xl"
         >
-          <div className="p-6 border-b border-white/5 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">
+          <div className="p-6 border-b border-[rgba(184,134,63,0.1)] flex items-center justify-between">
+            <h2 className="text-xl font-bold text-[#F2E0C8]">
               {isExistingUser ? 'Edit Profile' : 'Create Account'}
             </h2>
             <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-white/70">
@@ -121,7 +121,7 @@ export const ProfileEditModal = ({
                 >
                   {uploading ? (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                      <Loader2 className="w-8 h-8 text-[#D97706] animate-spin" />
+                      <Loader2 className="w-8 h-8 text-[#B8863F] animate-spin" />
                     </div>
                   ) : displayUrl ? (
                     <img src={displayUrl} alt="Profile" className="w-full h-full object-cover" />
@@ -144,7 +144,7 @@ export const ProfileEditModal = ({
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Username"
-                  className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-[#D97706]"
+                  className="w-full p-4 bg-[#080503] border border-[rgba(184,134,63,0.15)] rounded-xl text-[#F2E0C8] focus:outline-none focus:border-[#B8863F]"
                 />
               </div>
               <div>
@@ -154,14 +154,14 @@ export const ProfileEditModal = ({
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Bio"
                   rows={3}
-                  className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-[#D97706]"
+                  className="w-full p-4 bg-[#080503] border border-[rgba(184,134,63,0.15)] rounded-xl text-[#F2E0C8] focus:outline-none focus:border-[#B8863F]"
                 />
               </div>
 
               <button
                 onClick={handleSave}
                 disabled={loading || uploading}
-                className="w-full py-4 bg-gradient-to-r from-[#D97706] to-amber-600 text-black font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
+                className="w-full py-4 bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] text-[#140D07] font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 shadow-[0_0_12px_rgba(184,134,63,0.35)]"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 {isExistingUser ? 'Save Changes' : 'Complete Registration'}

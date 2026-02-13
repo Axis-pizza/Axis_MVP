@@ -3,6 +3,7 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { JupiterService, WalletService, type JupiterToken } from '../services/jupiter';
 import { fetchPredictionTokens, fetchStockTokens, fetchCommodityTokens } from '../services/dflow';
+import { fetchMarketCapMap } from '../services/coingecko';
 import { toast } from 'sonner';
 import type { StrategyConfig, AssetItem, ManualDashboardProps } from '../components/create/manual/types';
 
@@ -12,7 +13,8 @@ export const useManualDashboard = ({
   onDeploySuccess,
   initialConfig,
   initialTokens,
-}: Pick<ManualDashboardProps, 'onDeploySuccess' | 'initialConfig' | 'initialTokens'>) => {
+  verifiedOnly = false,
+}: Pick<ManualDashboardProps, 'onDeploySuccess' | 'initialConfig' | 'initialTokens'> & { verifiedOnly?: boolean }) => {
   
   // Haptic feedback helper
   const triggerHaptic = useCallback(() => {
@@ -113,8 +115,13 @@ export const useManualDashboard = ({
         else if (tokenFilter === 'prediction') baseList = baseList.filter(t => t.source === 'dflow');
     }
 
+    // 3. Verified Only filter
+    if (verifiedOnly) {
+      baseList = baseList.filter(t => t.isVerified);
+    }
+
     return baseList.slice(0, 100);
-  }, [allTokens, userTokens, activeTab, searchQuery, tokenFilter, trendingIds]);
+  }, [allTokens, userTokens, activeTab, searchQuery, tokenFilter, trendingIds, verifiedOnly]);
 
   // エイリアス (互換性のため)
   const displayTokens = sortedVisibleTokens;
@@ -126,11 +133,12 @@ export const useManualDashboard = ({
     const init = async () => {
       setIsLoading(true);
       try {
-        const [list, predictionTokens, stockTokens, commodityTokens] = await Promise.all([
+        const [list, predictionTokens, stockTokens, commodityTokens, mcMaps] = await Promise.all([
           JupiterService.getLiteList(),
           fetchPredictionTokens().catch(() => []),
           fetchStockTokens().catch(() => []),
           fetchCommodityTokens().catch(() => []),
+          fetchMarketCapMap().catch(() => ({ byAddress: new Map<string, number>(), bySymbol: new Map<string, number>() })),
         ]);
 
         // 人気トークンを上位に表示するための並び替え
@@ -145,20 +153,26 @@ export const useManualDashboard = ({
         // 全トークンをマージ (Source情報を付与したトークンも含む)
         // Note: fetchXxxTokens で取得したトークンには既に source プロパティがついている前提
         const merged = [
-            ...popular, 
-            ...predictionTokens, 
-            ...stockTokens, 
-            ...commodityTokens, 
+            ...popular,
+            ...predictionTokens,
+            ...stockTokens,
+            ...commodityTokens,
             ...others
         ];
-        
-        setAllTokens(merged);
+
+        // Enrich with market cap from CoinGecko
+        const enriched = merged.map(t => {
+          const mc = mcMaps.byAddress.get(t.address) ?? mcMaps.bySymbol.get(t.symbol.toUpperCase());
+          return mc ? { ...t, marketCap: mc } : t;
+        });
+
+        setAllTokens(enriched);
         
         // 初期トークン設定 (もしあれば)
         if (initialTokens && initialTokens.length > 0) {
           const initialAssets: AssetItem[] = [];
           initialTokens.forEach(p => {
-            const t = merged.find(x => x.symbol === p.symbol); // symbolマッチは少し危険だが簡易的
+            const t = enriched.find(x => x.symbol === p.symbol);
             if (t) {
                 initialAssets.push({ 
                     token: t, 

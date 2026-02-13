@@ -11,7 +11,7 @@ import { ProfileEditModal } from './ProfileEditModal';
 const InviteModal = ({ isOpen, onClose, pubkey }: { isOpen: boolean; onClose: () => void; pubkey: string }) => {
   const { showToast } = useToast();
   const inviteLink = `${window.location.origin}/?ref=${pubkey}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(inviteLink)}&color=D97706&bgcolor=0C0A09&margin=10`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(inviteLink)}&color=C9975B&bgcolor=0F0B07&margin=10`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inviteLink);
@@ -37,35 +37,35 @@ const InviteModal = ({ isOpen, onClose, pubkey }: { isOpen: boolean; onClose: ()
         initial={{ scale: 0.9, opacity: 0, y: 20 }} 
         animate={{ scale: 1, opacity: 1, y: 0 }} 
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-[#D97706]/20 bg-gradient-to-b from-[#1C1917] to-black p-8 text-center shadow-2xl shadow-orange-900/20"
+        className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-[#B8863F]/15 bg-gradient-to-b from-[#140E08] to-[#080503] p-8 text-center shadow-2xl shadow-[#6B4420]/20"
       >
-        <div className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-[#D97706]/10 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-[#D97706]/10 blur-3xl pointer-events-none" />
+        <div className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-[#B8863F]/8 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-[#B8863F]/8 blur-3xl pointer-events-none" />
 
-        <button onClick={onClose} className="absolute top-4 right-4 text-white/30 hover:text-white transition-colors">
+        <button onClick={onClose} className="absolute top-4 right-4 text-[#F2E0C8]/30 hover:text-[#F2E0C8] transition-colors">
           <X className="w-6 h-6" />
         </button>
 
-        <h3 className="mb-2 text-2xl font-serif font-bold text-white tracking-tight">Invite & Earn</h3>
-        <p className="mb-8 text-sm text-[#78716C]">Share your link to earn referral XP.</p>
+        <h3 className="mb-2 text-2xl font-serif font-bold text-[#F2E0C8] tracking-tight">Invite & Earn</h3>
+        <p className="mb-8 text-sm text-[#7A5A30]">Share your link to earn referral XP.</p>
 
-        <div className="mx-auto mb-8 w-fit rounded-2xl border border-[#D97706]/20 bg-[#0C0A09] p-4 shadow-inner">
+        <div className="mx-auto mb-8 w-fit rounded-2xl border border-[#B8863F]/15 bg-[#080503] p-4 shadow-inner">
           <img src={qrUrl} alt="Invite QR" className="h-48 w-48 rounded-lg opacity-90" />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <button 
             onClick={handleCopy}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#292524] py-3.5 text-sm font-bold text-white transition-all hover:bg-[#44403c] active:scale-95 border border-white/5"
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#221509] py-3.5 text-sm font-bold text-[#F2E0C8] transition-all hover:bg-[#221509] active:scale-95 border border-[rgba(184,134,63,0.08)]"
           >
             <Copy className="w-4 h-4" /> Copy Link
           </button>
           
           <button 
             onClick={handleShareX}
-            className="group flex items-center justify-center gap-2 rounded-xl bg-black py-3.5 text-sm font-bold text-white transition-all hover:border-[#D97706]/50 border border-[#D97706]/20 active:scale-95"
+            className="group flex items-center justify-center gap-2 rounded-xl bg-black py-3.5 text-sm font-bold text-[#F2E0C8] transition-all hover:border-[#B8863F]/35 border border-[#B8863F]/15 active:scale-95"
           >
-            <Share2 className="w-4 h-4 group-hover:text-[#D97706] transition-colors" /> Post on X
+            <Share2 className="w-4 h-4 group-hover:text-[#B8863F] transition-colors" /> Post on X
           </button>
         </div>
       </motion.div>
@@ -220,14 +220,14 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
             <motion.div 
               initial={{x:'100%'}} animate={{x:0}} exit={{x:'100%'}} 
               transition={{type:'spring', damping:25, stiffness: 200}} 
-              className={`fixed top-0 right-0 bottom-0 w-[90%] max-w-sm bg-[#0C0A09] border-l border-white/10 ${drawerZIndex} flex flex-col safe-area-top shadow-2xl`}
+              className={`fixed top-0 right-0 bottom-0 w-[90%] max-w-sm bg-[#080503] border-l border-[rgba(184,134,63,0.15)] ${drawerZIndex} flex flex-col safe-area-top shadow-2xl`}
             >
               
               <div className="flex justify-between items-center p-6 pb-2 shrink-0">
-                <h2 className="font-serif font-bold text-xl text-white">
+                <h2 className="font-serif font-bold text-xl text-[#F2E0C8]">
                     {showConnectView ? "Connect Wallet" : "My Profile"}
                 </h2>
-                <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-[#78716C] transition-colors">
+                <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-[#7A5A30] transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -237,14 +237,14 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 {showConnectView && (
                   <div className="flex flex-col items-center justify-center h-full text-center py-10">
                     <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
-                      <Wallet className="w-10 h-10 text-white/30" />
+                      <Wallet className="w-10 h-10 text-[#F2E0C8]/30" />
                     </div>
-                    <p className="text-white/60 mb-8 px-4">
+                    <p className="text-[#F2E0C8]/60 mb-8 px-4">
                       Connect your Solana wallet to claim XP and manage your portfolio.
                     </p>
                     <button
                       onClick={handleConnect}
-                      className="w-full py-4 bg-[#D97706] hover:bg-[#b45309] text-black font-bold rounded-xl active:scale-95 transition-all"
+                      className="w-full py-4 bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] hover:brightness-110 text-black font-bold rounded-xl active:scale-95 transition-all"
                     >
                       Connect Wallet
                     </button>
@@ -254,48 +254,48 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   <>
                     <div className="flex flex-col items-center mb-8">
                       <div className="relative group cursor-pointer" onClick={() => setIsEditOpen(true)}>
-                        <div className="w-24 h-24 rounded-full border-2 border-[#D97706]/30 p-1">
-                          <div className="w-full h-full rounded-full bg-[#1C1917] overflow-hidden flex items-center justify-center relative">
+                        <div className="w-24 h-24 rounded-full border-2 border-[#B8863F]/30 p-1">
+                          <div className="w-full h-full rounded-full bg-[#140E08] overflow-hidden flex items-center justify-center relative">
                             {userData?.avatar_url ? (
                               <img src={api.getProxyUrl(userData.avatar_url)} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
-                              <User className="w-10 h-10 text-white/20" />
+                              <User className="w-10 h-10 text-[#F2E0C8]/20" />
                             )}
                           </div>
                         </div>
-                        <div className="absolute bottom-1 right-1 bg-[#D97706] text-black p-1.5 rounded-full border border-black shadow-lg group-hover:scale-110 transition-transform">
+                        <div className="absolute bottom-1 right-1 bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] text-[#140D07] p-1.5 rounded-full border border-black shadow-lg group-hover:scale-110 transition-transform">
                           <Edit className="w-3.5 h-3.5" />
                         </div>
                       </div>
 
-                      <h3 className="mt-4 text-xl font-bold text-white">
+                      <h3 className="mt-4 text-xl font-bold text-[#F2E0C8]">
                         {userData?.username || `${publicKey.toBase58().slice(0,4)}...${publicKey.toBase58().slice(-4)}`}
                       </h3>
                       {userData?.bio ? (
-                        <p className="text-sm text-[#78716C] text-center mt-1 max-w-[200px] leading-relaxed">
+                        <p className="text-sm text-[#7A5A30] text-center mt-1 max-w-[200px] leading-relaxed">
                           {userData.bio}
                         </p>
                       ) : (
-                        <button onClick={() => setIsEditOpen(true)} className="text-xs text-[#78716C]/50 mt-1 hover:text-[#D97706] transition-colors">
+                        <button onClick={() => setIsEditOpen(true)} className="text-xs text-[#7A5A30]/50 mt-1 hover:text-[#B8863F] transition-colors">
                           + Add Bio
                         </button>
                       )}
                     </div>
 
-                    <div className="relative mb-6 overflow-hidden rounded-2xl border border-[#D97706]/20 bg-gradient-to-br from-[#0C0A09] via-[#1c1917] to-[#451a03] p-6 text-center shadow-lg">
+                    <div className="relative mb-6 overflow-hidden rounded-2xl border border-[#B8863F]/15 bg-[radial-gradient(circle_at_70%_20%,#221509,#0B0704_60%)] p-6 text-center shadow-lg">
                       <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
-                      <div className="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-[#D97706]/10 blur-3xl" />
+                      <div className="absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-[#B8863F]/8 blur-3xl" />
                       
-                      <Trophy className="absolute -right-4 -bottom-4 h-24 w-24 rotate-12 text-[#D97706]/5 transition-transform duration-500 group-hover:rotate-6" />
+                      <Trophy className="absolute -right-4 -bottom-4 h-24 w-24 rotate-12 text-[#B8863F]/5 transition-transform duration-500 group-hover:rotate-6" />
                       
                       <div className="relative z-10">
-                        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#D97706]">Season 0 Rank</p>
-                        <h3 className="mb-1 font-serif text-5xl font-bold tracking-tight text-white drop-shadow-sm">
+                        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#B8863F]">Season 0 Rank</p>
+                        <h3 className="mb-1 font-serif text-5xl font-bold tracking-tight text-[#F2E0C8] drop-shadow-sm">
                           {userData?.total_xp?.toLocaleString() || 0}
                         </h3>
                         <div className="flex items-center justify-center gap-2">
-                          <p className="text-sm text-[#78716C]">Current XP</p>
-                          <span className="rounded border border-white/5 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/50">
+                          <p className="text-sm text-[#7A5A30]">Current XP</p>
+                          <span className="rounded border border-[rgba(184,134,63,0.08)] bg-white/5 px-1.5 py-0.5 text-[10px] text-[#F2E0C8]/50">
                             {userData?.rank_tier || 'Novice'}
                           </span>
                         </div>
@@ -306,7 +306,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       <button 
                         onClick={handleCheckIn}
                         disabled={loading}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#D97706] py-3.5 font-bold text-black shadow-lg shadow-orange-900/20 transition-all active:scale-95 hover:bg-[#b45309] disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#B8863F] py-3.5 font-bold text-black shadow-lg shadow-[#6B4420]/20 transition-all active:scale-95 hover:brightness-110 disabled:opacity-50"
                       >
                         {loading ? <Sparkles className="h-5 w-5 animate-spin" /> : <CheckCircle className="h-5 w-5" />}
                         <span>Daily Check-in</span>
@@ -316,16 +316,16 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       <button 
                         onClick={handleFaucet}
                         disabled={faucetLoading}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-500/20 bg-[#1C1917] py-3.5 font-bold text-purple-400 transition-all active:scale-95 hover:bg-[#292524] disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(184,134,63,0.15)] bg-[#140E08] py-3.5 font-bold text-[#B89860] transition-all active:scale-95 hover:bg-[#221509] disabled:opacity-50"
                       >
                         {faucetLoading ? <Sparkles className="h-5 w-5 animate-spin" /> : <Droplets className="h-5 w-5" />}
                         Get 1,000 USDC
                       </button>
                       <button 
                         onClick={() => setIsInviteOpen(true)}
-                        className="group flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#1C1917] py-3.5 font-bold text-[#E7E5E4] transition-all active:scale-95 hover:bg-[#292524]"
+                        className="group flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(184,134,63,0.15)] bg-[#140E08] py-3.5 font-bold text-[#F2E0C8] transition-all active:scale-95 hover:bg-[#221509]"
                       >
-                        <QrCode className="h-5 w-5 text-[#78716C] transition-colors group-hover:text-white" /> 
+                        <QrCode className="h-5 w-5 text-[#7A5A30] transition-colors group-hover:text-[#F2E0C8]" /> 
                         Invite & Earn
                       </button>
                       

@@ -3,31 +3,38 @@
 @import './mobile-styles.css';
 
 @theme {
-  /* * 重要: ここでTailwindのデフォルトフォント(--font-sans)を
-   * Times New Romanに強制的に書き換えます。
-   */
+  /* * Times New Roman serif font */
   --font-sans: "Times New Roman", Times, serif;
 
-  /* 高級なブロンズ・ゴールド（Brand Primaryの代わり） */
-  --color-orange-400: #F59E0B; /* 明るいゴールド */
-  --color-orange-500: #D97706; /* 深いブロンズ */
-  --color-orange-600: #B45309; /* 焼き色 */
-  
-  /* アンバーも同系色のゴールドに統一 */
-  --color-amber-400: #FCD34D;
-  --color-amber-500: #F59E0B;
-  
-  /* 背景色の黒を「漆黒（リッチブラック）」に変更 */
-  --color-zinc-900: #1C1917; /* Warm Dark */
-  --color-black: #0C0A09;     /* Deepest Warm Black */
+  /* ===== Metallic Gold Scale — Red-biased, high contrast ===== */
+  --color-orange-400: #D4A261; /* gold-300: warm satin gold */
+  --color-orange-500: #B8863F; /* gold-500: primary metallic accent */
+  --color-orange-600: #8B5E28; /* gold-700: deep bronze */
 
-  /* 旧変数も上書き */
-  --color-brand-primary: #D97706;
-  --color-brand-secondary: #F59E0B;
-  --color-bg-dark: #0C0A09;
+  --color-amber-400: #E8C890; /* gold-100: bright metallic highlight */
+  --color-amber-500: #D4A261; /* gold-300 */
+
+  /* ===== Core Backgrounds — ultra-deep warm black ===== */
+  --color-zinc-900: #140E08; /* bg-secondary */
+  --color-black: #080503;    /* bg-primary — near-void black */
+
+  /* ===== Brand Tokens ===== */
+  --color-brand-primary: #B8863F;
+  --color-brand-secondary: #D4A261;
+  --color-bg-dark: #080503;
+  --color-bg-secondary: #140E08;
+  --color-bg-tertiary: #221509;
+  --color-gold-900: #6B4420;
+  --color-gold-700: #8B5E28;
+  --color-gold-500: #B8863F;
+  --color-gold-300: #D4A261;
+  --color-gold-100: #E8C890;
+  --color-text-primary: #F2E0C8;
+  --color-text-secondary: #B89860;
+  --color-text-muted: #7A5A30;
 }
 
-/* 以下はスタイル定義 */
+/* Global reset */
 * {
   box-sizing: border-box;
 }
@@ -37,29 +44,27 @@ html {
 }
 
 body {
-  background-color: #0C0A09; 
-  color: #E7E5E4; /* オフホワイト */
-  /* ここでも指定しますが、@themeの--font-sansが実質的に優先されます */
+  background-color: #080503;
+  color: #F2E0C8;
   font-family: "Times New Roman", Times, serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: 0.02em;
 }
 
-/* --- 以下、高級感エフェクト（変更なし） --- */
-
-/* スクロールバーを細く高級に */
+/* Scrollbar — thin, gold-accented */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(217, 119, 6, 0.3);
+  background: rgba(184, 134, 63, 0.2);
   border-radius: 4px;
 }
+
 .wallet-adapter-modal-wrapper {
   z-index: 99999 !important;
 }
@@ -67,69 +72,86 @@ body {
 .wallet-adapter-modal-overlay {
   z-index: 99998 !important;
 }
-/* マットな磨りガラス */
+
+/* Glass — deep luxury frosted panel */
 .glass {
-  background: rgba(28, 25, 23, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  background: rgba(20, 14, 8, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(184, 134, 63, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(184, 134, 63, 0.05);
 }
 
-/* 文字のゴールドグラデーション */
+/* Gold gradient text — metallic luster with red undertone */
 .gradient-text {
-  background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 50%, #D97706 100%);
+  background: linear-gradient(
+    135deg,
+    #E8C890 0%,
+    #D4A261 25%,
+    #B8863F 50%,
+    #8B5E28 75%,
+    #6B4420 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 0 2px 10px rgba(245, 158, 11, 0.1);
+  text-shadow: none;
 }
 
-/* ピザ生地（背景パターン）を落ち着いた色味に */
+/* Crust pattern — ultra-deep warm gradient */
 .crust-pattern {
-  background-image: radial-gradient(circle at 50% 50%, #78350F 0%, #451a03 100%);
+  background-image: radial-gradient(circle at 50% 50%, #221509 0%, #080503 100%);
   opacity: 0.8;
 }
 
-/* トッピングの色もシックに */
-.topping-pepperoni { background: #9F1239; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
-.topping-cheese { background: #F59E0B; }
+/* Topping colors — muted institutional palette */
+.topping-pepperoni { background: #9F1239; box-shadow: inset 0 2px 4px rgba(0,0,0,0.4); }
+.topping-cheese { background: #B8863F; }
 .topping-basil { background: #15803D; }
 
-/* 読み込み中の光るエフェクト */
+/* Pulse glow — warm metallic gold glow */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 15px rgba(217, 119, 6, 0.1); }
-  50% { box-shadow: 0 0 30px rgba(217, 119, 6, 0.3); }
+  0%, 100% { box-shadow: 0 0 15px rgba(184, 134, 63, 0.08), 0 0 40px rgba(184, 134, 63, 0.03); }
+  50% { box-shadow: 0 0 20px rgba(184, 134, 63, 0.2), 0 0 60px rgba(184, 134, 63, 0.08); }
 }
 .pulse-glow {
   animation: pulse-glow 3s ease-in-out infinite;
 }
 
-/* マトリックス（背景の流れる文字）をゴールドの粒子に */
+/* Metallic shine — for CTA buttons and high-value elements */
+@keyframes metallic-shine {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Matrix rain — gold particles */
 @keyframes matrix-rain {
   0% { transform: translateY(-100%); opacity: 0; }
-  10% { opacity: 0.6; }
-  90% { opacity: 0.6; }
+  10% { opacity: 0.5; }
+  90% { opacity: 0.5; }
   100% { transform: translateY(100vh); opacity: 0; }
 }
 .matrix-char {
   animation: matrix-rain 5s linear infinite;
-  color: #D97706;
-  text-shadow: 0 0 4px rgba(245, 158, 11, 0.5);
+  color: #B8863F;
+  text-shadow: 0 0 6px rgba(184, 134, 63, 0.3);
 }
 
-/* 下部のナビゲーションバーの影 */
+/* Floating nav shadow — deep void with subtle gold edge */
 .floating-nav-shadow {
-  box-shadow: 
-    0 -10px 40px -10px rgba(0, 0, 0, 0.8),
-    0 0 20px -5px rgba(217, 119, 6, 0.1);
+  box-shadow:
+    0 -10px 40px -10px rgba(0, 0, 0, 0.95),
+    0 0 1px 0 rgba(184, 134, 63, 0.15),
+    0 0 30px -5px rgba(184, 134, 63, 0.05);
 }
 
-/* 背景のグリッド線 */
+/* Background grid — barely visible */
 .tactical-grid {
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(184, 134, 63, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184, 134, 63, 0.02) 1px, transparent 1px);
   background-size: 50px 50px;
   mask-image: radial-gradient(circle at center, black 30%, transparent 80%);
 }

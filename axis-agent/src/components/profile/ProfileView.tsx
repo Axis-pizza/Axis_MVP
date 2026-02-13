@@ -12,7 +12,7 @@ import { OGBadge } from '../common/OGBadge';
 
 // --- Types & Styles ---
 const FIXED_BG_STYLE = {
-  background: 'radial-gradient(circle at top right, #451a03 0%, #000000 80%)'
+  background: 'radial-gradient(circle at 70% 20%, #221509, #0B0704 60%)'
 };
 
 interface Strategy {
@@ -185,7 +185,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   if (!publicKey) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center min-h-[70vh]">
-        <div className="w-20 h-20 bg-[#1C1917] rounded-full flex items-center justify-center border border-white/10 mb-6 animate-pulse">
+        <div className="w-20 h-20 bg-[#140E08] rounded-full flex items-center justify-center border border-[rgba(184,134,63,0.15)] mb-6 animate-pulse">
           <Wallet className="w-8 h-8 text-white/50" />
         </div>
         <h2 className="text-2xl font-serif font-bold text-white mb-2">Connect Wallet</h2>
@@ -193,7 +193,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
           Access your portfolio, track referrals, and climb the leaderboard.
         </p>
         <div className="w-full max-w-xs">
-           <WalletMultiButton style={{ width: '100%', justifyContent: 'center', background: '#D97706', borderRadius: '12px', fontWeight: 'bold' }} />
+           <WalletMultiButton style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #6B4420, #B8863F, #E8C890)', borderRadius: '12px', fontWeight: 'bold' }} />
         </div>
       </div>
     );
@@ -203,20 +203,20 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
     <div className="max-w-md mx-auto h-full flex flex-col pt-4 md:pt-28 px-4 pb-32 safe-area-top relative">
       {/* Net Worth Card */}
       <div className="mb-8 relative group perspective-1000">
-        <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#0C0A09] shadow-2xl" style={{ aspectRatio: '1.58/1' }}>
+        <div className="relative overflow-hidden rounded-[24px] border border-[rgba(184,134,63,0.15)] bg-[#080503] shadow-2xl" style={{ aspectRatio: '1.58/1' }}>
             <div className="absolute inset-0 z-0" style={FIXED_BG_STYLE} />
             <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
             <div className="relative z-10 h-full p-6 flex flex-col justify-between bg-black/10 backdrop-blur-[1px]">
             <div className="flex justify-between items-start">
                     <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/5 w-fit">
-                            <Wallet className="w-3 h-3 text-[#D97706]" />
+                        <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-[rgba(184,134,63,0.08)] w-fit">
+                            <Wallet className="w-3 h-3 text-[#B8863F]" />
                             <span className="font-bold text-white text-sm font-serif">{formatAddress(publicKey.toBase58())}</span>
                         </div>
                         {userProfile?.is_vip && <div className="ml-1"><OGBadge size="sm" /></div>}
                     </div>
                     <div className="flex gap-2">
-                         <button onClick={() => setCurrencyMode(m => m === 'USD' ? 'USDC' : 'USD')} className="text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white/70 border border-white/10">{currencyMode}</button>
+                         <button onClick={() => setCurrencyMode(m => m === 'USD' ? 'USDC' : 'USD')} className="text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white/70 border border-[rgba(184,134,63,0.15)]">{currencyMode}</button>
                          <button onClick={() => setIsHidden(!isHidden)} className="text-white/50">{isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
                     </div>
                  </div>
@@ -226,7 +226,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
                         {isHidden ? '••••••' : formatCurrency(displayValue, currencyMode)}
                     </h2>
                     {pnlVal !== 0 && (
-                      <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-2 border border-white/10 ${isPos ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                      <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-2 border border-[rgba(184,134,63,0.15)] ${isPos ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
                           {isPos ? <ArrowUpRight className="w-3 h-3"/> : <ArrowDownRight className="w-3 h-3"/>}
                           <span className="font-mono">{isHidden ? '••••' : `${isPos ? '+' : ''}${pnlVal.toFixed(2)}%`}</span>
                       </div>
@@ -235,7 +235,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
                  <div className="flex justify-between items-end">
                     <div>
                         <p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Points</p>
-                        <p className="text-sm text-[#D97706] font-bold font-mono">{userProfile?.totalPoints.toLocaleString() || 0}</p>
+                        <p className="text-sm text-[#B8863F] font-bold font-mono">{userProfile?.totalPoints.toLocaleString() || 0}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Rank</p>
@@ -247,12 +247,12 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white/10 mb-6 sticky top-0 md:top-20 bg-[#0C0A09] z-20 pt-2">
+      <div className="flex border-b border-[rgba(184,134,63,0.15)] mb-6 sticky top-0 md:top-20 bg-[#080503] z-20 pt-2">
          {['portfolio', 'leaderboard'].map(t => (
              <button
                 key={t}
                 onClick={() => setActiveTab(t as any)}
-                className={`flex-1 pb-3 font-bold text-sm capitalize transition-colors ${activeTab === t ? 'text-white border-b-2 border-[#D97706]' : 'text-white/40 hover:text-white/60'}`}
+                className={`flex-1 pb-3 font-bold text-sm capitalize transition-colors ${activeTab === t ? 'text-white border-b-2 border-[#B8863F]' : 'text-white/40 hover:text-white/60'}`}
              >
                 {t}
              </button>
@@ -298,14 +298,14 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
                     </div>
                 ) : (
                     leaderboardData.map((user, i) => (
-                        <div key={i} className={`flex items-center p-3 rounded-xl border transition-colors ${user.isMe ? 'bg-[#D97706]/10 border-[#D97706]/50' : 'bg-[#1C1917] border-white/5'}`}>
-                            <div className={`w-8 text-center font-mono font-bold text-lg ${user.rank <= 3 ? 'text-[#FFD700]' : 'text-[#78716C]'}`}>{user.rank}</div>
+                        <div key={i} className={`flex items-center p-3 rounded-xl border transition-colors ${user.isMe ? 'bg-[#B8863F]/10 border-[#B8863F]/30' : 'bg-[#140E08] border-[rgba(184,134,63,0.08)]'}`}>
+                            <div className={`w-8 text-center font-mono font-bold text-lg ${user.rank <= 3 ? 'text-[#FFD700]' : 'text-[#7A5A30]'}`}>{user.rank}</div>
                             <div className="flex-1 flex items-center gap-3 pl-2 min-w-0">
-                                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold text-white/50 border border-white/5 overflow-hidden">
+                                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold text-white/50 border border-[rgba(184,134,63,0.08)] overflow-hidden">
                                     {user.avatar_url ? <img src={api.getProxyUrl(user.avatar_url)} className="w-full h-full object-cover"/> : user.username.charAt(0)}
                                 </div>
                                 <div className="min-w-0">
-                                    <p className={`font-bold text-sm truncate ${user.isMe ? 'text-[#D97706]' : 'text-white'}`}>{user.username}</p>
+                                    <p className={`font-bold text-sm truncate ${user.isMe ? 'text-[#B8863F]' : 'text-white'}`}>{user.username}</p>
                                     <p className="text-[10px] text-white/30 font-mono">{formatAddress(user.pubkey)}</p>
                                 </div>
                             </div>
@@ -327,14 +327,14 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
 const FilterChip = memo(({ label, active, onClick, icon }: any) => (
   <button 
     onClick={onClick}
-    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${active ? 'bg-[#D97706] text-black' : 'bg-[#1C1917] border border-white/5 text-white/50 hover:bg-white/5'}`}
+    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${active ? 'bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] text-[#140D07]' : 'bg-[#140E08] border border-[rgba(184,134,63,0.08)] text-white/50 hover:bg-white/5'}`}
   >
     {icon} {label}
   </button>
 ));
 
 const EmptyState = memo(({ icon: Icon, title, sub }: any) => (
-  <div className="flex flex-col items-center justify-center py-12 text-white/20 border border-dashed border-white/5 rounded-2xl">
+  <div className="flex flex-col items-center justify-center py-12 text-white/20 border border-dashed border-[rgba(184,134,63,0.08)] rounded-2xl">
     <Icon className="w-10 h-10 mb-3 opacity-20" />
     <p className="text-sm font-bold text-white/40">{title}</p>
     <p className="text-xs">{sub}</p>
@@ -350,7 +350,7 @@ const StrategyCard = memo(({ strategy, onSelect }: { strategy: Strategy; onSelec
   return (
     <button
       onClick={() => onSelect?.(strategy)}
-      className="w-full text-left bg-[#1C1917] p-4 rounded-xl border border-white/5 hover:border-[#D97706]/30 transition-colors active:scale-[0.98]"
+      className="w-full text-left bg-[#140E08] p-4 rounded-xl border border-[rgba(184,134,63,0.08)] hover:border-[#B8863F]/30 transition-colors active:scale-[0.98]"
     >
       <div className="flex justify-between items-start mb-3">
         <div>
@@ -364,7 +364,7 @@ const StrategyCard = memo(({ strategy, onSelect }: { strategy: Strategy; onSelec
       </div>
       <div className="flex items-center gap-0 mb-3">
          {displayTokens.map((t: any, i: number) => (
-           <div key={i} className="w-6 h-6 rounded-full overflow-hidden border-2 border-[#1C1917] bg-white/10 -ml-1.5 first:ml-0">
+           <div key={i} className="w-6 h-6 rounded-full overflow-hidden border-2 border-[#140E08] bg-white/10 -ml-1.5 first:ml-0">
              <TokenImage
                src={t.logoURI}
                alt={t.symbol || ''}
@@ -373,12 +373,12 @@ const StrategyCard = memo(({ strategy, onSelect }: { strategy: Strategy; onSelec
            </div>
          ))}
          {extraCount > 0 && (
-           <div className="w-6 h-6 rounded-full bg-white/10 border-2 border-[#1C1917] -ml-1.5 flex items-center justify-center">
+           <div className="w-6 h-6 rounded-full bg-white/10 border-2 border-[#140E08] -ml-1.5 flex items-center justify-center">
              <span className="text-[8px] text-white/60 font-bold">+{extraCount}</span>
            </div>
          )}
       </div>
-      <div className="flex justify-between items-center pt-3 border-t border-white/5">
+      <div className="flex justify-between items-center pt-3 border-t border-[rgba(184,134,63,0.08)]">
         <span className="text-[10px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 font-bold">ACTIVE</span>
         <span className="text-[10px] text-white/30">{new Date(strategy.createdAt * 1000).toLocaleDateString()}</span>
       </div>

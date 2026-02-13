@@ -34,7 +34,7 @@ interface SwipeDiscoverViewProps {
  */
 const SwipeCardSkeleton = memo(({ index }: { index: number }) => (
   <div
-    className="absolute inset-0 w-full h-full bg-[#121212] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl flex flex-col p-5 select-none pointer-events-none"
+    className="absolute inset-0 w-full h-full bg-[#121212] border border-[rgba(184,134,63,0.15)] rounded-[32px] overflow-hidden shadow-2xl flex flex-col p-5 select-none pointer-events-none"
     style={{
       // スタック表示のシミュレーション
       transform: `scale(${1 - index * 0.05}) translateY(${index * 10}px)`,
@@ -49,7 +49,7 @@ const SwipeCardSkeleton = memo(({ index }: { index: number }) => (
         <div className="w-16 h-5 bg-white/10 rounded-full animate-pulse" />
         <div className="w-40 h-8 bg-white/10 rounded-lg animate-pulse" />
       </div>
-      <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse border border-white/5" />
+      <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse border border-[rgba(184,134,63,0.08)]" />
     </div>
 
     {/* Description Skeleton */}
@@ -60,10 +60,10 @@ const SwipeCardSkeleton = memo(({ index }: { index: number }) => (
 
     {/* Stats Grid Skeleton */}
     <div className="grid grid-cols-2 gap-2 mb-4">
-      <div className="h-24 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
+      <div className="h-24 bg-white/5 rounded-2xl animate-pulse border border-[rgba(184,134,63,0.08)]" />
       <div className="flex flex-col gap-2 h-24">
-         <div className="flex-1 bg-white/5 rounded-xl animate-pulse border border-white/5" />
-         <div className="flex-1 bg-white/5 rounded-xl animate-pulse border border-white/5" />
+         <div className="flex-1 bg-white/5 rounded-xl animate-pulse border border-[rgba(184,134,63,0.08)]" />
+         <div className="flex-1 bg-white/5 rounded-xl animate-pulse border border-[rgba(184,134,63,0.08)]" />
       </div>
     </div>
 
@@ -74,7 +74,7 @@ const SwipeCardSkeleton = memo(({ index }: { index: number }) => (
           <div className="w-12 h-3 bg-white/5 rounded animate-pulse" />
        </div>
        {[1, 2, 3, 4].map((i) => (
-         <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-xl h-14 animate-pulse border border-white/5">
+         <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-xl h-14 animate-pulse border border-[rgba(184,134,63,0.08)]">
             <div className="flex items-center gap-3">
                <div className="w-9 h-9 rounded-full bg-white/10" />
                <div className="space-y-1.5">
@@ -120,7 +120,7 @@ const CosmicLaunchEffect = () => {
               position: 'absolute',
               width: `${width}px`,
               height: '30vh',
-              background: 'linear-gradient(to top, transparent, #fbbf24, #f97316, #22d3ee, transparent)',
+              background: 'linear-gradient(to top, transparent, #D4A261, #f97316, #22d3ee, transparent)',
               filter: 'blur(4px) brightness(2)',
               transformOrigin: 'center',
               boxShadow: '0 0 20px rgba(249, 115, 22, 0.6)'
@@ -136,7 +136,7 @@ const CosmicLaunchEffect = () => {
         const startY = random(80, 120);
         const moveX = random(50, 150);
         const moveY = random(-50, -150);
-        const colors = ['#fbbf24', '#f97316', '#22d3ee', '#ffffff'];
+        const colors = ['#D4A261', '#f97316', '#22d3ee', '#ffffff'];
         const color = colors[Math.floor(random(0, colors.length))];
 
         return (
@@ -214,12 +214,12 @@ const SwipeToConfirm = memo(({
       className={`relative h-16 w-full rounded-full overflow-hidden border select-none transition-all duration-300 ${
         isSuccess
           ? 'bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
-          : 'bg-[#1C1917] border-white/10 shadow-inner'
+          : 'bg-[#140E08] border-[rgba(184,134,63,0.15)] shadow-inner'
       }`}
     >
       <motion.div
         className={`absolute inset-y-0 left-0 rounded-full z-0 ${
-          isSuccess ? 'bg-emerald-500' : 'bg-gradient-to-r from-[#D97706] to-[#F59E0B]'
+          isSuccess ? 'bg-emerald-500' : 'bg-gradient-to-r from-[#B8863F] to-[#D4A261]'
         }`}
         style={{ width: progressWidth }}
       />
@@ -249,11 +249,11 @@ const SwipeToConfirm = memo(({
         className="relative top-1 left-1 w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing z-30"
       >
         {isLoading ? (
-          <Loader2 className="w-6 h-6 text-[#D97706] animate-spin" />
+          <Loader2 className="w-6 h-6 text-[#B8863F] animate-spin" />
         ) : isSuccess ? (
           <Check className="w-6 h-6 text-emerald-600" />
         ) : (
-          <ChevronRight className="w-6 h-6 text-[#D97706]" />
+          <ChevronRight className="w-6 h-6 text-[#B8863F]" />
         )}
       </motion.div>
     </div>
@@ -331,7 +331,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
             key="sheet"
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 bg-[#0C0A09] rounded-t-[32px] z-[310] overflow-hidden flex flex-col safe-area-bottom border-t border-white/10 shadow-2xl"
+            className="fixed bottom-0 left-0 right-0 bg-[#080503] rounded-t-[32px] z-[310] overflow-hidden flex flex-col safe-area-bottom border-t border-[rgba(184,134,63,0.15)] shadow-2xl"
             style={{ maxHeight: '92vh' }}
           >
             <div className="w-full flex justify-center pt-4 pb-2" onClick={status === 'IDLE' ? onClose : undefined}>
@@ -367,10 +367,10 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                            <div key={step} className="flex items-center gap-3">
                              <div className={`w-3 h-3 rounded-full transition-all duration-300 ${
                                isActive
-                                 ? step === 'SUCCESS' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-[#D97706] shadow-[0_0_8px_rgba(217,119,6,0.6)]'
+                                 ? step === 'SUCCESS' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-[#B8863F] shadow-[0_0_8px_rgba(184,134,63,0.6)]'
                                  : 'bg-white/10'
                              } ${isCurrent && status !== 'SUCCESS' ? 'animate-pulse' : ''}`} />
-                             {i < 3 && <div className={`w-8 h-0.5 transition-all duration-300 ${i < currentIdx ? 'bg-[#D97706]' : 'bg-white/10'}`} />}
+                             {i < 3 && <div className={`w-8 h-0.5 transition-all duration-300 ${i < currentIdx ? 'bg-[#B8863F]' : 'bg-white/10'}`} />}
                            </div>
                          );
                        })}
@@ -403,14 +403,14 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                          <span className={`font-serif font-bold text-white tracking-tighter transition-all duration-200 ${amount === '0' ? 'text-white/30' : 'text-white'} text-6xl`}>
                            {amount}
                          </span>
-                         <span className="text-xl font-bold text-[#D97706]">USDC</span>
+                         <span className="text-xl font-bold text-[#B8863F]">USDC</span>
                        </div>
-                       <div className="flex items-center gap-2 text-xs text-[#78716C] font-mono bg-white/5 py-1.5 px-3 rounded-full border border-white/5">
+                       <div className="flex items-center gap-2 text-xs text-[#78716C] font-mono bg-white/5 py-1.5 px-3 rounded-full border border-[rgba(184,134,63,0.08)]">
                           <Wallet className="w-3 h-3" />
                           <span>{balance.toFixed(4)} Available</span>
                           <button
                             onClick={() => setAmount((balance * 0.95).toFixed(4))}
-                            className="text-[#D97706] font-bold hover:text-[#fbbf24] transition-colors"
+                            className="text-[#B8863F] font-bold hover:text-[#D4A261] transition-colors"
                             disabled={status !== 'IDLE' && status !== 'ERROR'}
                           >
                             MAX
@@ -510,7 +510,7 @@ const SuccessOverlay = ({ strategy, onClose, onGoToStrategy, onBuy }: { strategy
         initial={{ opacity: 0, y: 50, rotateX: 20 }}
         animate={{ opacity: 1, y: 0, rotateX: 0 }}
         transition={{ delay: 0.3, type: "spring" }}
-        className="w-full max-w-xs bg-[#1C1917]/90 rounded-3xl border border-orange-500/30 p-5 mb-8 relative overflow-hidden shadow-2xl z-20 backdrop-blur-xl"
+        className="w-full max-w-xs bg-[#140E08]/90 rounded-3xl border border-[rgba(184,134,63,0.25)] p-5 mb-8 relative overflow-hidden shadow-2xl z-20 backdrop-blur-xl"
       >
          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-500 via-yellow-400 to-cyan-500" />
          <div className="flex items-center gap-4 mb-5 pt-2">
@@ -518,9 +518,9 @@ const SuccessOverlay = ({ strategy, onClose, onGoToStrategy, onBuy }: { strategy
                 <img 
                   src={strategy.creatorPfpUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${strategy.creatorAddress}`}
                   alt="creator" 
-                  className="w-16 h-16 rounded-full border-2 border-white/10 bg-black object-cover"
+                  className="w-16 h-16 rounded-full border-2 border-[rgba(184,134,63,0.15)] bg-black object-cover"
                 />
-                <div className="absolute -bottom-2 -right-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#1C1917] shadow-lg flex items-center gap-1">
+                <div className="absolute -bottom-2 -right-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#140E08] shadow-lg flex items-center gap-1">
                     ROI {(strategy.roi || 0).toFixed(0)}%
                 </div>
             </div>
@@ -533,7 +533,7 @@ const SuccessOverlay = ({ strategy, onClose, onGoToStrategy, onBuy }: { strategy
          </div>
          <div className="flex gap-1.5 overflow-hidden pl-1 opacity-90">
             {(strategy.tokens || []).slice(0, 6).map((t: any, i: number) => (
-                <div key={i} className="w-9 h-9 rounded-full bg-black flex items-center justify-center border border-white/10 shadow-lg relative -ml-2 first:ml-0 transition-transform hover:-translate-y-1">
+                <div key={i} className="w-9 h-9 rounded-full bg-black flex items-center justify-center border border-[rgba(184,134,63,0.15)] shadow-lg relative -ml-2 first:ml-0 transition-transform hover:-translate-y-1">
                     {t.logoURI ? (
                         <img src={t.logoURI} alt={t.symbol} className="w-full h-full rounded-full object-cover" />
                     ) : (
@@ -580,7 +580,7 @@ const SuccessOverlay = ({ strategy, onClose, onGoToStrategy, onBuy }: { strategy
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
           onClick={onClose}
-          className="w-full py-4 bg-white/5 border border-white/10 text-white/60 font-bold text-lg rounded-2xl hover:bg-white/10 hover:text-white active:scale-95 transition-all flex items-center justify-center gap-2"
+          className="w-full py-4 bg-white/5 border border-[rgba(184,134,63,0.15)] text-white/60 font-bold text-lg rounded-2xl hover:bg-white/10 hover:text-white active:scale-95 transition-all flex items-center justify-center gap-2"
         >
           Keep Scouting
         </motion.button>
@@ -920,8 +920,8 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
              
              {/* 中央のローディングインジケーター */}
              <div className="absolute inset-0 flex flex-col items-center justify-center z-50">
-                <div className="bg-[#0C0A09]/80 backdrop-blur-xl p-6 rounded-3xl border border-white/10 shadow-2xl flex flex-col items-center">
-                   <Loader2 className="w-8 h-8 text-[#D97706] animate-spin mb-3" />
+                <div className="bg-[#080503]/80 backdrop-blur-xl p-6 rounded-3xl border border-[rgba(184,134,63,0.15)] shadow-2xl flex flex-col items-center">
+                   <Loader2 className="w-8 h-8 text-[#B8863F] animate-spin mb-3" />
                    <p className="text-xs font-bold text-white/50 tracking-widest animate-pulse">
                      SCOUTING GEMS...
                    </p>
@@ -948,11 +948,11 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
     return (
       <div className="relative w-full h-[100dvh] bg-[#030303] flex flex-col items-center justify-center p-4">
         <div className="text-center">
-          <div className="w-20 h-20 bg-[#1C1917] rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
-            <Sparkles className="w-8 h-8 text-[#D97706]" />
+          <div className="w-20 h-20 bg-[#140E08] rounded-full flex items-center justify-center mx-auto mb-6 border border-[rgba(184,134,63,0.15)]">
+            <Sparkles className="w-8 h-8 text-[#B8863F]" />
           </div>
           <h3 className="text-xl font-bold text-white mb-2">That's all for now!</h3>
-          <button onClick={() => setCurrentIndex(0)} className="px-6 py-3 bg-[#D97706] text-white font-bold rounded-xl flex items-center gap-2 mx-auto mt-4">
+          <button onClick={() => setCurrentIndex(0)} className="px-6 py-3 bg-[#B8863F] text-white font-bold rounded-xl flex items-center gap-2 mx-auto mt-4">
             <RefreshCw className="w-4 h-4" /> Start Over
           </button>
         </div>
@@ -982,7 +982,7 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
           whileTap={{ scale: 0.9 }}
           onClick={() => currentStrategy && handleSwipe('left', currentStrategy)}
           disabled={isSwiping}
-          className="hidden md:flex absolute left-8 lg:left-20 xl:left-32 z-30 w-16 h-16 rounded-full border border-white/10 bg-[#1C1917]/50 backdrop-blur-md text-white/40 hover:text-red-500 hover:border-red-500/50 transition-colors items-center justify-center shadow-lg"
+          className="hidden md:flex absolute left-8 lg:left-20 xl:left-32 z-30 w-16 h-16 rounded-full border border-[rgba(184,134,63,0.15)] bg-[#140E08]/50 backdrop-blur-md text-white/40 hover:text-red-500 hover:border-red-500/50 transition-colors items-center justify-center shadow-lg"
         >
           <X className="w-8 h-8" />
         </motion.button>
@@ -1015,7 +1015,7 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
           whileTap={{ scale: 0.9 }}
           onClick={() => currentStrategy && handleSwipe('right', currentStrategy)}
           disabled={isSwiping}
-          className="hidden md:flex absolute right-8 lg:right-20 xl:right-32 z-30 w-16 h-16 rounded-full border border-white/10 bg-[#1C1917]/50 backdrop-blur-md text-white/40 hover:text-emerald-400 hover:border-emerald-400/50 transition-colors items-center justify-center shadow-lg"
+          className="hidden md:flex absolute right-8 lg:right-20 xl:right-32 z-30 w-16 h-16 rounded-full border border-[rgba(184,134,63,0.15)] bg-[#140E08]/50 backdrop-blur-md text-white/40 hover:text-emerald-400 hover:border-emerald-400/50 transition-colors items-center justify-center shadow-lg"
         >
           <Rocket className="w-8 h-8" />
         </motion.button>

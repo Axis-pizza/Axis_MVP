@@ -38,10 +38,10 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ strategy 
   }).join(' ');
 
   const isPositive = (data[data.length - 1]?.value ?? 0) >= (data[0]?.value ?? 0);
-  const color = isPositive ? '#D97706' : '#EF4444'; 
+  const color = isPositive ? '#B8863F' : '#EF4444'; 
 
   // Colors with explicit opacity for html2canvas compatibility
-  // #D97706 is RGB(217, 119, 6)
+  // #B8863F is RGB(217, 119, 6)
   const bgGold5 = 'rgba(217, 119, 6, 0.05)';   // /5
   const bgGold20 = 'rgba(217, 119, 6, 0.2)';  // /20
   const bgGold30 = 'rgba(217, 119, 6, 0.3)';  // /30
@@ -58,7 +58,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ strategy 
         left: '-9999px',
         width: '1200px', 
         height: '630px',
-        background: 'linear-gradient(135deg, #0C0A09 0%, #1C1917 100%)',
+        background: 'linear-gradient(135deg, #080503 0%, #140E08 100%)',
         fontFamily: '"Times New Roman", Times, serif', // Explicit font
       }}
       className="flex relative overflow-hidden text-[#E7E5E4]"
@@ -81,7 +81,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ strategy 
 
       {/* Grid Pattern */}
       <div className="absolute inset-0 opacity-20" 
-           style={{ backgroundImage: 'radial-gradient(#D97706 1px, transparent 1px)', backgroundSize: '40px 40px' }} 
+           style={{ backgroundImage: 'radial-gradient(#B8863F 1px, transparent 1px)', backgroundSize: '40px 40px' }} 
       />
 
       <div className="relative z-10 w-full h-full p-16 flex flex-col justify-between">
@@ -90,7 +90,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ strategy 
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-6">
             <div 
-              className="w-20 h-20 rounded-full bg-[#D97706] flex items-center justify-center text-3xl font-bold text-black shadow-2xl"
+              className="w-20 h-20 rounded-full bg-[#B8863F] flex items-center justify-center text-3xl font-bold text-black shadow-2xl"
               style={{ border: `4px solid ${borderGold30}` }}
             >
               {strategy.ticker[0]}
@@ -99,7 +99,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ strategy 
               <h1 className="text-5xl font-bold mb-2 tracking-tight" style={{ fontFamily: 'serif' }}>{strategy.name}</h1>
               <div className="flex items-center gap-3">
                 <span 
-                  className="text-[#D97706] px-4 py-1 rounded-full text-xl font-bold"
+                  className="text-[#B8863F] px-4 py-1 rounded-full text-xl font-bold"
                   style={{ background: bgGold20, border: `1px solid ${borderGold30}` }}
                 >
                   {strategy.ticker}
@@ -110,7 +110,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ strategy 
           </div>
           
           <div className="text-right">
-             <h2 className="text-4xl font-bold text-[#D97706] tracking-widest" style={{ fontFamily: 'serif' }}>AXIS</h2>
+             <h2 className="text-4xl font-bold text-[#B8863F] tracking-widest" style={{ fontFamily: 'serif' }}>AXIS</h2>
              <p className="text-sm tracking-[0.3em] uppercase mt-1" style={{ color: textGray }}>AI Strategy Factory</p>
           </div>
         </div>
@@ -154,7 +154,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ strategy 
                   }}
                 >
                    <p className="text-xs uppercase tracking-widest" style={{ color: textGray }}>Yield</p>
-                   <p className="text-[#D97706] text-3xl font-bold">{strategy.apy}%</p>
+                   <p className="text-[#B8863F] text-3xl font-bold">{strategy.apy}%</p>
                 </div>
              </div>
           </div>
@@ -173,8 +173,8 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(({ strategy 
                    {strategy.tokens.slice(0, 4).map((t: any) => (
                       <span 
                         key={t.symbol} 
-                        className="px-3 py-1 rounded text-sm text-[#D97706]"
-                        style={{ background: '#1C1917', border: `1px solid ${borderGold20}` }}
+                        className="px-3 py-1 rounded text-sm text-[#B8863F]"
+                        style={{ background: '#140E08', border: `1px solid ${borderGold20}` }}
                       >
                         {t.symbol} {t.weight}%
                       </span>

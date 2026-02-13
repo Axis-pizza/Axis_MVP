@@ -15,6 +15,7 @@ export interface JupiterToken {
   balance?: number;
   source?: string;
   dailyVolume?: number;
+  marketCap?: number;
   isMock?: boolean;
   predictionMeta?: {
     eventId: string;
@@ -49,8 +50,13 @@ export const JupiterService = {
         const response = await api.get('/jupiter/tokens');
         
         if (response && response.tokens && Array.isArray(response.tokens)) {
-          liteCache = response.tokens;
-          return response.tokens;
+          // Derive isVerified from tags if not already set
+          const tokens: JupiterToken[] = response.tokens.map((t: JupiterToken) => ({
+            ...t,
+            isVerified: t.isVerified ?? (Array.isArray(t.tags) && t.tags.includes('verified')),
+          }));
+          liteCache = tokens;
+          return tokens;
         }
         throw new Error('Invalid token list format');
       } catch (e) {

@@ -56,7 +56,7 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
   ];
 
   return (
-    <div className="relative min-h-screen bg-black">
+    <div className="relative min-h-screen bg-[#080503]">
       
       {/* --- ヘッダー部分 --- */}
       <div className="flex items-center justify-between w-full px-4 py-3 z-50 absolute top-0 md:top-16 left-0 right-0 pointer-events-none">
@@ -93,7 +93,7 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -10 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-12 w-48 bg-[#1C1917] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
+                    className="absolute right-0 top-12 w-48 bg-gradient-to-b from-[#140E08] to-[#080503] border border-[rgba(184,134,63,0.15)] rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
                   >
                     {menuLinks.map((link) => {
                       const IconComponent = link.icon;
@@ -137,9 +137,9 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
             onClick={() => setIsDrawerOpen(true)}
             className="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 hover:bg-white/10 active:scale-95 transition-all relative group"
           >
-            <User className="w-5 h-5 text-[#E7E5E4] group-hover:text-white transition-colors" />
+            <User className="w-5 h-5 text-[#F2E0C8] group-hover:text-[#F2E0C8] transition-colors" />
             {/* 通知バッジ（とりあえず表示） */}
-            <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#D97706] rounded-full border-2 border-black" />
+            <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#B8863F] rounded-full border-2 border-[#080503]" />
           </button>
 
         </div>

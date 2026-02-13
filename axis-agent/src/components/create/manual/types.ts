@@ -35,4 +35,11 @@ export type TabType = 'all' | 'your_tokens' | 'trending' | 'meme';
 
 // フックの型 (Mobile/Desktop Builderで使用)
 import type { ManualDashboardHook } from '../../../hooks/useManualDashboard';
+import type { TokenPreferences } from '../../../hooks/useTokenPreferences';
 export type ExtendedDashboardHook = ManualDashboardHook;
+
+export interface BuilderProps {
+  dashboard: ExtendedDashboardHook;
+  preferences: TokenPreferences;
+  onBack?: () => void;
+}

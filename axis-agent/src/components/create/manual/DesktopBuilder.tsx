@@ -1,11 +1,13 @@
-import { AnimatePresence } from 'framer-motion';
-import { Search, ArrowLeft, ChevronRight, Check, Loader2, AlertCircle, Percent, X, Sparkles, TrendingUp, Plus } from 'lucide-react';
+import { useEffect, useCallback } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Search, ArrowLeft, ChevronRight, Check, Loader2, AlertCircle, Percent, X, Sparkles, Plus, Star, ClipboardPaste } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { TokenImage } from '../../common/TokenImage';
 import { WeightControl } from './WeightControl';
 import { TabSelector } from './TabSelector';
+import { formatCompactUSD, abbreviateAddress } from '../../../utils/formatNumber';
 import type { JupiterToken } from '../../../services/jupiter';
-import type { AssetItem, ExtendedDashboardHook } from './types';
+import type { AssetItem, BuilderProps } from './types';
 
 // --- Desktop Sub Components ---
 
@@ -13,64 +15,95 @@ const DesktopTokenListItem = ({
   token,
   isSelected,
   onSelect,
+  isFavorite,
+  onToggleFavorite,
 }: {
   token: JupiterToken;
   isSelected: boolean;
   onSelect: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }) => (
   <button
     disabled={isSelected}
     onClick={onSelect}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all group ${
       isSelected
         ? 'bg-amber-950/40 border border-amber-800/30 cursor-default'
-        : 'hover:bg-white/5 active:bg-white/8'
+        : 'hover:bg-white/5'
     }`}
   >
+    {/* Star */}
+    {onToggleFavorite && (
+      <div
+        role="button"
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+        className="flex-none w-5 flex items-center justify-center"
+      >
+        <Star
+          size={12}
+          className={`transition-colors ${isFavorite ? 'text-amber-500 fill-amber-500' : 'text-white/15 group-hover:text-white/25'}`}
+        />
+      </div>
+    )}
+
+    {/* Icon + Badge */}
     <div className="relative flex-none">
-      <TokenImage
-        src={token.logoURI}
-        className="w-10 h-10 rounded-full bg-white/10"
-      />
+      <TokenImage src={token.logoURI} className="w-9 h-9 rounded-full bg-white/10" />
       {token.isVerified && (
-        <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center ${
-          isSelected ? 'bg-gradient-to-br from-amber-600 to-amber-800' : 'bg-blue-500'
-        }`}>
-          <Check size={10} className="text-white" />
+        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center ring-2 ring-[#0a0a0a]">
+          <Check size={8} className="text-white" />
         </div>
       )}
     </div>
 
+    {/* Name block */}
     <div className="flex-1 min-w-0 text-left">
-      <div className="flex items-center gap-2">
-        <span className={`font-semibold text-sm ${isSelected ? 'text-amber-500' : 'text-white'}`}>
+      <div className="flex items-center gap-1.5">
+        <span className={`font-bold text-sm ${isSelected ? 'text-amber-400' : 'text-white'}`}>
           {token.symbol}
         </span>
-        {token.tags?.includes('meme') && <Sparkles size={12} className="text-pink-400" />}
-        {token.tags?.includes('birdeye-trending') && <TrendingUp size={12} className="text-green-400" />}
+        {token.tags?.includes('meme') && <Sparkles size={10} className="text-pink-400" />}
+        {token.tags?.includes('stable') && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400">Stable</span>
+        )}
       </div>
-      <div className={`text-xs truncate ${isSelected ? 'text-amber-600/50' : 'text-white/40'}`}>
+      <div className="text-[11px] text-white/30 truncate">
         {token.name}
+        <span className="text-white/15 mx-1">·</span>
+        <span className="font-mono text-white/20">{abbreviateAddress(token.address)}</span>
       </div>
     </div>
 
-    {token.balance !== undefined && token.balance > 0 ? (
-       <div className="text-right">
-          <div className="text-sm font-mono text-white/90">
-            {token.balance < 0.001 ? '<0.001' : token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
-          </div>
-       </div>
+    {/* Right: Balance or MC/VOL */}
+    {token.balance != null && token.balance > 0 ? (
+      <div className="text-right flex-none min-w-[60px]">
+        <div className="text-xs font-mono text-white/80">
+          {token.balance < 0.001 ? '<0.001' : token.balance.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+        </div>
+        <div className="text-[10px] text-white/25">Balance</div>
+      </div>
     ) : (
-      isSelected ? (
-        <div className="flex-none w-8 h-8 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center">
-          <Check size={14} className="text-white" />
+      <div className="flex items-center gap-2 flex-none">
+        <div className="text-right w-[50px]">
+          <div className="text-[9px] text-white/25 uppercase leading-none mb-0.5">MC</div>
+          <div className="text-[11px] text-white/50 font-mono leading-none">{formatCompactUSD(token.marketCap)}</div>
         </div>
-      ) : (
-        <div className="flex-none w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 group-hover:text-white/50">
-          <Plus size={14} />
+        <div className="text-right w-[50px]">
+          <div className="text-[9px] text-white/25 uppercase leading-none mb-0.5">VOL</div>
+          <div className="text-[11px] text-white/50 font-mono leading-none">{formatCompactUSD(token.dailyVolume)}</div>
         </div>
-      )
+      </div>
     )}
+
+    {/* Add/Check */}
+    <div className={`flex-none w-7 h-7 rounded-full flex items-center justify-center ${
+      isSelected
+        ? 'bg-gradient-to-br from-amber-600 to-amber-800'
+        : 'bg-white/5 text-white/30 group-hover:text-white/50'
+    }`}>
+      {isSelected ? <Check size={12} className="text-white" /> : <Plus size={12} />}
+    </div>
   </button>
 );
 
@@ -112,12 +145,7 @@ const DesktopAssetCard = ({
 
 // --- Main DesktopBuilder ---
 
-interface DesktopBuilderProps {
-  dashboard: ExtendedDashboardHook;
-  onBack?: () => void;
-}
-
-export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
+export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps) => {
   const {
     portfolio,
     searchQuery,
@@ -144,6 +172,35 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
   } = dashboard;
 
   const { publicKey } = useWallet();
+
+  // Esc key handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && searchQuery) setSearchQuery('');
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchQuery, setSearchQuery]);
+
+  // Paste CA handler
+  const handlePasteCA = useCallback(async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim().length >= 32) {
+        setSearchQuery(text.trim());
+      }
+    } catch { /* clipboard denied */ }
+  }, [setSearchQuery]);
+
+  // Token select with search history recording
+  const handleTokenSelect = useCallback((token: JupiterToken) => {
+    preferences.addToSearchHistory({
+      address: token.address,
+      symbol: token.symbol,
+      logoURI: token.logoURI,
+    });
+    addTokenDirect(token);
+  }, [addTokenDirect, preferences]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -268,19 +325,56 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tokens..."
-                className="w-full bg-amber-950/20 border border-amber-900/20 rounded-xl pl-11 pr-10 py-3 text-sm focus:border-amber-700/50 focus:bg-amber-950/30 outline-none transition-all placeholder:text-amber-900/40 text-white"
+                placeholder="Search name, symbol, or paste address..."
+                className="w-full bg-amber-950/20 border border-amber-900/20 rounded-xl pl-11 pr-24 py-3 text-sm focus:border-amber-700/50 focus:bg-amber-950/30 outline-none transition-all placeholder:text-amber-900/40 text-white"
               />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10"
-                >
-                  <X size={14} className="text-white/40" />
-                </button>
-              )}
-              {isSearching && <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 text-amber-600 animate-spin" size={16} />}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {isSearching && <Loader2 className="text-amber-600 animate-spin" size={14} />}
+                {searchQuery ? (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10"
+                  >
+                    <X size={14} className="text-white/40" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handlePasteCA}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-900/30 text-amber-500 text-[11px] font-bold hover:bg-amber-900/50 transition-colors"
+                  >
+                    <ClipboardPaste size={11} />
+                    Paste
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Search History Chips */}
+            {!searchQuery && preferences.searchHistory.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1.5 px-1">
+                  <span className="text-[10px] text-white/25 uppercase tracking-wider font-bold">Recent</span>
+                  <button
+                    onClick={preferences.clearSearchHistory}
+                    className="text-[10px] text-amber-700/50 hover:text-amber-500 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                  {preferences.searchHistory.map(item => (
+                    <button
+                      key={item.address}
+                      onClick={() => setSearchQuery(item.symbol !== '?' ? item.symbol : item.address)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 shrink-0 hover:bg-white/10 border border-white/5 transition-colors"
+                    >
+                      <TokenImage src={item.logoURI} className="w-3.5 h-3.5 rounded-full" />
+                      <span className="text-[10px] text-white/60 font-medium">{item.symbol}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <TabSelector 
                activeTab={activeTab} 
@@ -300,34 +394,65 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
               )}
             </div>
 
-            {/* Sub Filters - All removed to prevent duplication */}
-            {activeTab === 'all' && (
-              <div className="flex gap-1.5 mt-2 overflow-x-auto no-scrollbar">
-                {([
-                  { key: 'crypto', label: 'Crypto', count: filterCounts.crypto },
-                  { key: 'stock', label: 'Stock', count: filterCounts.stock },
-                  { key: 'commodity', label: 'Commodities', count: filterCounts.commodity },
-                  { key: 'prediction', label: 'Prediction', count: filterCounts.prediction },
-                ] as const).map(({ key, label, count }) => (
-                  count === undefined || count > 0 ? (
-                    <button
-                      key={key}
-                      onClick={() => setTokenFilter(prev => prev === key ? 'all' : key)}
-                      className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        tokenFilter === key
-                          ? 'bg-amber-600 text-black'
-                          : 'bg-white/5 text-white/40 hover:bg-white/10'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ) : null
-                ))}
-              </div>
-            )}
+            {/* Sub Filters + Verified Only Toggle */}
+            <div className="flex items-center justify-between mt-2">
+              
+
+              {/* Verified Only Toggle */}
+              <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-2">
+                <span className="text-[10px] text-white/30 font-bold">Verified</span>
+                <div
+                  className={`relative w-7 h-4 rounded-full transition-colors ${
+                    preferences.verifiedOnly ? 'bg-amber-600' : 'bg-white/10'
+                  }`}
+                  onClick={() => preferences.setVerifiedOnly(!preferences.verifiedOnly)}
+                >
+                  <motion.div
+                    className="absolute top-[2px] w-3 h-3 rounded-full bg-white shadow-sm"
+                    animate={{ left: preferences.verifiedOnly ? 13 : 2 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                </div>
+              </label>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar">
+            {/* Favorites Bar */}
+            {!searchQuery && preferences.favorites.size > 0 && (
+              <div className="px-2 py-2 mb-1 border-b border-white/5">
+                <span className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block px-1">Favorites</span>
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                  {dashboard.allTokens.filter(t => preferences.favorites.has(t.address)).map(token => (
+                    <button
+                      key={token.address}
+                      onClick={() => handleTokenSelect(token)}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg shrink-0 border transition-colors ${
+                        selectedIds.has(token.address)
+                          ? 'bg-amber-900/30 border-amber-800/30 opacity-50'
+                          : 'bg-white/[0.03] border-white/5 hover:bg-white/10'
+                      }`}
+                    >
+                      <TokenImage src={token.logoURI} className="w-4 h-4 rounded-full" />
+                      <span className="text-[10px] text-amber-400 font-bold">{token.symbol}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Column Headers */}
+            {!isLoading && sortedVisibleTokens.length > 0 && (
+              <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-white/20 uppercase tracking-wider">
+                <div className="w-5" />
+                <div className="w-9" />
+                <div className="flex-1">Token</div>
+                <div className="w-[50px] text-right">MC</div>
+                <div className="w-[50px] text-right">VOL</div>
+                <div className="w-7" />
+              </div>
+            )}
+
             {isLoading ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3">
                 <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
@@ -339,15 +464,17 @@ export const DesktopBuilder = ({ dashboard, onBack }: DesktopBuilderProps) => {
                 <span className="text-sm">No tokens found</span>
               </div>
             ) : (
-              <div className="space-y-0.5 pt-1">
-                {sortedVisibleTokens.map((token, index) => {
+              <div className="space-y-0.5">
+                {sortedVisibleTokens.map((token) => {
                   const isSelected = selectedIds.has(token.address);
                   return (
                     <DesktopTokenListItem
-                        key={token.address}
-                        token={token}
-                        isSelected={isSelected}
-                        onSelect={() => addTokenDirect(token)}
+                      key={token.address}
+                      token={token}
+                      isSelected={isSelected}
+                      onSelect={() => handleTokenSelect(token)}
+                      isFavorite={preferences.isFavorite(token.address)}
+                      onToggleFavorite={() => preferences.toggleFavorite(token.address)}
                     />
                   );
                 })}

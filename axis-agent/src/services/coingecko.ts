@@ -10,6 +10,7 @@ const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 
 // Cache for token list
 let tokenCache: TokenInfo[] = [];
+let rawCache: CoinGeckoToken[] = [];
 let cacheTime = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -56,7 +57,8 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
     if (!response.ok) throw new Error(`CoinGecko returned ${response.status}`);
     
     const markets: CoinGeckoToken[] = await response.json();
-    
+    rawCache = markets;
+
     tokenCache = markets
       .filter(m => m.symbol) 
       .map(m => ({
@@ -209,9 +211,38 @@ export function clearTokenCache(): void {
   cacheTime = 0;
 }
 
+/**
+ * Build Maps of market cap data from CoinGecko.
+ * Returns both address-keyed and symbol-keyed maps for flexible matching.
+ * Shares cache with fetchSolanaTokens to avoid duplicate API calls.
+ */
+export async function fetchMarketCapMap(): Promise<{
+  byAddress: Map<string, number>;
+  bySymbol: Map<string, number>;
+}> {
+  if (rawCache.length === 0 || Date.now() - cacheTime > CACHE_TTL) {
+    await fetchSolanaTokens(250);
+  }
+
+  const byAddress = new Map<string, number>();
+  const bySymbol = new Map<string, number>();
+
+  for (const t of rawCache) {
+    if (!t.market_cap) continue;
+    const addr = t.platforms?.solana;
+    if (addr && addr.length >= 32) {
+      byAddress.set(addr, t.market_cap);
+    }
+    bySymbol.set(t.symbol.toUpperCase(), t.market_cap);
+  }
+
+  return { byAddress, bySymbol };
+}
+
 // Default Export
 export const CoinGeckoService = {
   getMarketData,
   fetchSolanaTokens,
+  fetchMarketCapMap,
   searchTokens
 };

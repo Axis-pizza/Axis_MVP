@@ -134,14 +134,14 @@ export const DeploymentBlueprint = ({
     <div className="max-w-3xl mx-auto animate-in slide-in-from-bottom-8 duration-500 text-white">
       
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-serif font-bold text-[#E7E5E4] mb-2">This is Your ETF-Token</h2>
-        <p className="text-[#A8A29E]">Review your ETF specifications.</p>
+        <h2 className="text-3xl font-serif font-bold text-[#F2E0C8] mb-2">This is Your ETF-Token</h2>
+        <p className="text-[#B89860]">Review your ETF specifications.</p>
       </div>
 
-      <div className="bg-[#E7E5E4] text-[#0C0A09] rounded-sm p-8 shadow-2xl relative overflow-hidden mb-8 font-serif">
-        <div className="relative border-b-2 border-[#0C0A09] pb-6 mb-6 flex justify-between items-start">
+      <div className="bg-gradient-to-b from-[#F2E0C8] to-[#D4A261] text-[#080503] rounded-sm p-8 shadow-2xl relative overflow-hidden mb-8 font-serif">
+        <div className="relative border-b-2 border-[#080503] pb-6 mb-6 flex justify-between items-start">
           <div className="flex items-center gap-4">
-             <div className="w-16 h-16 border-2 border-[#0C0A09] flex items-center justify-center bg-white overflow-hidden">
+             <div className="w-16 h-16 border-2 border-[#080503] flex items-center justify-center bg-white overflow-hidden">
              <img 
                   src='/ETFtoken.png' 
                   alt="Strategy Icon" 
@@ -151,8 +151,8 @@ export const DeploymentBlueprint = ({
              <div>
                <h1 className="text-3xl font-bold uppercase tracking-wide">{strategyName}</h1>
                <div className="flex items-center gap-2 mt-1">
-                 <span className="px-2 py-0.5 border border-[#0C0A09] text-xs font-bold bg-[#0C0A09] text-[#E7E5E4]">{safeSymbol}</span>
-                 <span className="text-sm font-mono text-[#0C0A09]/70">TYPE: {strategyType}</span>
+                 <span className="px-2 py-0.5 border border-[#080503] text-xs font-bold bg-[#080503] text-[#F2E0C8]">{safeSymbol}</span>
+                 <span className="text-sm font-mono text-[#080503]/70">TYPE: {strategyType}</span>
                </div>
              </div>
           </div>
@@ -160,7 +160,7 @@ export const DeploymentBlueprint = ({
 
         <div className="relative grid md:grid-cols-2 gap-8 mb-8">
            <div>
-             <h4 className="text-xs font-bold uppercase tracking-widest border-b border-[#0C0A09]/20 pb-2 mb-3 flex items-center gap-2">
+             <h4 className="text-xs font-bold uppercase tracking-widest border-b border-[#080503]/20 pb-2 mb-3 flex items-center gap-2">
                <FileText className="w-3 h-3" /> Composition
              </h4>
              <ul className="space-y-2">
@@ -174,16 +174,16 @@ export const DeploymentBlueprint = ({
            </div>
 
            <div>
-             <h4 className="text-xs font-bold uppercase tracking-widest border-b border-[#0C0A09]/20 pb-2 mb-3 flex items-center gap-2">
+             <h4 className="text-xs font-bold uppercase tracking-widest border-b border-[#080503]/20 pb-2 mb-3 flex items-center gap-2">
                <ShieldCheck className="w-3 h-3" /> Parameters
              </h4>
              <ul className="space-y-3 text-sm">
                <li className="flex justify-between">
-                 <span className="text-[#0C0A09]/70">Ticker</span>
+                 <span className="text-[#080503]/70">Ticker</span>
                  <span className="font-bold">${safeSymbol}</span>
                </li>
                <li className="flex justify-between">
-                 <span className="text-[#0C0A09]/70">Total Assets</span>
+                 <span className="text-[#080503]/70">Total Assets</span>
                  <span className="font-bold">{safeTokens.length}</span>
                </li>
              </ul>
@@ -192,10 +192,10 @@ export const DeploymentBlueprint = ({
       </div>
 
       <div className="flex gap-4 pb-20">
-        <button onClick={onBack} disabled={isDeploying} className="px-8 py-4 bg-[#1C1917] rounded-xl font-bold text-[#78716C] hover:text-[#E7E5E4]">
+        <button onClick={onBack} disabled={isDeploying} className="px-8 py-4 bg-[#140E08] rounded-xl font-bold text-[#7A5A30] hover:text-[#F2E0C8]">
           Modify
         </button>
-        <button onClick={handleInitialDeployClick} disabled={isDeploying} className="flex-1 py-4 bg-gradient-to-r from-[#D97706] to-[#B45309] text-[#0C0A09] font-bold rounded-xl flex items-center justify-center gap-2">
+        <button onClick={handleInitialDeployClick} disabled={isDeploying} className="flex-1 py-4 bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] text-[#080503] font-bold rounded-xl flex items-center justify-center gap-2">
           <Wallet className="w-5 h-5" /> Deposit & Mint
         </button>
       </div>
@@ -204,10 +204,10 @@ export const DeploymentBlueprint = ({
         {isDepositModalOpen && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsDepositModalOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50" />
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[#1C1917] border border-[#D97706]/20 rounded-3xl p-6 z-50 shadow-2xl">
-              <h3 className="text-xl font-bold text-[#E7E5E4] mb-4">Initial Liquidity</h3>
-              <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} className="w-full p-4 bg-[#0C0A09] border border-[#D97706]/20 rounded-xl text-xl font-bold text-[#E7E5E4] mb-6" />
-              <button onClick={handleConfirmDeploy} disabled={isDeploying} className="w-full py-4 bg-[#E7E5E4] text-[#0C0A09] font-bold rounded-xl flex justify-center gap-2">
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[#140E08] border border-[rgba(184,134,63,0.15)] rounded-3xl p-6 z-50 shadow-2xl">
+              <h3 className="text-xl font-bold text-[#F2E0C8] mb-4">Initial Liquidity</h3>
+              <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} className="w-full p-4 bg-[#080503] border border-[rgba(184,134,63,0.15)] rounded-xl text-xl font-bold text-[#F2E0C8] mb-6" />
+              <button onClick={handleConfirmDeploy} disabled={isDeploying} className="w-full py-4 bg-gradient-to-b from-[#F2E0C8] to-[#D4A261] text-[#080503] font-bold rounded-xl flex justify-center gap-2">
                 {isDeploying ? <Loader2 className="animate-spin" /> : "Confirm & Mint"}
               </button>
             </motion.div>
