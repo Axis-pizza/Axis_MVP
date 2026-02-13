@@ -11,7 +11,7 @@ import {
   Plus, Loader2
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getUsdcBalance } from '../../services/usdc';
 import { PizzaChart } from '../common/PizzaChart';
 
 interface TokenAllocation {
@@ -50,14 +50,14 @@ export const StrategyDashboard = ({
 }: StrategyDashboardProps) => {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
-  const [solBalance, setSolBalance] = useState<number>(0);
+  const [usdcBalance, setUsdcBalance] = useState<number>(0);
 
   useEffect(() => {
     const fetchBalance = async () => {
       if (!publicKey) return;
       try {
-        const bal = await connection.getBalance(publicKey);
-        setSolBalance(bal / LAMPORTS_PER_SOL);
+        const bal = await getUsdcBalance(connection, publicKey);
+        setUsdcBalance(bal);
       } catch {
       }
     };
@@ -99,7 +99,7 @@ export const StrategyDashboard = ({
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
           <p className="text-xs text-white/50 mb-1">Total Value Locked</p>
-          <p className="text-2xl font-bold">{totalTvl.toFixed(2)} SOL</p>
+          <p className="text-2xl font-bold">{totalTvl.toFixed(2)} USDC</p>
         </div>
         <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
           <p className="text-xs text-white/50 mb-1">Total P&L</p>
@@ -121,7 +121,7 @@ export const StrategyDashboard = ({
           <Wallet className="w-4 h-4 text-white/50" />
           <span className="text-sm text-white/50">Available</span>
         </div>
-        <span className="font-mono font-bold">{solBalance.toFixed(4)} SOL</span>
+        <span className="font-mono font-bold">{usdcBalance.toFixed(2)} USDC</span>
       </div>
 
       {/* Strategy List */}
@@ -198,7 +198,7 @@ const StrategyCard = ({
             </span>
           </div>
           <div className="flex items-center gap-3 text-xs">
-            <span className="text-white/50">TVL: <span className="text-white">{strategy.tvl.toFixed(2)} SOL</span></span>
+            <span className="text-white/50">TVL: <span className="text-white">{strategy.tvl.toFixed(2)} USDC</span></span>
             <span className={strategy.pnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}>
               {strategy.pnlPercent >= 0 ? '+' : ''}{strategy.pnlPercent.toFixed(1)}%
             </span>

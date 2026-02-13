@@ -6,15 +6,14 @@ import {
   Sparkles, Lock
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
-import { 
-  PublicKey, 
-  Transaction, 
-  SystemProgram,
-  LAMPORTS_PER_SOL,
+import {
+  PublicKey,
+  Transaction,
 } from '@solana/web3.js';
 import { PizzaChart } from '../common/PizzaChart';
 import { api } from '../../services/api';
 import { Buffer } from 'buffer';
+import { getUsdcBalance, getOrCreateUsdcAta, createUsdcTransferIx } from '../../services/usdc';
 
 // ★修正: ここに mint と logoURI を追加して受け取れるようにする
 interface TokenAllocation {
@@ -37,7 +36,7 @@ interface DepositFlowProps {
 
 type DepositStatus = 'INPUT' | 'CONFIRMING' | 'PROCESSING' | 'SAVING' | 'SUCCESS' | 'ERROR';
 
-const QUICK_AMOUNTS = [0.5, 1.0, 5.0];
+const QUICK_AMOUNTS = [5, 10, 50];
 
 export const DepositFlow = ({
   strategyAddress,
@@ -62,8 +61,8 @@ export const DepositFlow = ({
     const fetchBalance = async () => {
       if (!publicKey) return;
       try {
-        const bal = await connection.getBalance(publicKey);
-        setBalance(bal / LAMPORTS_PER_SOL);
+        const bal = await getUsdcBalance(connection, publicKey);
+        setBalance(bal);
       } catch {
       }
     };
@@ -79,8 +78,7 @@ export const DepositFlow = ({
     setErrorMessage(null);
 
     try {
-      // --- 1. Solana Transaction ---
-      const lamports = Math.floor(parsedAmount * LAMPORTS_PER_SOL);
+      // --- 1. USDC SPL Transfer ---
       let strategyPubkey;
       try {
          strategyPubkey = new PublicKey(strategyAddress);
@@ -88,12 +86,16 @@ export const DepositFlow = ({
          strategyPubkey = new PublicKey("So11111111111111111111111111111111111111112");
       }
 
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: strategyPubkey,
-          lamports,
-        })
+      const transaction = new Transaction();
+
+      // Ensure destination ATA exists
+      const { ata: fromAta, instruction: createFromIx } = await getOrCreateUsdcAta(connection, publicKey, publicKey);
+      const { ata: toAta, instruction: createToIx } = await getOrCreateUsdcAta(connection, publicKey, strategyPubkey);
+      if (createFromIx) transaction.add(createFromIx);
+      if (createToIx) transaction.add(createToIx);
+
+      transaction.add(
+        createUsdcTransferIx(fromAta, toAta, publicKey, parsedAmount)
       );
 
       setStatus('PROCESSING');
@@ -260,9 +262,9 @@ export const DepositFlow = ({
                     <Wallet className="w-3 h-3" /> Balance
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[#E7E5E4] font-mono">{balance.toFixed(4)} SOL</span>
+                    <span className="text-[#E7E5E4] font-mono">{balance.toFixed(2)} USDC</span>
                     <button 
-                      onClick={() => setAmount((balance - 0.01).toFixed(4))}
+                      onClick={() => setAmount(balance.toFixed(2))}
                       className="text-[#D97706] hover:text-[#fbbf24] font-bold transition-colors"
                     >
                       MAX
@@ -281,7 +283,7 @@ export const DepositFlow = ({
                     disabled={status !== 'INPUT' && status !== 'ERROR'}
                   />
                   <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <span className="text-sm font-bold text-[#78716C]">SOL</span>
+                    <span className="text-sm font-bold text-[#78716C]">USDC</span>
                   </div>
                 </div>
 
@@ -292,7 +294,7 @@ export const DepositFlow = ({
                       onClick={() => setAmount(val.toString())}
                       className="py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-sm font-medium text-[#A8A29E] hover:text-[#E7E5E4] transition-all"
                     >
-                      {val} SOL
+                      {val} USDC
                     </button>
                   ))}
                 </div>
@@ -375,7 +377,7 @@ const DepositSuccess = ({
         <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: themeColor }} />
         <div className="flex justify-between mb-2">
           <span className="opacity-60">INITIAL DEPOSIT</span>
-          <span className="font-bold">{amount} SOL</span>
+          <span className="font-bold">{amount} USDC</span>
         </div>
         <div className="flex justify-between mb-4">
           <span className="opacity-60">STATUS</span>

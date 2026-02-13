@@ -5,12 +5,14 @@ import {
   TrendingUp, TrendingDown, Layers, Activity, PieChart, Wallet, ArrowRight, X, Check, ArrowDown, Loader2, ChevronRight
 } from 'lucide-react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey, LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
-import { 
-  getAssociatedTokenAddress, 
-  createTransferInstruction, 
-  TOKEN_PROGRAM_ID 
+import { PublicKey, Transaction } from '@solana/web3.js';
+import {
+  getAssociatedTokenAddress,
+  createTransferInstruction,
+  TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
+import { getUsdcBalance, getOrCreateUsdcAta, createUsdcTransferIx } from '../../services/usdc';
+import { USDC_DECIMALS } from '../../config/constants';
 import { RichChart } from '../common/RichChart';
 import { api } from '../../services/api';
 import type { Strategy } from '../../types';
@@ -153,15 +155,15 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
   
   const [mode, setMode] = useState<'BUY' | 'SELL'>('BUY');
   const [amount, setAmount] = useState('0');
-  const [solBalance, setSolBalance] = useState(0);
+  const [usdcBalance, setUsdcBalance] = useState(0);
   const MOCK_PRICE_PER_TOKEN = 1.0; // 1:1 Rate
 
   useEffect(() => {
     if (!publicKey || !isOpen) return;
     const fetchBalance = async () => {
       try {
-        const bal = await connection.getBalance(publicKey);
-        setSolBalance(bal / LAMPORTS_PER_SOL);
+        const bal = await getUsdcBalance(connection, publicKey);
+        setUsdcBalance(bal);
       } catch {
       }
     };
@@ -181,7 +183,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
     return (val * MOCK_PRICE_PER_TOKEN).toFixed(4); // 1:1 conversion
   }, [amount, mode]);
 
-  const currentBalance = mode === 'BUY' ? solBalance : userEtfBalance;
+  const currentBalance = mode === 'BUY' ? usdcBalance : userEtfBalance;
   const ticker = strategy.ticker || 'ETF';
 
   const handleNum = (num: string) => {
@@ -261,7 +263,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
                    <div className="flex flex-col items-center gap-6 py-4">
                      <div className="text-center">
                         <p className="text-sm font-bold text-white mb-1">Processing Transaction...</p>
-                        <p className="text-xs text-[#78716C]">{mode === 'BUY' ? 'Sending SOL...' : `Sending ${ticker}...`}</p>
+                        <p className="text-xs text-[#78716C]">{mode === 'BUY' ? 'Sending USDC...' : `Sending ${ticker}...`}</p>
                      </div>
                      <Loader2 className="w-12 h-12 text-[#D97706] animate-spin" />
                    </div>
@@ -273,7 +275,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
                            {amount}
                          </span>
                          <span className={`text-xl font-bold ${mode === 'BUY' ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {mode === 'BUY' ? 'SOL' : ticker}
+                            {mode === 'BUY' ? 'USDC' : ticker}
                          </span>
                        </div>
                        
@@ -298,7 +300,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
                         <div className="flex items-center gap-2 text-3xl font-bold text-white">
                            <span>{estimatedOutput}</span>
                            <span className={mode === 'BUY' ? 'text-[#D97706]' : 'text-emerald-500'}>
-                               {mode === 'BUY' ? ticker : 'SOL'}
+                               {mode === 'BUY' ? ticker : 'USDC'}
                            </span>
                         </div>
                      </div>
@@ -485,19 +487,17 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       const transaction = new Transaction();
 
       if (mode === 'BUY') {
-        const lamports = Math.floor(amount * LAMPORTS_PER_SOL);
-        transaction.add(
-          SystemProgram.transfer({
-            fromPubkey: wallet.publicKey,
-            toPubkey: vaultPubkey,
-            lamports,
-          })
-        );
-      } 
+        // USDC SPL transfer
+        const { ata: fromAta, instruction: createFromIx } = await getOrCreateUsdcAta(connection, wallet.publicKey, wallet.publicKey);
+        const { ata: toAta, instruction: createToIx } = await getOrCreateUsdcAta(connection, wallet.publicKey, vaultPubkey);
+        if (createFromIx) transaction.add(createFromIx);
+        if (createToIx) transaction.add(createToIx);
+        transaction.add(createUsdcTransferIx(fromAta, toAta, wallet.publicKey, amount));
+      }
       else {
         const userAta = await getAssociatedTokenAddress(MASTER_MINT_ADDRESS, wallet.publicKey);
         const vaultAta = await getAssociatedTokenAddress(MASTER_MINT_ADDRESS, vaultPubkey);
-        const decimals = 9; 
+        const decimals = 9;
         const tokenAmount = BigInt(Math.floor(amount * Math.pow(10, decimals)));
 
         transaction.add(
@@ -631,7 +631,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
                   <span className="text-[10px] uppercase font-bold tracking-wider">TVL</span>
                 </div>
                 <p className="text-lg font-bold text-white">
-                  {typeof strategy?.tvl === 'number' ? (strategy.tvl >= 1000 ? `${(strategy.tvl/1000).toFixed(1)}k` : strategy.tvl.toFixed(0)) : '0'} <span className="text-xs font-normal text-[#57534E]">SOL</span>
+                  {typeof strategy?.tvl === 'number' ? (strategy.tvl >= 1000 ? `${(strategy.tvl/1000).toFixed(1)}k` : strategy.tvl.toFixed(0)) : '0'} <span className="text-xs font-normal text-[#57534E]">USDC</span>
                 </p>
             </div>
 

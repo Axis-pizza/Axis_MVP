@@ -73,7 +73,7 @@ app.post("/claim", async (c) => {
           }
       }
 
-      const { signature, latestBlockhash, connection } = await SolanaService.claimFaucet(c.env.FAUCET_PRIVATE_KEY, wallet_address);
+      const { signature, latestBlockhash, connection } = await SolanaService.claimFaucet(c.env.FAUCET_PRIVATE_KEY, wallet_address, c.env.HELIUS_RPC_URL);
   
       c.executionCtx.waitUntil(
           SolanaService.confirmTransaction(connection, signature, latestBlockhash)

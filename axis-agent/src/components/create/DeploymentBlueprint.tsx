@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileText, ShieldCheck, Wallet, ArrowRight, Info, X, Loader2 } from 'lucide-react';
 import { useConnection } from '@solana/wallet-adapter-react';
-import { Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js'; 
+import { Transaction } from '@solana/web3.js';
 import { useWallet } from '../../hooks/useWallet';
 import { useToast } from '../../context/ToastContext';
 import { api } from '../../services/api';
 import { SERVER_WALLET_PUBKEY } from '../../config/constants';
+import { getOrCreateUsdcAta, createUsdcTransferIx } from '../../services/usdc';
 
 interface DeploymentBlueprintProps {
   strategyName: string;
@@ -46,7 +47,7 @@ export const DeploymentBlueprint = ({
 
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState(initialTvl ? initialTvl.toString() : "1.0");
-  const [depositAsset, setDepositAsset] = useState<'SOL' | 'USDC'>('SOL');
+  const [depositAsset, setDepositAsset] = useState<'SOL' | 'USDC'>('USDC');
   const [isDeploying, setIsDeploying] = useState(false);
 
   // 安全な表示用変数の作成
@@ -68,25 +69,27 @@ export const DeploymentBlueprint = ({
     setIsDeploying(true);
 
     try {
-        const amountSol = parseFloat(depositAmount);
-        
-        // 1. SOL送金
+        const amountUsdc = parseFloat(depositAmount);
+
+        // 1. USDC送金
         let txSignature = '';
-        if (amountSol > 0) {
-            showToast(`💰 Sending ${amountSol} SOL to Vault...`, "info");
-            const transaction = new Transaction().add(
-                SystemProgram.transfer({
-                    fromPubkey: wallet.publicKey,
-                    toPubkey: SERVER_WALLET_PUBKEY,
-                    lamports: Math.floor(amountSol * LAMPORTS_PER_SOL)
-                })
-            );
+        if (amountUsdc > 0) {
+            showToast(`Sending ${amountUsdc} USDC to Vault...`, "info");
+            const transaction = new Transaction();
+
+            const { ata: fromAta, instruction: createFromIx } = await getOrCreateUsdcAta(connection, wallet.publicKey, wallet.publicKey);
+            const { ata: toAta, instruction: createToIx } = await getOrCreateUsdcAta(connection, wallet.publicKey, SERVER_WALLET_PUBKEY);
+            if (createFromIx) transaction.add(createFromIx);
+            if (createToIx) transaction.add(createToIx);
+
+            transaction.add(createUsdcTransferIx(fromAta, toAta, wallet.publicKey, amountUsdc));
+
             const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = wallet.publicKey;
             const signedTx = await wallet.signTransaction(transaction);
             txSignature = await connection.sendRawTransaction(signedTx.serialize());
-            showToast("⏳ Confirming Transaction...", "info");
+            showToast("Confirming Transaction...", "info");
             await connection.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed');
         }
 
@@ -103,7 +106,7 @@ export const DeploymentBlueprint = ({
                 weight: t.weight,
                 logoURI: t.logoURI
             })),
-            tvl: amountSol
+            tvl: amountUsdc
         };
 
         const result = await api.deploy(txSignature, strategyData);
@@ -116,7 +119,7 @@ export const DeploymentBlueprint = ({
 
         // ナビゲーションは最後に（state更新完了後）
         if (onDeploySuccess) {
-            onDeploySuccess(result.mintAddress || result.strategyId, amountSol, depositAsset);
+            onDeploySuccess(result.mintAddress || result.strategyId, amountUsdc, depositAsset);
         } else {
             onComplete();
         }

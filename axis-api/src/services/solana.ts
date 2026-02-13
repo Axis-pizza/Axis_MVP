@@ -2,7 +2,6 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  clusterApiUrl,
   Transaction,
 } from "@solana/web3.js";
 import {
@@ -12,14 +11,14 @@ import {
 import bs58 from "bs58";
 import { USDC_MINT } from "../config/constants";
 
-export async function claimFaucet(privateKey: string, walletAddress: string) {
+export async function claimFaucet(privateKey: string, walletAddress: string, rpcUrl: string) {
   if (!walletAddress) throw new Error("Wallet address required");
 
   // Decode private key
   const secret = bs58.decode(privateKey);
   const adminKeypair = Keypair.fromSecretKey(secret);
 
-  const connection = new Connection(clusterApiUrl("devnet"), "processed");
+  const connection = new Connection(rpcUrl, "processed");
   const userPublicKey = new PublicKey(walletAddress);
 
   const adminTokenAccount = await getOrCreateAssociatedTokenAccount(

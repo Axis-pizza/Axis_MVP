@@ -7,8 +7,6 @@ import { useWallet } from '../../hooks/useWallet';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { ProfileEditModal } from './ProfileEditModal';
-import { useConnection } from '@solana/wallet-adapter-react';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 const InviteModal = ({ isOpen, onClose, pubkey }: { isOpen: boolean; onClose: () => void; pubkey: string }) => {
   const { showToast } = useToast();
@@ -84,7 +82,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isWalletModalPending, setIsWalletModalPending] = useState(false);
-  const { connection } = useConnection();
   const { setVisible, visible: walletModalVisible } = useWalletModal();
   const { publicKey, disconnect, ready, connected } = useWallet();
 
@@ -169,68 +166,15 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const handleFaucet = async () => {
     if (!publicKey) return;
     setFaucetLoading(true);
-    const walletAddress = publicKey.toBase58();
-
-    // 複数のdevnet RPCエンドポイントを試す（各RPCに個別のレート制限がある）
-    const DEVNET_RPCS = [
-      "https://api.devnet.solana.com",
-      "https://devnet.helius-rpc.com/?api-key=15319bf4-5b40-4958-ac8d-6313aa55eb92",
-    ];
-
     try {
-      // 1. バックエンドのfaucet APIを試す（サーバーサイドなのでCORS問題なし）
-      try {
-        const result = await api.requestFaucet(walletAddress);
-        if (result.success || result.tx_signature) {
-          showToast("1 SOL Airdropped successfully!", "success");
-          return;
-        }
-      } catch {
-      }
-
-      // 2. 複数のRPCエンドポイントで順番にairdropを試す
-      let lastError: any = null;
-      for (const rpc of DEVNET_RPCS) {
-        try {
-          const res = await fetch(rpc, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              jsonrpc: "2.0",
-              id: 1,
-              method: "requestAirdrop",
-              params: [walletAddress, 1 * LAMPORTS_PER_SOL],
-            }),
-          });
-          const data = await res.json();
-          if (data.result) {
-            // トランザクションの確認待ち
-            const latestBlockHash = await connection.getLatestBlockhash();
-            await connection.confirmTransaction({
-              blockhash: latestBlockHash.blockhash,
-              lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
-              signature: data.result,
-            });
-            showToast("1 SOL Airdropped successfully!", "success");
-            return;
-          }
-          lastError = data.error;
-        } catch (e) {
-          lastError = e;
-        }
-      }
-
-      // すべて失敗した場合
-      throw lastError || new Error("All airdrop methods failed");
-    } catch (e: any) {
-      const msg = e?.message || e?.toString() || "";
-      if (msg.includes("429") || msg.includes("Too many requests") || msg.includes("rate")) {
-        showToast("Rate limit reached. Please wait a few minutes and try again.", "error");
+      const result = await api.requestFaucet(publicKey.toBase58());
+      if (result.success) {
+        showToast("1,000 USDC received!", "success");
       } else {
-        // 最終手段: Solana Faucet サイトを案内
-        showToast("Airdrop failed. Opening Solana Faucet...", "error");
-        window.open(`https://faucet.solana.com/?wallet=${walletAddress}`, "_blank");
+        showToast(result.message || "Faucet request failed", "error");
       }
+    } catch {
+      showToast("Network error. Please try again.", "error");
     } finally {
       setFaucetLoading(false);
     }
@@ -375,7 +319,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                         className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-500/20 bg-[#1C1917] py-3.5 font-bold text-purple-400 transition-all active:scale-95 hover:bg-[#292524] disabled:opacity-50"
                       >
                         {faucetLoading ? <Sparkles className="h-5 w-5 animate-spin" /> : <Droplets className="h-5 w-5" />}
-                        Get 1 SOL (Devnet)
+                        Get 1,000 USDC
                       </button>
                       <button 
                         onClick={() => setIsInviteOpen(true)}

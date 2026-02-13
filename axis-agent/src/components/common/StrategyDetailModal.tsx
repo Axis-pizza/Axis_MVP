@@ -127,13 +127,13 @@ export const StrategyDetailModal = ({ isOpen, onClose, strategy }: StrategyDetai
                                 <Wallet className="w-3 h-3" /> TVL
                             </div>
                             <p className="text-xl font-bold text-white">
-                                {strategy.tvl ? strategy.tvl.toLocaleString() : '0'} SOL
+                                {strategy.tvl ? strategy.tvl.toLocaleString() : '0'} USDC
                             </p>
                         </div>
                         </div>
 
                         <div className="bg-[#0C0A09] p-4 rounded-xl border border-white/5">
-                        <label className="text-xs text-[#78716C] font-bold uppercase mb-2 block">Deposit Amount (SOL)</label>
+                        <label className="text-xs text-[#78716C] font-bold uppercase mb-2 block">Deposit Amount (USDC)</label>
                         <div className="flex gap-3">
                             <input 
                                 type="number" 

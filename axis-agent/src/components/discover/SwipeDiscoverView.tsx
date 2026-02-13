@@ -4,7 +4,8 @@ import { RefreshCw, Loader2, Sparkles, Rocket, X, Wallet, ArrowDown, ArrowLeft, 
 import { SwipeCard } from './SwipeCard';
 import { api } from '../../services/api';
 import { useWallet, useConnection } from '../../hooks/useWallet';
-import { PublicKey, LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
+import { PublicKey, Transaction } from '@solana/web3.js';
+import { getUsdcBalance, getOrCreateUsdcAta, createUsdcTransferIx } from '../../services/usdc';
 import { JupiterService } from '../../services/jupiter';
 import { DexScreenerService } from '../../services/dexscreener';
 import { useToast } from '../../context/ToastContext';
@@ -283,8 +284,8 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
     if (!publicKey || !isOpen) return;
     const fetchBalance = async () => {
       try {
-        const bal = await connection.getBalance(publicKey);
-        setBalance(bal / LAMPORTS_PER_SOL);
+        const bal = await getUsdcBalance(connection, publicKey);
+        setBalance(bal);
       } catch {
       }
     };
@@ -402,7 +403,7 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
                          <span className={`font-serif font-bold text-white tracking-tighter transition-all duration-200 ${amount === '0' ? 'text-white/30' : 'text-white'} text-6xl`}>
                            {amount}
                          </span>
-                         <span className="text-xl font-bold text-[#D97706]">SOL</span>
+                         <span className="text-xl font-bold text-[#D97706]">USDC</span>
                        </div>
                        <div className="flex items-center gap-2 text-xs text-[#78716C] font-mono bg-white/5 py-1.5 px-3 rounded-full border border-white/5">
                           <Wallet className="w-3 h-3" />
@@ -841,10 +842,14 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
       }
 
       const targetPubkey = new PublicKey(targetAddressStr.trim());
-      const lamports = Math.floor(parsedAmount * LAMPORTS_PER_SOL);
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({ fromPubkey: wallet.publicKey, toPubkey: targetPubkey, lamports })
-      );
+      const transaction = new Transaction();
+
+      // USDC SPL transfer
+      const { ata: fromAta, instruction: createFromIx } = await getOrCreateUsdcAta(connection, wallet.publicKey, wallet.publicKey);
+      const { ata: toAta, instruction: createToIx } = await getOrCreateUsdcAta(connection, wallet.publicKey, targetPubkey);
+      if (createFromIx) transaction.add(createFromIx);
+      if (createToIx) transaction.add(createToIx);
+      transaction.add(createUsdcTransferIx(fromAta, toAta, wallet.publicKey, parsedAmount));
 
       const latestBlockhash = await connection.getLatestBlockhash();
       transaction.recentBlockhash = latestBlockhash.blockhash;
