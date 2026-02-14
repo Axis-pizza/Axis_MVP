@@ -164,16 +164,25 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   };
 
   const handleFaucet = async () => {
-    if (!publicKey) return;
+    if (!publicKey) {
+      showToast("Please connect your wallet first", "error");
+      return;
+    }
     setFaucetLoading(true);
     try {
-      const result = await api.requestFaucet(publicKey.toBase58());
+      const walletAddress = publicKey.toBase58();
+      console.log('[Faucet] Requesting for wallet:', walletAddress);
+      const result = await api.requestFaucet(walletAddress);
+      console.log('[Faucet] Response:', result);
       if (result.success) {
-        showToast("1,000 USDC received!", "success");
+        showToast(result.message || "1,000 USDC received!", "success");
       } else {
-        showToast(result.message || "Faucet request failed", "error");
+        const errMsg = result.error || result.message || "Faucet request failed";
+        console.error('[Faucet] Error:', errMsg);
+        showToast(errMsg, "error");
       }
-    } catch {
+    } catch (e) {
+      console.error('[Faucet] Exception:', e);
       showToast("Network error. Please try again.", "error");
     } finally {
       setFaucetLoading(false);

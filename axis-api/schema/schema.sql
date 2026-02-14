@@ -31,6 +31,7 @@ CREATE TABLE users (
   total_xp INTEGER DEFAULT 500,
   rank_tier TEXT DEFAULT 'Novice',
   last_checkin INTEGER DEFAULT 0,
+  last_faucet_at INTEGER DEFAULT 0,
 
   -- 投資成績データ (ALTER分をここに統合)
   pnl_percent REAL DEFAULT 0,

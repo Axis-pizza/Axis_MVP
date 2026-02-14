@@ -381,13 +381,26 @@ export const api = {
 
   async requestFaucet(wallet: string) {
     try {
+      console.log('[Faucet API] POST /claim', { wallet_address: wallet });
       const res = await fetch(`${API_BASE}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ wallet_address: wallet }),
       });
-      return await res.json();
+      const text = await res.text();
+      console.log('[Faucet API] Status:', res.status, 'Body:', text);
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        return { success: false, error: `Server returned invalid response (${res.status}): ${text.slice(0, 200)}` };
+      }
+      if (!res.ok) {
+        return { success: false, error: data.error || data.message || `Server error (${res.status})` };
+      }
+      return data;
     } catch (e) {
+      console.error('[Faucet API] Exception:', e);
       return { success: false, error: 'Network Error' };
     }
   },

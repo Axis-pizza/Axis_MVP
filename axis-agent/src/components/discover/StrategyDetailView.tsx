@@ -448,9 +448,6 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
     const nextState = !isWatchlisted;
     setIsWatchlisted(nextState);
 
-    // 2. トーストでフィードバック
-    showToast(nextState ? "Added to Watchlist" : "Removed from Watchlist", "success");
-
     try {
       await api.toggleWatchlist(strategy.id, wallet.publicKey.toBase58());
     } catch (e: any) {
