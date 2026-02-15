@@ -1,6 +1,6 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { api } from "./api"; // 既存のAPIクライアント（axiosインスタンスなど）
+import { api } from "./api";
 
 export interface JupiterToken {
   address: string;
@@ -27,18 +27,18 @@ export interface JupiterToken {
   };
 }
 
-// フォールバック用の最低限のリスト
+// Minimum fallback token list
 const CRITICAL_FALLBACK: JupiterToken[] = [
   { address: "So11111111111111111111111111111111111111112", chainId: 101, decimals: 9, name: "Wrapped SOL", symbol: "SOL", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", tags: ["verified"], isVerified: true },
   { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", chainId: 101, decimals: 6, name: "USD Coin", symbol: "USDC", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", tags: ["verified"], isVerified: true },
 ];
 
-// クライアント側でのメモリキャッシュ
+// Client-side memory cache
 let liteCache: JupiterToken[] | null = null;
 let pendingListPromise: Promise<JupiterToken[]> | null = null;
 
 export const JupiterService = {
-  // バックエンド経由でリスト取得 (BFF)
+  // Fetch token list via backend (BFF)
   getLiteList: async (): Promise<JupiterToken[]> => {
     if (liteCache) return liteCache;
     if (pendingListPromise) return pendingListPromise;
@@ -46,7 +46,7 @@ export const JupiterService = {
     pendingListPromise = (async () => {
       try {
         console.log("Fetching tokens via Axis API...");
-        // 独自のAPIエンドポイントを叩く
+        // Call our own API endpoint
         const response = await api.get('/jupiter/tokens');
         
         if (response && response.tokens && Array.isArray(response.tokens)) {
@@ -72,7 +72,7 @@ export const JupiterService = {
     }
   },
 
-  // BFF経由でトレンドトークン取得 (Jupiter v2 API)
+  // Fetch trending tokens via BFF (Jupiter v2 API)
   getTrendingTokens: async (): Promise<JupiterToken[]> => {
     try {
       const response = await api.get('/jupiter/trending?category=toptrending&interval=24h&limit=50');
@@ -107,7 +107,7 @@ export const JupiterService = {
     }
   },
 
-  // バックエンド経由で価格取得
+  // Fetch prices via backend
   getPrices: async (mintAddresses: string[]): Promise<Record<string, number>> => {
     const validMints = mintAddresses.filter(m => m && m.length > 30);
     if (validMints.length === 0) return {};
@@ -126,7 +126,7 @@ export const JupiterService = {
     }
   },
   
-  // BFF経由サーバーサイド検索 (Jupiter v2 API)
+  // Server-side search via BFF (Jupiter v2 API)
   searchTokens: async (query: string): Promise<JupiterToken[]> => {
     const q = query.trim();
     if (!q) return [];

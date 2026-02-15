@@ -5,9 +5,14 @@ import {
   X,
   BookOpen,
   FileText,
+  Github,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { SwipeDiscoverView } from './SwipeDiscoverView';
+import { ListDiscoverView } from './ListDiscoverView';
+import { ProfileDrawer } from '../common/ProfileDrawer';
+import type { Strategy } from '../../types';
 
 // X (formerly Twitter) logo SVG component
 const XLogo = ({ size = 16 }: { size?: number }) => (
@@ -15,10 +20,6 @@ const XLogo = ({ size = 16 }: { size?: number }) => (
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
   </svg>
 );
-import { ListDiscoverView } from './ListDiscoverView';
-import { ProfileDrawer } from '../common/ProfileDrawer'; 
-import type { Strategy } from '../../types';
-import { motion, AnimatePresence } from 'framer-motion'; // アニメーション用に追加
 
 type ViewMode = 'swipe' | 'list';
 
@@ -36,7 +37,7 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
   });
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // メニューの開閉状態
+  const [isMenuOpen, setIsMenuOpen] = useState(false); // Menu open/close state
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, viewMode);
@@ -48,27 +49,28 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
 
   const navigate = useNavigate();
 
-  // リンクの定義
+  // Menu link definitions
   const menuLinks = [
     { label: 'Docs', icon: BookOpen, url: 'https://muse-7.gitbook.io/axis/product-docs/' },
     { label: 'X', icon: XLogo, url: 'https://x.com/axis_pizza' },
+    { label: 'GitHub', icon: Github, url: 'https://github.com/Axis-pizza/Axis_MVP' },
     { label: 'Terms', icon: FileText, url: '/terms', isInternal: true },
   ];
 
   return (
     <div className="relative min-h-screen bg-[#080503]">
       
-      {/* --- ヘッダー部分 --- */}
+      {/* Header */}
       <div className="flex items-center justify-between w-full px-4 py-3 z-50 absolute top-0 md:top-16 left-0 right-0 pointer-events-none">
-        {/* pointer-events-none にして、下のスワイプ操作を邪魔しないようにしつつ、ボタンだけ auto にする */}
+        {/* pointer-events-none prevents blocking swipe gestures; buttons use pointer-events-auto */}
         
-        {/* 左側：ロゴなどを置く場合はここ (現在は空) */}
+        {/* Left side: placeholder for logo (currently empty) */}
         <div />
 
-        {/* 右側：ボタン群 */}
+        {/* Right side: button group */}
         <div className="flex items-center gap-3 pointer-events-auto">
 
-          {/* 1. メニューボタン (Docsなど) */}
+          {/* Menu button (Docs, etc.) */}
           <div className="relative">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -77,17 +79,17 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
               {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
-            {/* ドロップダウンメニュー */}
+            {/* Dropdown menu */}
             <AnimatePresence>
               {isMenuOpen && (
                 <>
-                  {/* 背景クリックで閉じるための不可視レイヤー */}
+                  {/* Invisible overlay to close menu on background click */}
                   <div 
                     className="fixed inset-0 z-40" 
                     onClick={() => setIsMenuOpen(false)} 
                   />
                   
-                  {/* メニュー本体 */}
+                  {/* Menu body */}
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: -10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -132,20 +134,20 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
             </AnimatePresence>
           </div>
 
-          {/* 2. プロフィールボタン (既存) */}
+          {/* Profile button */}
           <button
             onClick={() => setIsDrawerOpen(true)}
             className="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 hover:bg-white/10 active:scale-95 transition-all relative group"
           >
             <User className="w-5 h-5 text-[#F2E0C8] group-hover:text-[#F2E0C8] transition-colors" />
-            {/* 通知バッジ（とりあえず表示） */}
+            {/* Notification badge */}
             <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#B8863F] rounded-full border-2 border-[#080503]" />
           </button>
 
         </div>
       </div>
 
-      {/* --- メインコンテンツ --- */}
+      {/* Main content */}
       <div className="relative">
         {viewMode === 'swipe' ? (
           <SwipeDiscoverView
@@ -161,7 +163,7 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
         )}
       </div>
 
-      {/* --- ドロワー本体 --- */}
+      {/* Profile drawer */}
       <ProfileDrawer 
         isOpen={isDrawerOpen} 
         onClose={() => setIsDrawerOpen(false)} 

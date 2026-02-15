@@ -2,9 +2,9 @@ import React, { createContext, useContext, useState, useMemo, useCallback } from
 import { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { transact } from '@solana-mobile/mobile-wallet-adapter-protocol';
 import { toWeb3JsTransaction } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import { Buffer } from 'buffer'; // Bufferをインポート
+import { Buffer } from 'buffer';
 
-// アプリのメタデータ
+// App metadata
 const APP_IDENTITY = {
   name: 'Axis App',
   uri:  'https://axis.app',
@@ -26,7 +26,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [publicKey, setPublicKey] = useState<PublicKey | null>(null);
 
-  // ウォレット接続 (Authorize)
+  // Wallet connection (Authorize)
   const connect = useCallback(async () => {
     try {
       console.log('Connecting to wallet...');
@@ -37,12 +37,12 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
         });
 
         setAuthToken(authResult.auth_token);
-        
-        // 【修正箇所】Base64のアドレスをデコードしてPublicKeyを作成
+
+        // Decode the Base64 address and create a PublicKey
         const account = authResult.accounts[0];
         const addressBuffer = Buffer.from(account.address, 'base64');
         const pubKey = new PublicKey(addressBuffer);
-        
+
         setPublicKey(pubKey);
         console.log('Connected:', pubKey.toBase58());
       });
@@ -51,13 +51,13 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // ウォレット切断
+  // Wallet disconnect
   const disconnect = useCallback(() => {
     setAuthToken(null);
     setPublicKey(null);
   }, []);
 
-  // トランザクション署名
+  // Transaction signing
   const signTransaction = useCallback(async (transaction: Transaction | VersionedTransaction) => {
     if (!authToken || !publicKey) throw new Error('Wallet not connected');
 
@@ -74,7 +74,7 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
           transactions: [transaction],
         });
 
-        // 署名済みトランザクションをWeb3.js形式に変換
+        // Convert the signed transaction to Web3.js format
         signedTransaction = toWeb3JsTransaction(result);
       });
     } catch (error) {
@@ -86,23 +86,23 @@ export const WalletProvider = ({ children }: { children: React.ReactNode }) => {
     return signedTransaction;
   }, [authToken, publicKey]);
 
-  // メッセージ署名
+  // Message signing
   const signMessage = useCallback(async (message: Uint8Array) => {
     if (!authToken || !publicKey) throw new Error('Wallet not connected');
-    
+
     let signedMessage: Uint8Array | null = null;
     try {
         await transact(async (wallet) => {
             await wallet.reauthorize({ auth_token: authToken, identity: APP_IDENTITY });
-            const [result] = await wallet.signMessages({ 
-                messages: [message], 
-                addresses: [publicKey.toBase64()] // ここはBase64で渡す必要がある（PublicKeyオブジェクトならtoBase64()があるはずだが、なければBuffer変換）
+            const [result] = await wallet.signMessages({
+                messages: [message],
+                // Address must be passed as Base64 (use toBase64() on PublicKey, or convert via Buffer)
+                addresses: [publicKey.toBase64()]
             });
-            // MWAの仕様上、署名結果のpayloadが返る
-            // signed_payload は署名されたメッセージそのものではなく署名データの場合があるため仕様確認が必要ですが、
-            // 一般的に signature は result.signatures[0] のように取得するか、signed_payload を確認します。
-            // ここでは簡易的に signed_payload を返します。
-            signedMessage = result.signed_payload; 
+            // Per MWA spec, the result contains the signed payload.
+            // Note: signed_payload may contain signature data rather than the signed message itself;
+            // check the MWA documentation for details.
+            signedMessage = result.signed_payload;
         });
     } catch (e) {
         console.error(e);

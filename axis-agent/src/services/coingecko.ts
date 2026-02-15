@@ -18,7 +18,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const priceCache: Record<string, { price: number; change24h: number; timestamp: number }> = {};
 const PRICE_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 
-// ✅ 追加: Solanaアドレスのバリデーション用正規表現 (Base58, 32-44文字)
+// Regex for validating Solana addresses (Base58, 32-44 chars)
 const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 export interface CoinGeckoToken {
@@ -64,7 +64,7 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
       .map(m => ({
         symbol: m.symbol.toUpperCase(),
         name: m.name,
-        // platforms.solanaがあればそれを優先、なければIDをフォールバックとして使う
+        // Prefer platforms.solana address, fall back to CoinGecko ID
         address: m.platforms?.solana || m.id, 
         logoURI: m.image,
         price: m.current_price,
@@ -86,8 +86,8 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
 export async function getMarketData(mints: string[]): Promise<Record<string, { price: number; change24h: number }>> {
   if (!mints || mints.length === 0) return {};
 
-  // ✅ 修正: 厳格なバリデーション (undefined除外 + Base58チェック)
-  // これにより "USDC" や "undefined" などの不正な文字列がAPIに飛ぶのを防ぎ、400エラーを回避します。
+  // Strict validation: exclude undefined and non-Base58 strings
+  // Prevents invalid strings like "USDC" or "undefined" from being sent to the API
   const validMints = mints.filter(m => 
     m && 
     typeof m === 'string' && 
@@ -99,7 +99,7 @@ export async function getMarketData(mints: string[]): Promise<Record<string, { p
 
   const now = Date.now();
   
-  // キャッシュチェック
+  // Check cache
   const uncachedMints = validMints.filter(mint => {
     const cached = priceCache[mint];
     return !cached || (now - cached.timestamp > PRICE_CACHE_TTL);
@@ -118,12 +118,12 @@ export async function getMarketData(mints: string[]): Promise<Record<string, { p
     return result;
   }
 
-  // APIコール (チャンク分割)
+  // API calls (chunked)
   const chunks = chunkArray(uncachedMints, 50);
   const fetchPromises = chunks.map(async (chunk) => {
     try {
       const ids = chunk.join(',');
-      // URL生成
+      // Build URL
       const url = `${COINGECKO_API}/simple/token_price/solana?contract_addresses=${ids}&vs_currencies=usd&include_24hr_change=true`;
       
       const res = await fetch(url);
@@ -138,7 +138,7 @@ export async function getMarketData(mints: string[]): Promise<Record<string, { p
 
   const results = await Promise.all(fetchPromises);
 
-  // キャッシュ更新
+  // Update cache
   results.forEach(data => {
     if (!data) return;
     Object.entries(data).forEach(([mint, info]: [string, any]) => {
@@ -153,7 +153,7 @@ export async function getMarketData(mints: string[]): Promise<Record<string, { p
     });
   });
 
-  // 結果構築
+  // Build result
   const finalResult: Record<string, { price: number; change24h: number }> = {};
   validMints.forEach(mint => {
     const cached = priceCache[mint];

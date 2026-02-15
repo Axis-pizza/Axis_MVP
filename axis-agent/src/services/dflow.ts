@@ -143,13 +143,13 @@ export async function fetchPredictionTokens(): Promise<JupiterToken[]> {
 }
 
 export async function fetchStockTokens(): Promise<JupiterToken[]> {
-  // 1) symbolで検索（x-api-key必須）
+  // 1) Search by symbol (x-api-key required)
   const found: JupiterToken[] = [];
 
   for (const sym of XSTOCK_SYMBOLS) {
     const results = await JupiterService.searchTokens(sym);
 
-    // 2) いちばんそれっぽいのを拾う（symbol一致優先）
+    // 2) Pick the best match (prefer exact symbol match)
     const best =
       results.find(t => t.symbol?.toLowerCase() === sym.toLowerCase()) ??
       results[0];
@@ -160,12 +160,12 @@ export async function fetchStockTokens(): Promise<JupiterToken[]> {
         tags: Array.from(new Set([...(best.tags ?? []), "stock", "xstocks"])),
         source: "stock",
         isMock: false,
-        // price は JupiterService.getPrices で上書きしてもOK
+        // Price can be overridden by JupiterService.getPrices
       });
     }
   }
 
-  // 3) 価格もまとめて付けたいなら（mint IDs が必要）
+  // 3) Batch-fetch prices (requires mint IDs)
   const prices = await JupiterService.getPrices(found.map(t => t.address));
   const withPrices = found.map(t => ({
     ...t,
@@ -182,7 +182,7 @@ function fallbackToken(x: typeof REMORA_METALS[number]): JupiterToken {
     decimals: 6,
     name: x.name,
     symbol: x.symbol,
-    logoURI: "", // 取れない時は空でもOK（UI側でプレースホルダ推奨）
+    logoURI: "", // Empty is OK; UI should show a placeholder
     tags: ["commodity", "rwa", "remora", "metals"],
     isVerified: false,
     source: "commodity",
@@ -213,7 +213,7 @@ export async function fetchCommodityTokens(): Promise<JupiterToken[]> {
 
     return withPrices;
   } catch {
-    // UIが落ちないように最低限返す
+    // Return minimum fallback to prevent UI crashes
     return REMORA_METALS.map(fallbackToken);
   }
 }

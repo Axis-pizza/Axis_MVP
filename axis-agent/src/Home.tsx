@@ -31,7 +31,7 @@ export default function Home() {
   const { setVisible: setWalletModalVisible } = useWalletModal();
   const [balance, setBalance] = useState<number | null>(null);
 
-  // ウォレット残高の取得（USDC）
+  // Fetch wallet balance (USDC)
   const getBalance = useCallback(async () => {
     if (!publicKey || !connection) return 0;
     try {
@@ -47,7 +47,7 @@ export default function Home() {
     }
   }, [connected, getBalance]);
 
-  // 初回訪問時にオンボーディングを表示（ウォレット接続不要）
+  // Show onboarding on first visit (no wallet connection required)
   useEffect(() => {
     const isCompleted = localStorage.getItem(TUTORIAL_KEY);
     if (!isCompleted) {

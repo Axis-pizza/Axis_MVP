@@ -9,13 +9,13 @@ const CLARITY_PROJECT_ID = "t0od4wxooa";
 
 function App() {
   useEffect(() => {
-    // GA4の初期化
+    // Initialize GA4
     if (GA_MEASUREMENT_ID) {
       ReactGA.initialize(GA_MEASUREMENT_ID);
     
     }
 
-    // Clarityの設定
+    // Set up Microsoft Clarity
     if (CLARITY_PROJECT_ID) {
       (function(c: any, l: any, a: any, r: any, i: any){
         c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
@@ -24,7 +24,7 @@ function App() {
       })(window, document, "clarity", "script", CLARITY_PROJECT_ID);
     }
 
-    // リファラー処理
+    // Handle referrer parameter
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) {
