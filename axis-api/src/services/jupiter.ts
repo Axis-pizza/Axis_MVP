@@ -16,6 +16,7 @@ const CACHE_TTL = 1000 * 60 * 60; // 1時間
 
 const JUP_TOKEN_API_V2 = 'https://api.jup.ag/tokens/v2';
 const JUP_PRICE_API_V2 = 'https://api.jup.ag/price/v2';
+const SOLANA_TOKEN_LIST_API = 'https://token-list-api.solana.cloud/v1/list';
 
 function buildHeaders(apiKey?: string): HeadersInit {
   const headers: HeadersInit = {};
@@ -48,6 +49,7 @@ export const JupiterService = {
       return tokenListCache;
     }
 
+    // Jupiter Token API v2 を試行
     try {
       console.log('Fetching verified token list from Jupiter v2...');
       const response = await fetch(
@@ -55,7 +57,7 @@ export const JupiterService = {
         { headers: buildHeaders(apiKey) }
       );
       if (!response.ok) {
-        throw new Error(`Failed to fetch token list: ${response.status}`);
+        throw new Error(`Jupiter v2 returned ${response.status}`);
       }
 
       const data: any[] = await response.json();
@@ -63,13 +65,31 @@ export const JupiterService = {
 
       tokenListCache = tokens;
       lastTokenListFetch = now;
-
-      console.log(`Cached ${tokens.length} verified tokens`);
+      console.log(`Cached ${tokens.length} verified tokens from Jupiter v2`);
       return tokens;
     } catch (error) {
-      console.error('Jupiter Token List Error:', error);
+      console.warn('Jupiter v2 failed, trying Solana Token List fallback:', error);
+    }
+
+    // フォールバック: Solana Token List API
+    try {
+      const response = await fetch(SOLANA_TOKEN_LIST_API);
+      if (!response.ok) {
+        throw new Error(`Solana Token List returned ${response.status}`);
+      }
+
+      const data: any = await response.json();
+      const content = data?.content;
+      const tokens = Array.isArray(content) ? content.map(normalizeToken) : [];
+
+      tokenListCache = tokens;
+      lastTokenListFetch = now;
+      console.log(`Cached ${tokens.length} tokens from Solana Token List (fallback)`);
+      return tokens;
+    } catch (fallbackError) {
+      console.error('Solana Token List fallback also failed:', fallbackError);
       if (tokenListCache) return tokenListCache;
-      throw error;
+      throw fallbackError;
     }
   },
 
@@ -80,16 +100,32 @@ export const JupiterService = {
   searchTokens: async (query: string, apiKey?: string): Promise<JupiterToken[]> => {
     if (!query || query.trim().length === 0) return [];
 
+    const q = query.trim();
+
+    // Jupiter v2 検索を試行
     try {
-      const url = `${JUP_TOKEN_API_V2}/search?query=${encodeURIComponent(query.trim())}`;
+      const url = `${JUP_TOKEN_API_V2}/search?query=${encodeURIComponent(q)}`;
       const response = await fetch(url, { headers: buildHeaders(apiKey) });
-      if (!response.ok) return [];
+      if (!response.ok) throw new Error(`Search returned ${response.status}`);
 
       const data: any[] = await response.json();
-      return Array.isArray(data) ? data.map(normalizeToken) : [];
+      const tokens = Array.isArray(data) ? data.map(normalizeToken) : [];
+      if (tokens.length > 0) return tokens;
     } catch {
-      return [];
+      // フォールバックへ
     }
+
+    // フォールバック: キャッシュ済みトークンリストからローカル検索
+    if (tokenListCache) {
+      const lower = q.toLowerCase();
+      return tokenListCache.filter(t =>
+        t.symbol.toLowerCase().includes(lower) ||
+        t.name.toLowerCase().includes(lower) ||
+        t.address === q
+      ).slice(0, 20);
+    }
+
+    return [];
   },
 
   /**

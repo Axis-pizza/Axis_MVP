@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles } from 'lucide-react-native';
-import { colors } from '../../config/theme';
+import { colors, serifFont } from '../../config/theme';
 
 interface Props {
   onCreate: () => void;
@@ -16,20 +17,23 @@ export function CreateLanding({ onCreate }: Props) {
           <Sparkles size={32} color={colors.accent} />
         </View>
 
-        <Text className="text-white text-3xl font-bold text-center mb-3" style={{ fontFamily: 'serif' }}>
+        <Text className="text-3xl font-bold text-center mb-3" style={{ color: colors.accent, fontFamily: serifFont }}>
           Your Idea.{'\n'}Your ETF.
         </Text>
 
-        <Text className="text-stone-500 text-center text-base mb-10 leading-6">
+        <Text className="text-center text-base mb-10 leading-6" style={{ color: colors.textMuted }}>
           Build, manage, and scale your on-chain index fund in seconds.
         </Text>
 
-        <Pressable
-          onPress={onCreate}
-          className="px-10 py-4 rounded-xl"
-          style={{ backgroundColor: colors.accent }}
-        >
-          <Text className="text-white font-bold text-base">Create Strategy</Text>
+        <Pressable onPress={onCreate} className="rounded-xl overflow-hidden">
+          <LinearGradient
+            colors={['#6B4420', '#B8863F', '#E8C890']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ paddingHorizontal: 40, paddingVertical: 16, borderRadius: 12 }}
+          >
+            <Text className="font-bold text-base" style={{ color: '#000' }}>Create Strategy</Text>
+          </LinearGradient>
         </Pressable>
       </Animated.View>
     </View>

@@ -339,18 +339,25 @@ app.post('/users/:wallet/checkin', async (c) => {
 
       const now = Math.floor(Date.now() / 1000);
       const lastCheckin = user.last_checkin || 0;
-      
-      // 20時間チェック (テスト時は短くしてもOK)
-      if (now - lastCheckin < 20 * 60 * 60) { 
+
+      // 日本時間(UTC+9)基準で同じ日かチェック
+      const JST_OFFSET = 9 * 3600;
+      const todayJST = Math.floor((now + JST_OFFSET) / 86400);
+      const lastCheckinDayJST = Math.floor((lastCheckin + JST_OFFSET) / 86400);
+
+      if (lastCheckin > 0 && todayJST === lastCheckinDayJST) {
            return c.json({ success: false, message: 'Already checked in today' });
       }
 
-      // ★追加: VIP判定とポイント倍率の適用
-      const whitelistEntry = await c.env.whitelist_db
-          .prepare('SELECT 1 FROM users WHERE wallet_address = ?')
-          .bind(wallet)
-          .first();
-      const isVip = !!whitelistEntry;
+      // VIP判定（whitelist_db が未設定の場合はスキップ）
+      let isVip = false;
+      if (c.env.whitelist_db) {
+          const whitelistEntry = await c.env.whitelist_db
+              .prepare('SELECT 1 FROM users WHERE wallet_address = ?')
+              .bind(wallet)
+              .first();
+          isVip = !!whitelistEntry;
+      }
 
       const basePoints = 10;
       // VIPなら1.5倍 (端数切り捨て)

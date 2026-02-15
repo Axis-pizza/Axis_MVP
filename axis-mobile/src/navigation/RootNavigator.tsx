@@ -20,14 +20,14 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.borderLight,
+          backgroundColor: 'rgba(10, 10, 10, 0.95)',
+          borderTopColor: 'rgba(184, 134, 63, 0.15)',
           borderTopWidth: 1,
           paddingBottom: 4,
           height: 60,
         },
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textDim,
+        tabBarActiveTintColor: '#B8863F',
+        tabBarInactiveTintColor: '#7A5A30',
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',

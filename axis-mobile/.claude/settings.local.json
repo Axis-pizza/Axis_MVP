@@ -12,7 +12,10 @@
       "Bash(npx expo export:*)",
       "Bash(node --print:*)",
       "Bash(npx expo install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(adb devices:*)",
+      "Bash(adb kill-server:*)",
+      "Bash(adb start-server:*)"
     ]
   }
 }

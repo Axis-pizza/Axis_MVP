@@ -856,13 +856,17 @@ export const SwipeDiscoverView = ({ onToggleView, onStrategySelect, onOverlayCha
 
       const signedTx = await wallet.signTransaction(transaction);
       setInvestStatus('CONFIRMING');
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
 
       await connection.confirmTransaction({
         signature,
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      });
+      }, 'confirmed');
 
       setInvestStatus('PROCESSING');
       showToast(`Payment confirmed! Processing token transfer...`, "info");
