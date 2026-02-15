@@ -3,8 +3,13 @@ import { Bindings } from '../config/env';
 import * as UserModel from '../models/user';
 import * as InviteModel from '../models/invite';
 import { sendInviteEmail } from '../services/email';
+import { createTwitterAuth, handleTwitterCallback } from '../services/twitter';
 
 const app = new Hono<{ Bindings: Bindings }>();
+
+// --- Twitter OAuth ---
+app.get('/twitter', createTwitterAuth);
+app.get('/twitter/callback', handleTwitterCallback);
 
 app.post('/request-invite', async (c) => {
   try {

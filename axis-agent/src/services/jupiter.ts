@@ -72,22 +72,38 @@ export const JupiterService = {
     }
   },
 
-  // 動的トレンド取得 (DexScreenerは直接叩いてもOKだが、隠蔽するならサーバー側へ)
-  // 今回は一旦そのまま、もしくはサーバー側で実装済みなら差し替え
-  getTrendingTokens: async (): Promise<string[]> => {
+  // BFF経由でトレンドトークン取得 (Jupiter v2 API)
+  getTrendingTokens: async (): Promise<JupiterToken[]> => {
     try {
-      const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=solana`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      if (data.pairs) {
-        const mints = data.pairs
-            .filter((p: any) => p.chainId === 'solana')
-            .map((p: any) => p.baseToken.address);
-        return Array.from(new Set(mints)) as string[];
+      const response = await api.get('/jupiter/trending?category=toptrending&interval=24h&limit=50');
+      if (response && response.tokens && Array.isArray(response.tokens)) {
+        return response.tokens.map((t: JupiterToken) => ({
+          ...t,
+          isVerified: t.isVerified ?? (Array.isArray(t.tags) && t.tags.includes('verified')),
+        }));
       }
       return [];
     } catch {
-      return [];
+      // DexScreener fallback
+      try {
+        const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=solana`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        if (data.pairs) {
+          const mints = data.pairs
+              .filter((p: any) => p.chainId === 'solana')
+              .map((p: any) => p.baseToken.address);
+          const uniqueMints = Array.from(new Set(mints)) as string[];
+          // Convert mint addresses to JupiterToken objects using cache
+          const list = liteCache || [];
+          return uniqueMints
+            .map(m => list.find(t => t.address === m))
+            .filter((t): t is JupiterToken => t !== undefined);
+        }
+        return [];
+      } catch {
+        return [];
+      }
     }
   },
 
@@ -110,20 +126,78 @@ export const JupiterService = {
     }
   },
   
+  // BFF経由サーバーサイド検索 (Jupiter v2 API)
   searchTokens: async (query: string): Promise<JupiterToken[]> => {
-    const q = query.trim().toLowerCase();
-    const list = await JupiterService.getLiteList();
+    const q = query.trim();
     if (!q) return [];
+
+    // CA (Contract Address) lookup: cache → fetchTokenByMint fallback
     if (q.length > 30) {
-        const match = list.find(t => t.address === q);
-        return match ? [match] : [];
+      const lowerQ = q.toLowerCase();
+      if (liteCache) {
+        const match = liteCache.find(t => t.address === lowerQ || t.address.toLowerCase() === lowerQ);
+        if (match) return [match];
+      }
+      const fetched = await JupiterService.fetchTokenByMint(q);
+      return fetched ? [fetched] : [];
     }
-    return list.filter(t => t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)).slice(0, 50);
+
+    // Symbol/name search: BFF server-side search
+    try {
+      const response = await api.get(`/jupiter/search?q=${encodeURIComponent(q)}`);
+      if (response && response.tokens && Array.isArray(response.tokens)) {
+        return response.tokens.map((t: JupiterToken) => ({
+          ...t,
+          isVerified: t.isVerified ?? (Array.isArray(t.tags) && t.tags.includes('verified')),
+        }));
+      }
+      return [];
+    } catch {
+      // Fallback to client-side filtering if BFF search fails
+      const list = await JupiterService.getLiteList();
+      const lowerQ = q.toLowerCase();
+      return list.filter(t =>
+        t.symbol.toLowerCase().includes(lowerQ) ||
+        t.name.toLowerCase().includes(lowerQ)
+      ).slice(0, 50);
+    }
   },
 
   getToken: async (mint: string): Promise<JupiterToken | null> => {
     const list = await JupiterService.getLiteList();
-    return list.find(t => t.address === mint) ?? null;
+    const cached = list.find(t => t.address === mint);
+    if (cached) return cached;
+    return JupiterService.fetchTokenByMint(mint);
+  },
+
+  /**
+   * Fetch a single token by mint address from Jupiter API.
+   * Used as fallback when token is not in the cached list.
+   */
+  fetchTokenByMint: async (mint: string): Promise<JupiterToken | null> => {
+    try {
+      const res = await fetch(`https://lite-api.jup.ag/tokens/v1/${mint}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data || !data.address) return null;
+      const token: JupiterToken = {
+        address: data.address,
+        chainId: 101,
+        decimals: data.decimals ?? 9,
+        name: data.name || 'Unknown',
+        symbol: data.symbol || 'UNKNOWN',
+        logoURI: data.logoURI || '',
+        tags: data.tags || [],
+        isVerified: Array.isArray(data.tags) && data.tags.includes('verified'),
+      };
+      // Add to cache for future lookups
+      if (liteCache && !liteCache.find(t => t.address === token.address)) {
+        liteCache.push(token);
+      }
+      return token;
+    } catch {
+      return null;
+    }
   },
 
   getFallbackTokens: () => CRITICAL_FALLBACK,

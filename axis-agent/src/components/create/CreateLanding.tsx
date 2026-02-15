@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
-import { Layers, Plus, Sparkles } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 
 interface CreateLandingProps {
   onCreate: () => void;
+  isLoading?: boolean;
 }
 
-export const CreateLanding = ({ onCreate }: CreateLandingProps) => {
+export const CreateLanding = ({ onCreate, isLoading }: CreateLandingProps) => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 pb-32 relative overflow-hidden">
         
@@ -48,10 +49,11 @@ export const CreateLanding = ({ onCreate }: CreateLandingProps) => {
             >
                 <button
                     onClick={onCreate}
-                    className="group relative w-full max-w-xs mx-auto py-5 bg-white text-black rounded-2xl font-black text-xl shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] hover:scale-105 hover:shadow-[0_0_60px_-10px_rgba(255,255,255,0.5)] transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden"
+                    disabled={isLoading}
+                    className="group relative w-full max-w-xs mx-auto py-5 bg-white text-black rounded-2xl font-black text-xl shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] hover:scale-105 hover:shadow-[0_0_60px_-10px_rgba(255,255,255,0.5)] transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden disabled:opacity-70"
                 >
                     <span className="relative z-10 flex items-center gap-2">
-                        Create Your ETF <Plus strokeWidth={3} size={24} />
+                        {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <>Create Your ETF <Plus strokeWidth={3} size={24} /></>}
                     </span>
                     
                     {/* Hover Shine Effect */}

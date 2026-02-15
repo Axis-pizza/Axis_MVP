@@ -470,5 +470,9 @@ export const api = {
       body: JSON.stringify({ tokens, strategyType, walletAddress }),
     });
     return res.json();
+  },
+
+  getTwitterAuthUrl(wallet: string): string {
+    return `${API_BASE}/auth/twitter?wallet=${wallet}`;
   }
 };

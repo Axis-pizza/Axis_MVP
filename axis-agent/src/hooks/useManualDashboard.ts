@@ -54,6 +54,9 @@ export const useManualDashboard = ({
   const [tokenFilter, setTokenFilter] = useState<'all' | 'crypto' | 'stock' | 'commodity' | 'prediction'>('all');
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Server-side search results
+  const [searchResults, setSearchResults] = useState<JupiterToken[]>([]);
+
   // --- Computed ---
   const totalWeight = useMemo(() => portfolio.reduce((sum, i) => sum + i.weight, 0), [portfolio]);
   const selectedIds = useMemo(() => new Set(portfolio.map(p => p.token.address)), [portfolio]);
@@ -67,17 +70,53 @@ export const useManualDashboard = ({
     prediction: allTokens.filter(t => t.source === 'dflow').length,
   }), [allTokens]);
 
+  // --- CA fallback: async fetch for unknown mint addresses ---
+  const [caFallbackToken, setCaFallbackToken] = useState<JupiterToken | null>(null);
+  const caFetchRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    // Looks like a Solana address (32-44 chars, base58)
+    if (q.length >= 32 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(q)) {
+      const hasMatch = allTokens.some(t => t.address.toLowerCase() === q.toLowerCase());
+      if (!hasMatch && caFetchRef.current !== q) {
+        caFetchRef.current = q;
+        setCaFallbackToken(null);
+        JupiterService.fetchTokenByMint(q).then(token => {
+          if (token && caFetchRef.current === q) {
+            setCaFallbackToken(token);
+          }
+        });
+      }
+    } else {
+      setCaFallbackToken(null);
+      caFetchRef.current = null;
+    }
+  }, [searchQuery, allTokens]);
+
   // --- Logic for displaying tokens based on Tabs & Filters ---
   const sortedVisibleTokens = useMemo(() => {
-    // 【修正】検索クエリがある場合は、タブに関係なく「全トークン」から検索する
     if (searchQuery.trim()) {
-        const lowerQ = searchQuery.toLowerCase();
-        // allTokens 全体から検索
-        return allTokens.filter(t => 
-            t.symbol.toLowerCase().includes(lowerQ) || 
-            t.name.toLowerCase().includes(lowerQ) ||
-            t.address.toLowerCase() === lowerQ
-        ).slice(0, 100);
+      const lowerQ = searchQuery.trim().toLowerCase();
+      const isAddress = lowerQ.length >= 32;
+
+      if (isAddress) {
+        // CA search: check allTokens + caFallbackToken
+        const results: JupiterToken[] = [];
+        const match = allTokens.find(t => t.address.toLowerCase() === lowerQ);
+        if (match) results.push(match);
+        if (caFallbackToken && !results.find(t => t.address === caFallbackToken.address)) {
+          results.unshift(caFallbackToken);
+        }
+        return results;
+      }
+
+      // Symbol/name search: use server-side search results
+      const results = [...searchResults];
+      if (caFallbackToken && !results.find(t => t.address === caFallbackToken.address)) {
+        results.unshift(caFallbackToken);
+      }
+      return results;
     }
 
     // --- 以下、検索クエリがない場合のタブごとの表示ロジック ---
@@ -87,8 +126,8 @@ export const useManualDashboard = ({
     if (activeTab === 'your_tokens') {
         baseList = userTokens;
     } else if (activeTab === 'meme') {
-        baseList = allTokens.filter(t => 
-            t.tags.includes('meme') || 
+        baseList = allTokens.filter(t =>
+            t.tags.includes('meme') ||
             ['WIF', 'BONK', 'POPCAT', 'MEW', 'BOME', 'PNUT', 'MOG', 'TRUMP', 'MELANIA'].includes(t.symbol.toUpperCase())
         );
         if (trendingIds.size > 0) {
@@ -120,8 +159,8 @@ export const useManualDashboard = ({
       baseList = baseList.filter(t => t.isVerified);
     }
 
-    return baseList.slice(0, 100);
-  }, [allTokens, userTokens, activeTab, searchQuery, tokenFilter, trendingIds, verifiedOnly]);
+    return baseList;
+  }, [allTokens, userTokens, activeTab, searchQuery, tokenFilter, trendingIds, verifiedOnly, caFallbackToken, searchResults]);
 
   // エイリアス (互換性のため)
   const displayTokens = sortedVisibleTokens;
@@ -209,26 +248,44 @@ export const useManualDashboard = ({
     }
   }, [activeTab, publicKey, connected, connection]);
 
-  // Fetch Trending
+  // Fetch Trending (Jupiter v2 returns JupiterToken[])
   useEffect(() => {
     if ((activeTab === 'trending' || activeTab === 'meme') && trendingIds.size === 0) {
-       JupiterService.getTrendingTokens().then(ids => {
-           if (ids.length > 0) setTrendingIds(new Set(ids));
+       JupiterService.getTrendingTokens().then(tokens => {
+           if (tokens.length > 0) {
+             setTrendingIds(new Set(tokens.map(t => t.address)));
+           }
        });
     }
   }, [activeTab, trendingIds.size]);
 
-  // Search Debounce (UI表示用)
+  // Search Debounce — async API call for symbol/name search
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    const q = searchQuery.trim();
+    if (!q) {
+      setIsSearching(false);
+      setSearchResults([]);
+      return;
+    }
+
+    // CA queries are handled by the caFallback effect, not the search API
+    if (q.length >= 32 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(q)) {
       setIsSearching(false);
       return;
     }
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    setIsSearching(true);
 
-    searchTimeoutRef.current = setTimeout(() => {
-      setIsSearching(false);
+    setIsSearching(true);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await JupiterService.searchTokens(q);
+        setSearchResults(results);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
     }, 300);
 
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
