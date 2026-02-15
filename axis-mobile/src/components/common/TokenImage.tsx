@@ -14,7 +14,7 @@ export const TokenImage = ({ src, alt, size = 24, style }: TokenImageProps) => {
   const [imgSrc, setImgSrc] = useState(src || FALLBACK_IMAGE);
   const [hasError, setHasError] = useState(false);
 
-  // エラーが発生した場合、またはソースがない場合のフォールバック表示
+  // Fallback display when an error occurs or no source is provided
   const handleError = () => {
     if (imgSrc !== FALLBACK_IMAGE) {
       setImgSrc(FALLBACK_IMAGE);

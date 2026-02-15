@@ -39,10 +39,10 @@ export interface PredictionToken {
   predictionMeta: PredictionMeta;
 }
 
-// アプリケーション全体で扱う統合トークン型
+// Unified token type used across the entire application
 export type AxisToken = StandardToken | PredictionToken;
 
-// Type Guard: 予測市場トークンかどうかを判定
+// Type guard: checks whether a token is a prediction market token
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function isPredictionToken(token: any): token is PredictionToken {
   return token && token.source === 'dflow' && 'predictionMeta' in token;
@@ -61,7 +61,7 @@ export interface UserProfile {
   rankTier: string;
   pnlPercent: number;
   referralCount?: number;
-  is_vip?: boolean; // ★ VIP/OG判定用 (VIP機能で利用)
+  is_vip?: boolean; // Used for VIP/OG status checks
 }
 
 
@@ -86,7 +86,7 @@ export interface TokenAllocation {
   mint?: string;
   weight: number;
   logoURI?: string;
-  token?: TokenInfo; // 将来的には AxisToken に統合予定
+  token?: TokenInfo; // Planned to be unified into AxisToken in the future
 }
 
 export interface Strategy {

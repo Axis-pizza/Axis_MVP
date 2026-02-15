@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Crown } from 'lucide-react-native';
 
@@ -8,8 +8,8 @@ interface OGBadgeProps {
 }
 
 export const OGBadge = ({ size = 'sm' }: OGBadgeProps) => {
-  
-  // サイズごとのスタイル定義
+
+  // Style definitions per size
   const getBadgeStyle = () => {
     switch (size) {
       case 'lg': return { paddingHorizontal: 12, paddingVertical: 6, gap: 8 };
@@ -36,8 +36,7 @@ export const OGBadge = ({ size = 'sm' }: OGBadgeProps) => {
 
   return (
     <LinearGradient
-      // Web版: from-yellow-600/20 to-amber-500/20
-      // React Nativeでは16進数+Alphaで近似
+      // Approximation of Web: from-yellow-600/20 to-amber-500/20 using hex+alpha
       colors={['rgba(202, 138, 4, 0.2)', 'rgba(245, 158, 11, 0.2)']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
@@ -53,13 +52,13 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 9999, // rounded-full
+    borderRadius: 9999,
     borderWidth: 1,
-    borderColor: 'rgba(234, 179, 8, 0.5)', // border-yellow-500/50
-    // shadow-[0_0_10px_rgba(234,179,8,0.2)] の再現はAndroid/iOSで異なるため簡易的に
+    borderColor: 'rgba(234, 179, 8, 0.5)',
+    // Shadow approximation of shadow-[0_0_10px_rgba(234,179,8,0.2)] differs on Android/iOS
   },
   text: {
-    color: '#EAB308', // text-yellow-500
+    color: '#EAB308',
     fontWeight: 'bold',
   },
 });

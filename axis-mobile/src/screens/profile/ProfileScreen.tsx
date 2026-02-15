@@ -8,12 +8,11 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight,
-  TrendingUp, Star, LayoutGrid, Award, Calendar
+  Star, LayoutGrid, Award,
 } from 'lucide-react-native';
 
 import { api } from '../../services/api';
 import { TokenImage } from '../../components/common/TokenImage';
-import { OGBadge } from '../../components/common/OGBadge';
 import { useWallet } from '../../context/WalletContext';
 
 
@@ -32,7 +31,7 @@ interface Strategy {
   createdAt: number;
 }
 
-// --- Colors (Web版と統一 - Metallic Gold Theme) ---
+// --- Colors (Consistent with Web - Metallic Gold Theme) ---
 const THEME = {
   bg: '#080503',
   cardBg: '#140E08',
@@ -85,7 +84,7 @@ export function ProfileScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
-  // Tab Change Animation
+  // Tab change animation
   useEffect(() => {
     fadeAnim.setValue(0);
     slideAnim.setValue(20);
@@ -95,7 +94,7 @@ export function ProfileScreen() {
     ]).start();
   }, [mainTab, subTab]);
 
-  // Initial Load
+  // Initial load
   useEffect(() => {
     if (connected && publicKey) {
       loadProfile();
@@ -168,7 +167,7 @@ export function ProfileScreen() {
     );
   }
 
-  // Header Component for FlatList
+  // Header component for FlatList
   const ListHeader = () => (
     <View>
       {/* Net Worth Card */}
@@ -283,7 +282,7 @@ export function ProfileScreen() {
     </View>
   );
 
-  // Strategy Item Render
+  // Strategy item render
   const renderStrategyItem = ({ item }: { item: Strategy }) => {
     const tvlUSD = (item.tvl || 0) * solPrice;
     const tokens = Array.isArray(item.tokens) ? item.tokens : [];
@@ -326,7 +325,7 @@ export function ProfileScreen() {
     );
   };
 
-  // Leaderboard Item Render
+  // Leaderboard item render
   const renderLeaderboardItem = ({ item, index }: { item: any, index: number }) => {
     const isMe = item.wallet_address === publicKey?.toBase58();
     let rankColor = THEME.textDim;
@@ -353,7 +352,7 @@ export function ProfileScreen() {
     );
   };
 
-  // Main Render
+  // Main render
   const activeData = mainTab === 'portfolio'
     ? (subTab === 'created' ? myStrategies : subTab === 'invested' ? investedStrategies : watchlist)
     : leaderboard;

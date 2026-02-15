@@ -30,7 +30,7 @@ export const api = {
   get: async (endpoint: string) => {
     const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
     
-    console.log(`Requesting: ${url}`); // デバッグ用ログ
+    console.log(`Requesting: ${url}`);
 
     const response = await fetch(url, {
       method: 'GET',
@@ -40,7 +40,7 @@ export const api = {
     });
 
     if (!response.ok) {
-      // エラーレスポンスの内容もログに出す
+      // Log error response body
       const text = await response.text();
       console.error(`API Error ${response.status}: ${text}`);
       throw new Error(`API Error: ${response.status}`);
@@ -248,13 +248,13 @@ export const api = {
           wallet_address: wallet,
           pnl_percent: pnl,
           total_invested_usd: invested,
-          strategy_id: strategyId // ★追加
+          strategy_id: strategyId
         }),
       });
     } catch {}
   },
   
-  // 投資済みリスト取得APIを新規追加
+  // Fetch invested strategies list
   async getInvestedStrategies(pubkey: string) {
     try {
       const res = await fetch(`${API_BASE}/users/${pubkey}/invested`);
@@ -350,9 +350,9 @@ export const api = {
   },
 
   /**
-   * サーバーへのデプロイリクエスト (Mint発行依頼)
-   * @param signature SOL送金のトランザクション署名
-   * @param metadata Strategyのメタデータ (name, ticker, tokens, tvl...)
+   * Send deployment request to the server (mint token issuance)
+   * @param signature Transaction signature from SOL transfer
+   * @param metadata Strategy metadata (name, ticker, tokens, tvl...)
    */
   async deploy(signature: string, metadata: any) {
     try {
@@ -362,8 +362,8 @@ export const api = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          signature, // バックエンドはこれを 'signedTransaction' or 'signature' として受け取る
-          metadata,  // 作成するETFの中身
+          signature,
+          metadata,
         }),
       });
 

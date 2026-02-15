@@ -24,7 +24,7 @@ const router = createBrowserRouter([
         element: <TermsPage />,
       },
       {
-        path: "/strategy/:id", // 追加: 詳細ページのルート
+        path: "/strategy/:id", // Strategy detail page route
         element: <StrategyDetailPage />,
       },
     ]

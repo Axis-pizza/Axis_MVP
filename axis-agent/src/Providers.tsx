@@ -15,8 +15,8 @@ export const Providers: FC<{ children: ReactNode }> = ({ children }) => {
     [network]
   );
 
-  // Phantomを明示的に追加（Wallet Standard非対応環境のフォールバック）
-  // WalletProvider が自動で重複排除するため、二重表示にはならない
+  // Explicitly add Phantom as a fallback for environments without Wallet Standard support.
+  // WalletProvider automatically deduplicates, so this won't cause duplicate entries.
   const wallets = useMemo(
     () => [new PhantomWalletAdapter()],
     []
