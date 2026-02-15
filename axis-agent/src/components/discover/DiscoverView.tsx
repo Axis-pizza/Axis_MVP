@@ -5,6 +5,7 @@ import {
   X,
   BookOpen,
   FileText,
+  Github,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SwipeDiscoverView } from './SwipeDiscoverView';
@@ -52,6 +53,7 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
   const menuLinks = [
     { label: 'Docs', icon: BookOpen, url: 'https://muse-7.gitbook.io/axis/product-docs/' },
     { label: 'X', icon: XLogo, url: 'https://x.com/axis_pizza' },
+    { label: 'GitHub', icon: Github, url: 'https://github.com/Axis-pizza/Axis_MVP' }, // 2. ここに追加
     { label: 'Terms', icon: FileText, url: '/terms', isInternal: true },
   ];
 
