@@ -121,7 +121,7 @@ export default function Home() {
 
         {/* STRATEGY DETAIL */}
         {view === 'STRATEGY_DETAIL' && selectedStrategy && (
-          <div className="fixed inset-0 z-50 bg-[#030303]">
+          <div className="fixed inset-0 z-[200] bg-[#030303]">
             <StrategyDetailView
               initialData={selectedStrategy}
               onBack={handleBackFromDetail}
