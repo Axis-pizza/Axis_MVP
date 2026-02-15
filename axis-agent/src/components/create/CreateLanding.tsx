@@ -43,24 +43,48 @@ export const CreateLanding = ({ onCreate, isLoading }: CreateLandingProps) => {
 
             {/* CTA Button */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-            >
-                <button
-                    onClick={onCreate}
-                    disabled={isLoading}
-                    className="group relative w-full max-w-xs mx-auto py-5 bg-white text-black rounded-2xl font-black text-xl shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] hover:scale-105 hover:shadow-[0_0_60px_-10px_rgba(255,255,255,0.5)] transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden disabled:opacity-70"
-                >
-                    <span className="relative z-10 flex items-center gap-2">
-                        {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : <>Create Your ETF <Plus strokeWidth={3} size={24} /></>}
-                    </span>
-                    
-                    {/* Hover Shine Effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full group-hover:animate-shine" />
-                </button>
-            </motion.div>
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.4 }}
+  className="flex justify-center"
+>
+  <button
+    onClick={onCreate}
+    disabled={isLoading}
+    className="group relative w-full max-w-xs transition-all duration-200 active:scale-95 disabled:opacity-70"
+  >
+    {/* 1. 最背面：周囲に広がる柔らかな光（グロー効果） */}
+    <div className="absolute -inset-1 bg-gradient-to-r from-orange-500/20 to-amber-300/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
+    {/* 2. ボタンの「厚み」と「接地面の影」 */}
+    <div className="absolute inset-0 translate-y-[6px] rounded-2xl bg-neutral-400 shadow-[0_10px_30px_rgba(0,0,0,0.5),0_4px_8px_rgba(0,0,0,0.3)] transition-transform duration-200 group-active:translate-y-[2px]" />
+
+    {/* 3. ボタンの「表面」 */}
+    <div className="relative flex items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-b from-white via-neutral-50 to-neutral-200 px-8 py-5 text-black transition-transform duration-200 group-hover:-translate-y-1 group-active:translate-y-[2px]">
+      
+      {/* 4. 内側のハイライト（ベベル：面取り効果） */}
+      <div className="absolute inset-0 rounded-2xl border-t-2 border-white/80 pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-[2px] bg-black/5 pointer-events-none" />
+
+      {/* テキストとアイコン */}
+      <span className="relative z-10 flex items-center gap-3 font-black text-xl tracking-tight text-neutral-800">
+        {isLoading ? (
+          <Loader2 className="w-6 h-6 animate-spin" />
+        ) : (
+          <>
+            Create Your ETF
+            <div className="flex items-center justify-center w-7 h-7 bg-neutral-900 rounded-full text-white shadow-[0_2px_4px_rgba(0,0,0,0.3)]">
+              <Plus strokeWidth={4} size={18} />
+            </div>
+          </>
+        )}
+      </span>
+
+      {/* 5. 表面を走る高級感のある光沢（アニメーション） */}
+      <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/60 to-transparent -translate-x-full group-hover:animate-[shine_1.2s_ease-in-out_infinite]" />
+    </div>
+  </button>
+</motion.div>
         </div>
     </div>
   );

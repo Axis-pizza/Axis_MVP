@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, ShieldCheck, Wallet, ArrowRight, Info, X, Loader2 } from 'lucide-react';
+import { FileText, ShieldCheck, Wallet, Loader2 } from 'lucide-react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { Transaction } from '@solana/web3.js';
 import { useWallet } from '../../hooks/useWallet';
@@ -27,7 +27,6 @@ interface DeploymentBlueprintProps {
 }
 
 export const DeploymentBlueprint = ({ 
-  // ★ デフォルト値を徹底的に設定してクラッシュを防ぐ
   strategyName = 'Untitled Strategy', 
   strategyType = 'BALANCED',
   tokens = [], 
@@ -39,8 +38,11 @@ export const DeploymentBlueprint = ({
   onComplete,
   onDeploySuccess 
 }: DeploymentBlueprintProps) => {
+  // tokensチェックは残しつつ、空の早期リターンはしないように修正（propsでデフォルト値を入れているため）
   if (!tokens) {
+     // logging or handling if needed
   }
+  
   const { connection } = useConnection();
   const wallet = useWallet();
   const { showToast } = useToast();
@@ -50,9 +52,7 @@ export const DeploymentBlueprint = ({
   const [depositAsset, setDepositAsset] = useState<'SOL' | 'USDC'>('USDC');
   const [isDeploying, setIsDeploying] = useState(false);
 
-  // 安全な表示用変数の作成
   const safeSymbol = info?.symbol || 'ETF';
-  const safeSymbolChar = safeSymbol[0] || 'E';
   const safeTokens = Array.isArray(tokens) ? tokens : [];
 
   const handleInitialDeployClick = () => {
@@ -121,7 +121,6 @@ export const DeploymentBlueprint = ({
         setIsDepositModalOpen(false);
         setIsDeploying(false);
 
-        // ナビゲーションは最後に（state更新完了後）
         if (onDeploySuccess) {
             onDeploySuccess(result.mintAddress || result.strategyId, amountUsdc, depositAsset);
         } else {
@@ -142,7 +141,11 @@ export const DeploymentBlueprint = ({
         <p className="text-[#B89860]">Review your ETF specifications.</p>
       </div>
 
-      <div className="bg-gradient-to-b from-[#F2E0C8] to-[#D4A261] text-[#080503] rounded-sm p-8 shadow-2xl relative overflow-hidden mb-8 font-serif">
+      {/* 変更点: 背景色を白一色に変更 
+          bg-gradient-to-b ... -> bg-white 
+          テキストカラーは黒系統のまま維持
+      */}
+      <div className="bg-white text-[#080503] rounded-sm p-8 shadow-2xl relative overflow-hidden mb-8 font-serif border border-white/10">
         <div className="relative border-b-2 border-[#080503] pb-6 mb-6 flex justify-between items-start">
           <div className="flex items-center gap-4">
              <div className="w-16 h-16 border-2 border-[#080503] flex items-center justify-center bg-white overflow-hidden">
@@ -155,7 +158,7 @@ export const DeploymentBlueprint = ({
              <div>
                <h1 className="text-3xl font-bold uppercase tracking-wide">{strategyName}</h1>
                <div className="flex items-center gap-2 mt-1">
-                 <span className="px-2 py-0.5 border border-[#080503] text-xs font-bold bg-[#080503] text-[#F2E0C8]">{safeSymbol}</span>
+                 <span className="px-2 py-0.5 border border-[#080503] text-xs font-bold bg-[#080503] text-white">{safeSymbol}</span>
                  <span className="text-sm font-mono text-[#080503]/70">TYPE: {strategyType}</span>
                </div>
              </div>
@@ -196,10 +199,10 @@ export const DeploymentBlueprint = ({
       </div>
 
       <div className="flex gap-4 pb-20">
-        <button onClick={onBack} disabled={isDeploying} className="px-8 py-4 bg-[#140E08] rounded-xl font-bold text-[#7A5A30] hover:text-[#F2E0C8]">
+        <button onClick={onBack} disabled={isDeploying} className="px-8 py-4 bg-[#140E08] rounded-xl font-bold text-[#7A5A30] hover:text-[#F2E0C8] border border-[#7A5A30]/30">
           Modify
         </button>
-        <button onClick={handleInitialDeployClick} disabled={isDeploying} className="flex-1 py-4 bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] text-[#080503] font-bold rounded-xl flex items-center justify-center gap-2">
+        <button onClick={handleInitialDeployClick} disabled={isDeploying} className="flex-1 py-4 bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] text-[#080503] font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-900/20">
           <Wallet className="w-5 h-5" /> Deposit & Mint
         </button>
       </div>
@@ -210,8 +213,11 @@ export const DeploymentBlueprint = ({
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsDepositModalOpen(false)} className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50" />
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[#140E08] border border-[rgba(184,134,63,0.15)] rounded-3xl p-6 z-50 shadow-2xl">
               <h3 className="text-xl font-bold text-[#F2E0C8] mb-4">Initial Liquidity</h3>
-              <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} className="w-full p-4 bg-[#080503] border border-[rgba(184,134,63,0.15)] rounded-xl text-xl font-bold text-[#F2E0C8] mb-6" />
-              <button onClick={handleConfirmDeploy} disabled={isDeploying} className="w-full py-4 bg-gradient-to-b from-[#F2E0C8] to-[#D4A261] text-[#080503] font-bold rounded-xl flex justify-center gap-2">
+              <div className="mb-6">
+                <label className="text-xs text-[#B89860] mb-1 block">Deposit Amount (USDC)</label>
+                <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} className="w-full p-4 bg-[#080503] border border-[rgba(184,134,63,0.15)] rounded-xl text-xl font-bold text-[#F2E0C8] focus:border-[#B8863F] outline-none transition-colors" />
+              </div>
+              <button onClick={handleConfirmDeploy} disabled={isDeploying} className="w-full py-4 bg-gradient-to-b from-[#F2E0C8] to-[#D4A261] text-[#080503] font-bold rounded-xl flex justify-center gap-2 hover:brightness-110 transition-all">
                 {isDeploying ? <Loader2 className="animate-spin" /> : "Confirm & Mint"}
               </button>
             </motion.div>

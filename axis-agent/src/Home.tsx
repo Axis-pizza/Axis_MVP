@@ -82,14 +82,6 @@ export default function Home() {
 
   return (
     <div className="bg-[#030303] min-h-screen text-white font-sans selection:bg-orange-500/30 relative overflow-x-hidden">
-      {/* Devnet Indicator */}
-      <div className="fixed top-3 left-3 z-[100]">
-        <div className="flex items-center gap-2 rounded-full border border-[#B8863F]/20 bg-[#0C0A09]/80 backdrop-blur-sm px-3 py-1.5">
-          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-          <span className="text-xs font-mono font-medium text-[#B89860]">Devnet</span>
-        </div>
-      </div>
-
       {/* Background Glows */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none overflow-hidden z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-900/10 blur-[120px] rounded-full" />

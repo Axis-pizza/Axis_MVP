@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, type PanInfo, type Variants, useDragControls } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { Search, ArrowLeft, ChevronRight, Check, Loader2, AlertCircle, Percent, X, Plus, ClipboardPaste } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -9,11 +9,19 @@ import { TabSelector } from './TabSelector';
 import type { JupiterToken } from '../../../services/jupiter';
 import type { BuilderProps } from './types';
 
-const drawerVariants: Variants = {
-  hidden: { y: "100%" },
-  visible: { y: "45%", transition: { type: "spring", damping: 25, stiffness: 200, mass: 0.8, delay: 0.2 } },
-  full: { y: "5%", transition: { type: "spring", damping: 25, stiffness: 200 } },
-  closed: { y: "calc(100% - 100px)", transition: { type: "spring", damping: 25, stiffness: 200 } },
+// 中央ポップアップ用のアニメーション
+const modalVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: { 
+    opacity: 1, 
+    scale: 1,
+    transition: { type: "spring", duration: 0.3, bounce: 0.2 } 
+  },
+  exit: { 
+    opacity: 0, 
+    scale: 0.95,
+    transition: { duration: 0.2 } 
+  }
 };
 
 export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) => {
@@ -28,11 +36,6 @@ export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) 
     hasSelection,
     isValidAllocation,
     sortedVisibleTokens,
-    displayTokens,
-    flyingToken,
-    flyingCoords,
-    activeTab,
-    setActiveTab,
     triggerAddAnimation,
     handleAnimationComplete,
     removeToken,
@@ -40,125 +43,138 @@ export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) 
     distributeEvenly,
     triggerHaptic,
     handleToIdentity,
-    tokenFilter,
-    setTokenFilter,
-    filterCounts,
+    activeTab,
+    setActiveTab,
+    flyingToken,
+    flyingCoords,
   } = dashboard;
 
   const { publicKey } = useWallet();
-  const dragControls = useDragControls();
-  const [drawerState, setDrawerState] = useState<'closed' | 'half' | 'full'>('half');
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
-  // Virtual scrolling
+  // Virtual scrolling for Token Selector
   const mobileScrollRef = useRef<HTMLDivElement>(null);
   const mobileVirtualizer = useVirtualizer({
     count: sortedVisibleTokens.length,
     getScrollElement: () => mobileScrollRef.current,
-    estimateSize: () => 64,
-    overscan: 8,
+    estimateSize: () => 68, 
+    overscan: 5,
   });
 
   const handleToIdentityMobile = useCallback(() => {
-    setDrawerState('closed');
+    setIsSelectorOpen(false);
     handleToIdentity();
   }, [handleToIdentity]);
 
   const handleTokenSelect = useCallback((token: JupiterToken) => {
-    // Record to search history
     preferences.addToSearchHistory({
       address: token.address,
       symbol: token.symbol,
       logoURI: token.logoURI,
     });
 
-    const el = document.querySelector(`[data-token="${token.address}"]`);
-    if (el) {
-      const rect = el.getBoundingClientRect();
-      triggerAddAnimation(token, rect);
-    } else {
-      dashboard.addTokenDirect(token);
-      triggerHaptic();
-    }
-  }, [triggerAddAnimation, dashboard, triggerHaptic, preferences]);
+    dashboard.addTokenDirect(token);
+    triggerHaptic();
+    
+    setIsSelectorOpen(false); 
+    setSearchQuery('');
+  }, [dashboard, triggerHaptic, preferences, setSearchQuery]);
 
-  // Esc key handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (searchQuery) setSearchQuery('');
-        else if (drawerState === 'full') setDrawerState('half');
+        else setIsSelectorOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchQuery, setSearchQuery, drawerState]);
+  }, [searchQuery, setSearchQuery]);
 
-  // Paste CA handler
   const handlePasteCA = useCallback(async () => {
     try {
       const text = await navigator.clipboard.readText();
       if (text && text.trim().length >= 32) {
         setSearchQuery(text.trim());
-        setDrawerState('full');
       }
     } catch { /* clipboard denied */ }
   }, [setSearchQuery]);
 
+  useEffect(() => {
+    if (portfolio.length === 0 && !isSelectorOpen) {
+      setIsSelectorOpen(true);
+    }
+  }, []);
+
   return (
-    <>
-      {/* Header */}
+    <div className="absolute inset-0 bg-[#030303] flex flex-col">
+      
+      {/* 1. Header (Fixed Top) */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="flex-none px-4 py-3 flex items-center justify-between z-30 bg-black border-b border-white/5 safe-area-top"
+        className="absolute top-0 left-0 right-0 z-30 bg-[#030303]/90 backdrop-blur-md border-b border-white/5 safe-area-top"
       >
-        <div className="flex items-center gap-3">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center active:bg-white/10 transition-colors"
+            >
+              <ArrowLeft size={20} className="text-white" />
+            </button>
+            
+          </div>
+          
           <button
-            onClick={onBack}
-            className="w-11 h-11 bg-white/5 rounded-full flex items-center justify-center active:bg-white/10 transition-colors"
+            onClick={() => setIsSelectorOpen(true)}
+            className="w-10 h-10 bg-[#B8863F]/10 rounded-full flex items-center justify-center text-[#B8863F] active:bg-[#B8863F]/20 transition-colors"
           >
-            <ArrowLeft size={20} />
+            <Plus size={20} />
           </button>
         </div>
       </motion.div>
 
-      {/* Main Builder Area */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 bg-[#050505] flex flex-col relative z-0 min-h-0">
-          {/* Stats Header */}
-          <div className="px-4 py-4 flex justify-between items-center border-b border-amber-900/10 bg-gradient-to-r from-[#050505] to-amber-950/10 z-10 sticky top-0">
+      {/* 2. Scrollable Content Area */}
+      {/* absolute inset-0 で画面全体を占有し、overflow-y-auto でここだけスクロールさせる */}
+      <div className="absolute inset-0 top-0 bottom-0 overflow-y-auto custom-scrollbar z-0">
+        
+        {/* Spacer for Fixed Header */}
+        <div className="h-[64px] safe-area-top" />
+
+        {/* Stats Header (Sticky) */}
+        <div className="sticky top-0 z-20 bg-[#030303]/95 border-b border-white/5 backdrop-blur-sm shadow-lg shadow-black/20 px-4 py-4 flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <div className={`relative w-20 h-20 rounded-2xl flex flex-col items-center justify-center overflow-hidden ${
+              <div className={`relative w-16 h-16 rounded-2xl flex flex-col items-center justify-center overflow-hidden border ${
                 totalWeight === 100
-                  ? 'bg-gradient-to-br from-emerald-900/50 to-emerald-950/80 ring-1 ring-emerald-700/30'
+                  ? 'bg-emerald-900/20 border-emerald-500/30'
                   : totalWeight > 100
-                    ? 'bg-gradient-to-br from-red-900/50 to-red-950/80 ring-1 ring-red-700/30'
-                    : 'bg-gradient-to-br from-amber-900/30 to-[#0a0a0a] ring-1 ring-amber-800/20'
+                    ? 'bg-red-900/20 border-red-500/30'
+                    : 'bg-amber-900/10 border-amber-500/20'
               }`}>
                 <span
-                  className={`text-3xl ${
+                  className={`text-2xl font-bold ${
                     totalWeight === 100 ? 'text-emerald-400' :
                     totalWeight > 100 ? 'text-red-400' : 'text-amber-500'
                   }`}
-                  style={{ fontFamily: '"Times New Roman", serif' }}
                 >
                   {totalWeight}
                 </span>
-                <span className="text-xs text-white/40 -mt-1">%</span>
+                <span className="text-[10px] text-white/40 -mt-1">%</span>
               </div>
 
               <div>
-                <div className="text-xs text-amber-700/70 font-medium uppercase tracking-wider">Total</div>
-                <div className="text-base mt-1">
+                <div className="text-[10px] text-white/40 font-bold uppercase tracking-wider">Allocation</div>
+                <div className="text-sm font-medium mt-0.5">
                   {totalWeight === 100 ? (
-                    <span className="text-emerald-400 flex items-center gap-1.5">
-                      <Check size={16} /> Complete
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <Check size={14} /> Ready
                     </span>
                   ) : totalWeight > 100 ? (
-                    <span className="text-red-400">+{totalWeight - 100}% over</span>
+                    <span className="text-red-400">Over limit</span>
                   ) : (
-                    <span className="text-white/50">{100 - totalWeight}% left</span>
+                    <span className="text-amber-500/80">{100 - totalWeight}% remaining</span>
                   )}
                 </div>
               </div>
@@ -168,33 +184,31 @@ export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) 
               {portfolio.length >= 2 && (
                 <button
                   onClick={distributeEvenly}
-                  className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl bg-amber-900/20 text-amber-600 active:bg-amber-900/30 transition-colors border border-amber-800/20"
+                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg bg-white/5 text-white/70 active:bg-white/10 transition-colors"
                 >
-                  <Percent size={14} />
+                  <Percent size={12} />
                   Equal
                 </button>
               )}
-              <div
-                className="text-sm text-amber-700/50"
-                style={{ fontFamily: '"Times New Roman", serif' }}
-              >
-                {portfolio.length} asset{portfolio.length !== 1 ? 's' : ''}
+              <div className="text-xs text-white/30 font-mono">
+                {portfolio.length} Asset{portfolio.length !== 1 ? 's' : ''}
               </div>
             </div>
-          </div>
+        </div>
 
-          {/* Portfolio List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar pb-48 overscroll-contain">
+        {/* Portfolio List */}
+        {/* pb-40 ensures last item's sliders are visible above FABs */}
+        <div className="p-4 space-y-3 pb-40">
             <AnimatePresence>
               {totalWeight > 100 && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="flex items-center gap-3 px-4 py-4 rounded-2xl bg-red-950/30 border border-red-900/30 text-red-400 text-sm"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium mb-2"
                 >
-                  <AlertCircle size={20} />
-                  <span>Total exceeds 100%</span>
+                  <AlertCircle size={16} />
+                  <span>Allocation exceeds 100%</span>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -211,267 +225,218 @@ export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) 
               ))}
             </AnimatePresence>
 
-            {portfolio.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="h-48 flex flex-col items-center justify-center gap-4"
-              >
-                <div className="w-20 h-20 rounded-3xl border-2 border-dashed border-amber-900/30 flex items-center justify-center bg-amber-950/10">
-                  <Plus size={32} className="text-amber-800/50" />
-                </div>
-                <span className="text-base text-amber-900/50">Select tokens from below</span>
-              </motion.div>
-            )}
-          </div>
+            {/* Empty State / Add Button */}
+            <motion.button
+              layout
+              onClick={() => setIsSelectorOpen(true)}
+              className="w-full py-6 rounded-3xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-2 text-white/30 active:bg-white/5 transition-colors bg-white/[0.02]"
+            >
+              <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center shadow-inner">
+                <Plus size={24} />
+              </div>
+              <span className="text-sm font-medium">Tap to add asset</span>
+            </motion.button>
         </div>
       </div>
 
-      {/* Token Selector Drawer */}
-      <motion.div
-        variants={drawerVariants}
-        initial="hidden"
-        animate={drawerState === 'closed' ? "closed" : drawerState === 'half' ? "visible" : "full"}
-        drag="y"
-        dragListener={false}
-        dragControls={dragControls}
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={0.05}
-        onDragEnd={(_: unknown, info: PanInfo) => {
-          const { offset, velocity } = info;
-          if (drawerState === 'half' && (offset.y > 100 || velocity.y > 500)) setDrawerState('closed');
-          else if (drawerState === 'half' && (offset.y < -100 || velocity.y < -500)) setDrawerState('full');
-          else if (drawerState === 'closed' && (offset.y < -50 || velocity.y < -500)) setDrawerState('half');
-          else if (drawerState === 'full' && (offset.y > 100 || velocity.y > 500)) setDrawerState('half');
-        }}
-        className="absolute top-0 bottom-0 left-0 right-0 bg-[#0a0a0a] rounded-t-[32px] shadow-[0_-10px_60px_rgba(180,83,9,0.15)] z-20 flex flex-col border-t border-amber-900/30"
-      >
-        {/* Drag Handle */}
-        <div
-          className="flex justify-center py-4 cursor-grab active:cursor-grabbing touch-none w-full"
-          onPointerDown={(e) => dragControls.start(e)}
-          onClick={() => setDrawerState(prev => prev === 'closed' ? 'half' : prev === 'half' ? 'full' : 'closed')}
+      {/* 3. FAB - Add Token (Fixed Bottom Right) */}
+      {!isSelectorOpen && (
+        <motion.div 
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="fixed bottom-6 right-6 z-40 safe-area-bottom"
         >
-          <div className={`w-14 h-1.5 rounded-full transition-colors ${
-            drawerState === 'closed'
-              ? 'bg-gradient-to-r from-amber-700 to-amber-600'
-              : 'bg-white/30'
-          }`} />
-        </div>
+          <button
+            onClick={() => setIsSelectorOpen(true)}
+            className="w-14 h-14 bg-[#B8863F] rounded-full shadow-lg shadow-amber-900/40 flex items-center justify-center text-black active:scale-95 transition-transform"
+          >
+            <Plus size={28} />
+          </button>
+        </motion.div>
+      )}
 
-        {/* Search */}
-        <div className="px-4 pb-2 shrink-0">
-          <div className="relative mb-3">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-amber-800/50" size={20} />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setDrawerState('full')}
-              placeholder="Search name, symbol, or address..."
-              className="w-full bg-amber-950/20 border border-amber-900/20 rounded-2xl pl-14 pr-28 py-4 text-base focus:border-amber-700/50 focus:bg-amber-950/30 outline-none transition-all placeholder:text-amber-900/40 text-white"
-            />
-            {/* Right side buttons */}
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {isSearching && <Loader2 className="text-amber-600 animate-spin" size={16} />}
-              {searchQuery ? (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="w-8 h-8 flex items-center justify-center rounded-full active:bg-white/10"
-                >
-                  <X size={16} className="text-white/40" />
-                </button>
-              ) : (
-                <button
-                  onClick={handlePasteCA}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-900/30 text-amber-500 text-xs font-bold active:bg-amber-900/50 transition-colors"
-                >
-                  <ClipboardPaste size={12} />
-                  Paste
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Search History Chips */}
-          {!searchQuery && preferences.searchHistory.length > 0 && (
-            <div className="mb-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] text-white/25 uppercase tracking-wider font-bold">Recent</span>
-                <button
-                  onClick={preferences.clearSearchHistory}
-                  className="text-[10px] text-amber-700/50 active:text-amber-500"
-                >
-                  Clear All
-                </button>
-              </div>
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-                {preferences.searchHistory.map(item => (
-                  <button
-                    key={item.address}
-                    onClick={() => setSearchQuery(item.symbol !== '?' ? item.symbol : item.address)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/5 shrink-0 active:bg-white/10 border border-white/5"
-                  >
-                    <TokenImage src={item.logoURI} className="w-4 h-4 rounded-full" />
-                    <span className="text-[11px] text-white/60 font-medium">{item.symbol}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <TabSelector
-             activeTab={activeTab}
-             setActiveTab={setActiveTab}
-             isWalletConnected={!!publicKey}
-          />
-
-          {/* Verified Only Toggle + Sub Filters */}
-          <div className="flex items-center justify-between mt-2">
-            {/* Sub Filters for All Tab */}
-            
-            {/* Verified Only Toggle */}
-            <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-2">
-              <span className="text-[10px] text-white/30 font-bold">Verified</span>
-              <div
-                className={`relative w-8 h-[18px] rounded-full transition-colors ${
-                  preferences.verifiedOnly ? 'bg-amber-600' : 'bg-white/10'
-                }`}
-                onClick={() => preferences.setVerifiedOnly(!preferences.verifiedOnly)}
-              >
-                <motion.div
-                  className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm"
-                  animate={{ left: preferences.verifiedOnly ? 15 : 2 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                />
-              </div>
-            </label>
-          </div>
-        </div>
-
-        {/* Token List */}
-        <div
-          ref={mobileScrollRef}
-          className="flex-1 overflow-y-auto px-3 pb-8 custom-scrollbar overscroll-contain"
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {/* Favorites Bar */}
-          {!searchQuery && preferences.favorites.size > 0 && (
-            <div className="px-1 py-2 mb-1 border-b border-white/5">
-              <span className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block">Favorites</span>
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
-                {dashboard.allTokens.filter(t => preferences.favorites.has(t.address)).map(token => (
-                  <button
-                    key={token.address}
-                    onClick={() => handleTokenSelect(token)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0 border transition-colors ${
-                      selectedIds.has(token.address)
-                        ? 'bg-amber-900/30 border-amber-800/30 opacity-50'
-                        : 'bg-white/[0.03] border-white/5 active:bg-white/10'
-                    }`}
-                  >
-                    <TokenImage src={token.logoURI} className="w-5 h-5 rounded-full" />
-                    <span className="text-[11px] text-amber-400 font-bold">{token.symbol}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Column Headers */}
-          {!isLoading && sortedVisibleTokens.length > 0 && (
-            <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-white/20 uppercase tracking-wider">
-              <div className="w-5" />
-              <div className="w-10" />
-              <div className="flex-1">Token</div>
-              <div className="w-[52px] text-right">MC</div>
-              <div className="w-[52px] text-right">VOL</div>
-              <div className="w-8" />
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-40 gap-4">
-              <Loader2 className="w-10 h-10 text-amber-600 animate-spin" />
-              <span className="text-base text-amber-800/50">Loading tokens...</span>
-            </div>
-          ) : sortedVisibleTokens.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 gap-3 text-amber-800/30">
-              <Search size={40} strokeWidth={1.5} />
-              <span className="text-base">No tokens found</span>
-            </div>
-          ) : (
-            <div
-              style={{
-                height: `${mobileVirtualizer.getTotalSize()}px`,
-                width: '100%',
-                position: 'relative',
-              }}
+      {/* 4. Next Step FAB (Fixed Bottom) */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 pb-[calc(env(safe-area-inset-bottom)+16px)] z-30 pointer-events-none">
+        <AnimatePresence>
+          {isValidAllocation && !isSelectorOpen && (
+            <motion.button
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              onClick={handleToIdentityMobile}
+              className="w-full h-14 bg-gradient-to-r from-amber-600 to-amber-700 text-black font-bold text-lg rounded-full shadow-xl shadow-black/50 flex items-center justify-center gap-2 pointer-events-auto active:scale-[0.98] transition-transform"
             >
-              {mobileVirtualizer.getVirtualItems().map((virtualRow) => {
-                const token = sortedVisibleTokens[virtualRow.index];
-                const isSelected = selectedIds.has(token.address);
-                return (
-                  <div
-                    key={token.address}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: `${virtualRow.size}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                  >
-                    <MobileTokenListItem
-                      token={token}
-                      isSelected={isSelected}
-                      hasSelection={hasSelection}
-                      onSelect={() => handleTokenSelect(token)}
-                      isFavorite={preferences.isFavorite(token.address)}
-                      onToggleFavorite={() => preferences.toggleFavorite(token.address)}
+              Next Step <ChevronRight size={20} />
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* 5. Centered Token Selector Modal */}
+      <AnimatePresence>
+        {isSelectorOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSelectorOpen(false)}
+              className="fixed inset-0 bg-black/80 z-50 backdrop-blur-sm"
+            />
+
+            {/* Modal Container (Center Alignment) */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 pointer-events-none safe-area-bottom safe-area-top">
+                <motion.div
+                  variants={modalVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  className="w-full max-w-sm bg-[#121212] border border-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden max-h-[70vh] pointer-events-auto relative"
+                >
+                  {/* Modal Header */}
+                  <div className="shrink-0 bg-[#121212] border-b border-white/5 p-4 pb-3">
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
+                            <input
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search name or address"
+                            className="w-full bg-white/5 border border-white/5 rounded-xl pl-10 pr-10 py-3 text-base text-white placeholder:text-white/30 focus:border-[#B8863F]/50 focus:bg-white/10 outline-none transition-all"
+                            autoFocus
+                            />
+                            {searchQuery ? (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full bg-white/10 text-white/50"
+                            >
+                                <X size={14} />
+                            </button>
+                            ) : (
+                            <button
+                                onClick={handlePasteCA}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-white/5 text-white/40 active:text-white"
+                            >
+                                <ClipboardPaste size={14} />
+                            </button>
+                            )}
+                        </div>
+                        
+                        <button 
+                            onClick={() => setIsSelectorOpen(false)}
+                            className="p-3 rounded-full bg-white/5 text-white/70 active:bg-white/10 transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <TabSelector
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        isWalletConnected={!!publicKey}
                     />
                   </div>
-                );
-              })}
+
+                  {/* Token List */}
+                  <div
+                    ref={mobileScrollRef}
+                    className="flex-1 overflow-y-auto bg-[#121212] custom-scrollbar"
+                  >
+                    {!searchQuery && preferences.favorites.size > 0 && (
+                      <div className="px-4 py-3 border-b border-white/5">
+                        <span className="text-[10px] text-white/30 uppercase tracking-wider font-bold mb-2 block">Starred</span>
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                          {dashboard.allTokens.filter(t => preferences.favorites.has(t.address)).map(token => (
+                            <button
+                              key={token.address}
+                              onClick={() => handleTokenSelect(token)}
+                              className="flex flex-col items-center gap-1.5 min-w-[64px]"
+                            >
+                              <div className="relative">
+                                <TokenImage src={token.logoURI} className="w-12 h-12 rounded-full bg-white/10 border border-white/5" />
+                                {selectedIds.has(token.address) && (
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center ring-2 ring-[#121212]">
+                                    <Check size={10} className="text-white" />
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-xs text-white/70 font-medium truncate w-full text-center">{token.symbol}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {isLoading ? (
+                      <div className="flex flex-col items-center justify-center h-48 gap-3">
+                        <Loader2 className="w-8 h-8 text-[#B8863F] animate-spin" />
+                        <span className="text-sm text-white/30">Loading tokens...</span>
+                      </div>
+                    ) : sortedVisibleTokens.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-48 gap-3 text-white/20">
+                        <Search size={32} />
+                        <span className="text-sm">No tokens found</span>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          height: `${mobileVirtualizer.getTotalSize()}px`,
+                          width: '100%',
+                          position: 'relative',
+                        }}
+                      >
+                        {mobileVirtualizer.getVirtualItems().map((virtualRow) => {
+                          const token = sortedVisibleTokens[virtualRow.index];
+                          const isSelected = selectedIds.has(token.address);
+                          return (
+                            <div
+                              key={token.address}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: `${virtualRow.size}px`,
+                                transform: `translateY(${virtualRow.start}px)`,
+                              }}
+                            >
+                              <div className="px-2 py-1">
+                                <MobileTokenListItem
+                                  token={token}
+                                  isSelected={isSelected}
+                                  hasSelection={hasSelection}
+                                  onSelect={() => handleTokenSelect(token)}
+                                  isFavorite={preferences.isFavorite(token.address)}
+                                  onToggleFavorite={() => preferences.toggleFavorite(token.address)}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
             </div>
-          )}
-        </div>
-      </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Flying Particle */}
       <AnimatePresence>
         {flyingToken && (
           <motion.div
             initial={{ position: 'fixed', left: flyingCoords?.x, top: flyingCoords?.y, x: "-50%", y: "-50%", scale: 1, opacity: 1 }}
-            animate={{ left: "50%", top: "20%", scale: 0.3, opacity: 0 }}
-            transition={{ duration: 0.4, ease: "backIn" }}
+            animate={{ left: "50%", top: "15%", scale: 0.2, opacity: 0 }}
+            transition={{ duration: 0.5, ease: "circOut" }}
             onAnimationComplete={handleAnimationComplete}
-            className="z-50 pointer-events-none"
+            className="z-[100] pointer-events-none"
           >
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-900 to-amber-950 border-2 border-amber-700 flex items-center justify-center overflow-hidden shadow-xl shadow-amber-900/50">
-              <TokenImage src={flyingToken.logoURI} className="w-full h-full object-cover" />
-            </div>
+            <TokenImage src={flyingToken.logoURI} className="w-12 h-12 rounded-full shadow-xl shadow-[#B8863F]/50 ring-2 ring-[#B8863F]" />
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* FAB */}
-      <div className="absolute bottom-0 left-0 right-0 p-5 pb-8 z-50 pointer-events-none safe-area-bottom">
-        <AnimatePresence>
-          {isValidAllocation && (
-            <motion.button
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
-              onClick={handleToIdentityMobile}
-              className="w-full py-5 bg-gradient-to-r from-amber-700 via-amber-600 to-amber-700 text-black font-bold text-lg rounded-2xl shadow-xl shadow-amber-900/40 flex items-center justify-center gap-3 pointer-events-auto active:scale-[0.98] transition-transform"
-            >
-              Next <ChevronRight size={22} />
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
-    </>
+    </div>
   );
 };

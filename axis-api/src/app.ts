@@ -10,6 +10,7 @@ import miscRoutes from './routes/misc';
 import kagemushaRoutes from './routes/kagemusha';
 import uploadRoutes from './routes/upload';
 import shareRoutes from './routes/share';
+import { runPriceSnapshot } from './services/snapshot';
 
 // @ts-ignore
 import { EmailMessage } from "cloudflare:email";
@@ -170,92 +171,7 @@ async function sendBugReportEmail(
 }
 
 
-// --- Helper 1: 全戦略の価格を保存するロジック (既存のまま) ---
-async function snapshotAllStrategies(env: Bindings) {
-  try {
-    const now = Math.floor(Date.now() / 1000);
-
-    // 1. 全戦略を取得
-    const { results: strategies } = await env.axis_db.prepare(
-      "SELECT id, config FROM strategies"
-    ).all();
-
-    if (!strategies || strategies.length === 0) {
-      return;
-    }
-
-    // 2. 全トークンのシンボルを抽出
-    const allSymbols = new Set<string>();
-    strategies.forEach((s: any) => {
-      try {
-        const tokens = JSON.parse(s.config);
-        tokens.forEach((t: any) => allSymbols.add(t.symbol.toUpperCase()));
-      } catch (e) { /* ignore */ }
-    });
-
-    // 3. CoinGecko IDマッピング (主要通貨)
-    const symbolToId: Record<string, string> = {
-      'SOL': 'solana', 'USDC': 'usd-coin', 'BONK': 'bonk', 
-      'JUP': 'jupiter-exchange-solana', 'JTO': 'jito-governance-token',
-      'RENDER': 'render-token', 'WIF': 'dogwifcoin', 'RAY': 'raydium'
-    };
-    
-    // IDリスト作成
-    const ids = Array.from(allSymbols)
-      .map(sym => symbolToId[sym] || 'solana')
-      .join(',');
-
-    // 4. CoinGeckoから一括価格取得
-    const res = await fetch(
-      `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}`,
-      { headers: { 'User-Agent': 'Axis-Indexer/1.0' } }
-    );
-    
-    let priceMap: Record<string, number> = {};
-    if (res.ok) {
-      const pricesData: any[] = await res.json();
-      pricesData.forEach(p => {
-        const sym = Object.keys(symbolToId).find(key => symbolToId[key] === p.id) || p.symbol.toUpperCase();
-        priceMap[sym] = p.current_price;
-      });
-    } else {
-      console.warn("Snapshot: Price fetch failed, using fallback.");
-    }
-    
-    priceMap['SOL'] = priceMap['SOL'] || 145;
-    priceMap['USDC'] = priceMap['USDC'] || 1;
-
-    // 5. 各戦略のNAV計算 & 保存
-    const statements = [];
-    for (const strat of strategies) {
-      try {
-        const tokens = JSON.parse(strat.config as string);
-        let currentNav = 0;
-        tokens.forEach((t: any) => {
-          const p = priceMap[t.symbol.toUpperCase()] || 0;
-          currentNav += p * (t.weight / 100);
-        });
-        if (currentNav === 0) currentNav = 100;
-        statements.push(
-          env.axis_db.prepare(
-            "INSERT INTO strategy_snapshots (strategy_id, nav, timestamp) VALUES (?, ?, ?)"
-          ).bind(strat.id, currentNav, now)
-        );
-      } catch (e) {
-        console.error(`Failed to calc strat ${strat.id}`, e);
-      }
-    }
-
-    if (statements.length > 0) {
-      await env.axis_db.batch(statements);
-    }
-
-  } catch (e) {
-    console.error("Cron Job Failed:", e);
-  }
-}
-
-// --- ★Helper 2: Holding XP 配布ロジック (新規追加) ---
+// --- Holding XP 配布ロジック ---
 async function distributeHoldingXP(env: Bindings) {
   try {
     const db = env.axis_db;
@@ -329,14 +245,31 @@ async function distributeHoldingXP(env: Bindings) {
 }
 
 export default {
-  
+
   fetch: app.fetch,
 
   // Cron Job (定期実行) のハンドラー
+  // */5 * * * * → 価格スナップショット (5分ごと)
+  // 0 * * * *   → XP配布 (毎時)
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
-    ctx.waitUntil(Promise.all([
-      snapshotAllStrategies(env), // 価格保存
-      distributeHoldingXP(env)    // XP配布
-    ]));
+    const tasks: Promise<void>[] = [];
+
+    // 価格スナップショット: 5分おき (*/5) または毎時 (0) どちらでも実行
+    tasks.push(
+      runPriceSnapshot(env.axis_db).catch(e =>
+        console.error('[Cron] Price snapshot failed:', e)
+      )
+    );
+
+    // XP配布: 毎時0分のみ
+    if (event.cron === '0 * * * *') {
+      tasks.push(
+        distributeHoldingXP(env).catch(e =>
+          console.error('[Cron] XP distribution failed:', e)
+        )
+      );
+    }
+
+    ctx.waitUntil(Promise.all(tasks));
   }
 };

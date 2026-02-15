@@ -21,7 +21,8 @@
       "Bash(grep:*)",
       "Bash(node -e \"\nconst bs58 = require\\(''bs58''\\);\nconst { Keypair } = require\\(''@solana/web3.js''\\);\nconst { getAssociatedTokenAddressSync } = require\\(''@solana/spl-token''\\);\nconst { PublicKey } = require\\(''@solana/web3.js''\\);\n\nconst sk = bs58.decode\\(''rmmvngJbxqJQQofGahoY7GcM8yH1j8VcPyvCtRX3od111cpEuRdX4hDsYjagCkys7UWDp5NEdZydQXcFXGGh38H''\\);\nconst kp = Keypair.fromSecretKey\\(sk\\);\nconsole.log\\(''Admin PubKey:'', kp.publicKey.toBase58\\(\\)\\);\n\nconst USDC_MINT = new PublicKey\\(''Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr''\\);\nconst ata = getAssociatedTokenAddressSync\\(USDC_MINT, kp.publicKey\\);\nconsole.log\\(''Admin USDC ATA:'', ata.toBase58\\(\\)\\);\n\nconsole.log\\(''Constants SERVER_WALLET_PUBKEY:'', ''BTcWoRe6Z9VaCPCxrcr5dQmn8cA8KNHpFdgJEVopSBsj''\\);\nconsole.log\\(''Match:'', kp.publicKey.toBase58\\(\\) === ''BTcWoRe6Z9VaCPCxrcr5dQmn8cA8KNHpFdgJEVopSBsj''\\);\n\")",
       "Bash(node -e:*)",
-      "Bash(node test-sim.mjs:*)"
+      "Bash(node test-sim.mjs:*)",
+      "Bash(find:*)"
     ]
   }
 }
