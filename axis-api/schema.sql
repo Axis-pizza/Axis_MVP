@@ -32,6 +32,7 @@ CREATE TABLE users (
   total_xp INTEGER DEFAULT 500,
   rank_tier TEXT DEFAULT 'Novice',
   last_checkin INTEGER DEFAULT 0,
+  last_faucet_at INTEGER DEFAULT 0,
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
 

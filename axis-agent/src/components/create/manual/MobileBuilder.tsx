@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, type PanInfo, type Variants, useDragControls } from 'framer-motion';
 import { Search, ArrowLeft, ChevronRight, Check, Loader2, AlertCircle, Percent, X, Plus, ClipboardPaste } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { TokenImage } from '../../common/TokenImage';
 import { MobileAssetCard, MobileTokenListItem } from './MobileComponents';
 import { TabSelector } from './TabSelector';
@@ -47,6 +48,15 @@ export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) 
   const { publicKey } = useWallet();
   const dragControls = useDragControls();
   const [drawerState, setDrawerState] = useState<'closed' | 'half' | 'full'>('half');
+
+  // Virtual scrolling
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
+  const mobileVirtualizer = useVirtualizer({
+    count: sortedVisibleTokens.length,
+    getScrollElement: () => mobileScrollRef.current,
+    estimateSize: () => 64,
+    overscan: 8,
+  });
 
   const handleToIdentityMobile = useCallback(() => {
     setDrawerState('closed');
@@ -341,6 +351,7 @@ export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) 
 
         {/* Token List */}
         <div
+          ref={mobileScrollRef}
           className="flex-1 overflow-y-auto px-3 pb-8 custom-scrollbar overscroll-contain"
           onPointerDown={(e) => e.stopPropagation()}
         >
@@ -390,19 +401,37 @@ export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) 
               <span className="text-base">No tokens found</span>
             </div>
           ) : (
-            <div className="space-y-0.5">
-              {sortedVisibleTokens.map((token, index) => {
+            <div
+              style={{
+                height: `${mobileVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {mobileVirtualizer.getVirtualItems().map((virtualRow) => {
+                const token = sortedVisibleTokens[virtualRow.index];
                 const isSelected = selectedIds.has(token.address);
                 return (
-                  <MobileTokenListItem
-                    key={`${token.address}-${index}`}
-                    token={token}
-                    isSelected={isSelected}
-                    hasSelection={hasSelection}
-                    onSelect={() => handleTokenSelect(token)}
-                    isFavorite={preferences.isFavorite(token.address)}
-                    onToggleFavorite={() => preferences.toggleFavorite(token.address)}
-                  />
+                  <div
+                    key={token.address}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <MobileTokenListItem
+                      token={token}
+                      isSelected={isSelected}
+                      hasSelection={hasSelection}
+                      onSelect={() => handleTokenSelect(token)}
+                      isFavorite={preferences.isFavorite(token.address)}
+                      onToggleFavorite={() => preferences.toggleFavorite(token.address)}
+                    />
+                  </div>
                 );
               })}
             </div>

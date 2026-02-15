@@ -18,6 +18,7 @@ export interface User {
   total_xp?: number;
   rank_tier?: string;
   last_checkin?: number;
+  last_faucet_at?: number;
   pnl_percent?: number;
   total_invested_usd?: number;
   last_snapshot_at?: number;
@@ -38,6 +39,24 @@ export async function findUserByEmail(db: D1Database, email: string): Promise<Us
 export async function findUserByWallet(db: D1Database, wallet: string): Promise<User | null> {
     const user = await db.prepare("SELECT * FROM users WHERE wallet_address = ?").bind(wallet ?? null).first();
     return user as User | null;
+}
+
+// --- Twitter Functions ---
+
+export async function linkTwitterToUser(
+  db: D1Database, wallet: string, twitterId: string, avatarUrl: string
+): Promise<void> {
+  await db.prepare(
+    "UPDATE users SET twitter_id = ?, avatar_url = ? WHERE wallet_address = ?"
+  ).bind(twitterId, avatarUrl, wallet).run();
+}
+
+export async function createTwitterUser(
+  db: D1Database, id: string, twitterId: string, name: string, avatarUrl: string, inviteCode: string
+): Promise<void> {
+  await db.prepare(
+    'INSERT INTO users (id, twitter_id, name, avatar_url, invite_code, total_xp, rank_tier, last_checkin) VALUES (?, ?, ?, ?, ?, 500, "Novice", 0)'
+  ).bind(id, twitterId, name, avatarUrl, inviteCode).run();
 }
 
 // --- Create Functions ---
