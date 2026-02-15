@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, Image, ActivityIndicator } from 'react-native';
 import { Search, Plus, Minus, Check } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { JupiterService, type JupiterToken } from '../../services/jupiter';
 import { colors } from '../../config/theme';
@@ -84,7 +85,6 @@ export function ManualBuilder({ onComplete }: Props) {
       logoURI: token.logoURI,
     };
     const updated = [...portfolio, newToken];
-    // Auto-distribute evenly
     const even = Math.floor(100 / updated.length);
     const distributed = updated.map((t, i) => ({
       ...t,
@@ -130,16 +130,16 @@ export function ManualBuilder({ onComplete }: Props) {
           <View className="w-8 h-8 rounded-full" style={{ backgroundColor: colors.surfaceLight }} />
         )}
         <View className="flex-1 ml-3">
-          <Text className="text-white font-medium text-sm">{item.symbol}</Text>
-          <Text className="text-stone-600 text-xs" numberOfLines={1}>{item.name}</Text>
+          <Text className="font-medium text-sm" style={{ color: colors.text }}>{item.symbol}</Text>
+          <Text className="text-xs" numberOfLines={1} style={{ color: colors.textMuted }}>{item.name}</Text>
         </View>
         <View className="w-8 h-8 rounded-full items-center justify-center" style={{
           backgroundColor: inPortfolio ? colors.accent : colors.surfaceLight,
         }}>
           {inPortfolio ? (
-            <Check size={16} color="white" />
+            <Check size={16} color="#000" />
           ) : (
-            <Plus size={16} color={colors.textDim} />
+            <Plus size={16} color={colors.textMuted} />
           )}
         </View>
       </Pressable>
@@ -158,9 +158,9 @@ export function ManualBuilder({ onComplete }: Props) {
     <View className="flex-1">
       {/* Portfolio preview */}
       {portfolio.length > 0 && (
-        <View className="mx-4 mb-3 p-3 rounded-xl" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderLight }}>
+        <View className="mx-4 mb-3 p-3 rounded-xl" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
           <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-stone-400 text-xs">{portfolio.length} tokens selected</Text>
+            <Text className="text-xs" style={{ color: colors.textSecondary }}>{portfolio.length} tokens selected</Text>
             <Text style={{ color: totalWeight === 100 ? colors.positive : colors.negative, fontSize: 12, fontWeight: '600' }}>
               {totalWeight}%
             </Text>
@@ -173,30 +173,33 @@ export function ManualBuilder({ onComplete }: Props) {
               ) : (
                 <View className="w-5 h-5 rounded-full" style={{ backgroundColor: colors.surfaceLight }} />
               )}
-              <Text className="text-white text-xs ml-2 flex-1">{token.symbol}</Text>
+              <Text className="text-xs ml-2 flex-1" style={{ color: colors.text }}>{token.symbol}</Text>
 
               <View className="flex-row items-center gap-2">
                 <Pressable onPress={() => updateWeight(token.address, token.weight - 5)}>
-                  <Minus size={14} color={colors.textDim} />
+                  <Minus size={14} color={colors.textMuted} />
                 </Pressable>
-                <Text className="text-white text-xs w-8 text-center">{token.weight}%</Text>
+                <Text className="text-xs w-8 text-center" style={{ color: colors.text }}>{token.weight}%</Text>
                 <Pressable onPress={() => updateWeight(token.address, token.weight + 5)}>
-                  <Plus size={14} color={colors.textDim} />
+                  <Plus size={14} color={colors.textMuted} />
                 </Pressable>
                 <Pressable onPress={() => removeToken(token.address)} className="ml-1">
-                  <Text className="text-stone-600 text-xs">x</Text>
+                  <Text className="text-xs" style={{ color: colors.textMuted }}>x</Text>
                 </Pressable>
               </View>
             </View>
           ))}
 
           {isValid && (
-            <Pressable
-              onPress={() => onComplete(portfolio)}
-              className="mt-3 py-3 rounded-xl items-center"
-              style={{ backgroundColor: colors.accent }}
-            >
-              <Text className="text-white font-bold">Next</Text>
+            <Pressable onPress={() => onComplete(portfolio)} className="mt-3 rounded-xl overflow-hidden">
+              <LinearGradient
+                colors={['#6B4420', '#B8863F', '#E8C890']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ paddingVertical: 12, borderRadius: 12, alignItems: 'center' }}
+              >
+                <Text className="font-bold" style={{ color: '#000' }}>Next</Text>
+              </LinearGradient>
             </Pressable>
           )}
         </View>
@@ -204,14 +207,15 @@ export function ManualBuilder({ onComplete }: Props) {
 
       {/* Search */}
       <View className="mx-4 mb-2">
-        <View className="flex-row items-center px-3 py-2 rounded-xl" style={{ backgroundColor: colors.surface }}>
-          <Search size={16} color={colors.textDim} />
+        <View className="flex-row items-center px-3 py-2 rounded-xl" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+          <Search size={16} color={colors.textMuted} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search tokens..."
-            placeholderTextColor={colors.textDim}
-            className="flex-1 ml-2 text-white text-sm"
+            placeholderTextColor={colors.textMuted}
+            className="flex-1 ml-2 text-sm"
+            style={{ color: colors.text }}
           />
         </View>
       </View>
@@ -226,7 +230,7 @@ export function ManualBuilder({ onComplete }: Props) {
             style={{
               backgroundColor: activeTab === tab ? `${colors.accent}20` : 'transparent',
               borderWidth: 1,
-              borderColor: activeTab === tab ? colors.accent : colors.borderLight,
+              borderColor: activeTab === tab ? colors.accent : colors.border,
             }}
           >
             <Text style={{ color: activeTab === tab ? colors.accent : colors.textMuted, fontSize: 12 }}>

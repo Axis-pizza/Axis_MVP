@@ -1,7 +1,7 @@
 import { Connection, PublicKey, TransactionInstruction } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
-  createAssociatedTokenAccountInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
   createTransferInstruction,
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
@@ -21,20 +21,18 @@ export async function getUsdcBalance(connection: Connection, publicKey: PublicKe
 }
 
 /**
- * Get or create the USDC Associated Token Account for an owner.
- * Returns { ata, instruction? } — instruction is set only if the ATA needs to be created.
+ * Get the USDC ATA address and an idempotent create instruction.
+ * The instruction is safe to include even if the ATA already exists.
  */
 export async function getOrCreateUsdcAta(
-  connection: Connection,
+  _connection: Connection,
   payer: PublicKey,
   owner: PublicKey
-): Promise<{ ata: PublicKey; instruction: TransactionInstruction | null }> {
+): Promise<{ ata: PublicKey; instruction: TransactionInstruction }> {
   const ata = await getAssociatedTokenAddress(USDC_MINT, owner);
-  const account = await connection.getAccountInfo(ata);
-  if (account) {
-    return { ata, instruction: null };
-  }
-  const instruction = createAssociatedTokenAccountInstruction(payer, ata, owner, USDC_MINT);
+  const instruction = createAssociatedTokenAccountIdempotentInstruction(
+    payer, ata, owner, USDC_MINT
+  );
   return { ata, instruction };
 }
 

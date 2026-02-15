@@ -3,13 +3,14 @@ import { View, Text, ScrollView, Pressable, Image, ActivityIndicator } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { ArrowLeft, Star, Copy, ExternalLink } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { api } from '../../services/api';
 import { JupiterService } from '../../services/jupiter';
 import { DexScreenerService } from '../../services/dexscreener';
 import { useToast } from '../../components/common/context/ToastContext';
-import { colors } from '../../config/theme';
+import { colors, serifFont } from '../../config/theme';
 import type { RootStackParamList } from '../../navigation/types';
 
 type DetailRoute = RouteProp<RootStackParamList, 'StrategyDetail'>;
@@ -79,12 +80,12 @@ export function StrategyDetailScreen() {
           <Pressable onPress={() => setIsWatchlisted(!isWatchlisted)} className="p-2">
             <Star
               size={22}
-              color={isWatchlisted ? colors.accent : colors.textDim}
+              color={isWatchlisted ? colors.accent : colors.textMuted}
               fill={isWatchlisted ? colors.accent : 'none'}
             />
           </Pressable>
           <Pressable onPress={handleCopyAddress} className="p-2">
-            <Copy size={20} color={colors.textDim} />
+            <Copy size={20} color={colors.textMuted} />
           </Pressable>
         </View>
       </View>
@@ -97,36 +98,36 @@ export function StrategyDetailScreen() {
               <Text style={{ color: typeColor, fontSize: 10, fontWeight: '700' }}>{strategy.type}</Text>
             </View>
             {strategy.ticker && (
-              <Text className="text-stone-500 text-sm">${strategy.ticker}</Text>
+              <Text className="text-sm" style={{ color: colors.textMuted }}>${strategy.ticker}</Text>
             )}
           </View>
-          <Text className="text-white text-2xl font-bold" style={{ fontFamily: 'serif' }}>
+          <Text className="text-2xl font-bold" style={{ color: colors.text, fontFamily: serifFont }}>
             {strategy.name}
           </Text>
           {strategy.description && (
-            <Text className="text-stone-500 text-sm mt-2">{strategy.description}</Text>
+            <Text className="text-sm mt-2" style={{ color: colors.textSecondary }}>{strategy.description}</Text>
           )}
         </View>
 
         {/* Stats */}
         <View className="flex-row mx-4 mb-6 gap-3">
-          <View className="flex-1 p-3 rounded-xl items-center" style={{ backgroundColor: colors.surface }}>
-            <Text className="text-stone-500 text-xs">TVL</Text>
-            <Text className="text-white font-bold mt-1">
+          <View className="flex-1 p-3 rounded-xl items-center" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+            <Text className="text-xs" style={{ color: colors.textMuted }}>TVL</Text>
+            <Text className="font-bold mt-1" style={{ color: colors.text }}>
               {typeof strategy.tvl === 'number' ? `${Number(strategy.tvl).toFixed(2)} SOL` : strategy.tvl || '0'}
             </Text>
           </View>
           {strategy.metrics && (
             <>
-              <View className="flex-1 p-3 rounded-xl items-center" style={{ backgroundColor: colors.surface }}>
-                <Text className="text-stone-500 text-xs">APY</Text>
-                <Text className="text-white font-bold mt-1">
+              <View className="flex-1 p-3 rounded-xl items-center" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+                <Text className="text-xs" style={{ color: colors.textMuted }}>APY</Text>
+                <Text className="font-bold mt-1" style={{ color: colors.text }}>
                   {strategy.metrics.expectedApy?.toFixed(1)}%
                 </Text>
               </View>
-              <View className="flex-1 p-3 rounded-xl items-center" style={{ backgroundColor: colors.surface }}>
-                <Text className="text-stone-500 text-xs">Risk</Text>
-                <Text className="text-white font-bold mt-1">
+              <View className="flex-1 p-3 rounded-xl items-center" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+                <Text className="text-xs" style={{ color: colors.textMuted }}>Risk</Text>
+                <Text className="font-bold mt-1" style={{ color: colors.text }}>
                   {strategy.metrics.riskScore}/10
                 </Text>
               </View>
@@ -135,8 +136,8 @@ export function StrategyDetailScreen() {
         </View>
 
         {/* Token composition */}
-        <View className="mx-4 p-4 rounded-xl mb-6" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderLight }}>
-          <Text className="text-stone-400 text-xs uppercase tracking-wider mb-3">Composition</Text>
+        <View className="mx-4 p-4 rounded-xl mb-6" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+          <Text className="text-xs uppercase tracking-wider mb-3" style={{ color: colors.textSecondary }}>Composition</Text>
           {(strategy.tokens || []).map((token, i) => {
             const addr = token.address || token.mint || '';
             const priceData = tokenPrices[addr];
@@ -148,13 +149,13 @@ export function StrategyDetailScreen() {
                   <View className="w-8 h-8 rounded-full" style={{ backgroundColor: colors.surfaceLight }} />
                 )}
                 <View className="flex-1 ml-3">
-                  <Text className="text-white font-medium">{token.symbol}</Text>
-                  <Text className="text-stone-600 text-xs">{token.weight}%</Text>
+                  <Text className="font-medium" style={{ color: colors.text }}>{token.symbol}</Text>
+                  <Text className="text-xs" style={{ color: colors.textMuted }}>{token.weight}%</Text>
                 </View>
                 <View className="items-end">
                   {priceData && (
                     <>
-                      <Text className="text-stone-400 text-xs">{formatPrice(priceData.price)}</Text>
+                      <Text className="text-xs" style={{ color: colors.textSecondary }}>{formatPrice(priceData.price)}</Text>
                       <Text
                         style={{
                           color: priceData.change24h >= 0 ? colors.positive : colors.negative,
@@ -180,11 +181,17 @@ export function StrategyDetailScreen() {
         style={{ bottom: insets.bottom + 8 }}
       >
         <Pressable
-          className="py-4 rounded-xl items-center"
-          style={{ backgroundColor: colors.accent }}
+          className="rounded-xl overflow-hidden"
           onPress={() => showToast('Trading not yet available on mobile', 'info')}
         >
-          <Text className="text-white font-bold text-base">Trade</Text>
+          <LinearGradient
+            colors={['#6B4420', '#B8863F', '#E8C890']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ paddingVertical: 16, borderRadius: 12, alignItems: 'center' }}
+          >
+            <Text className="font-bold text-base" style={{ color: '#000' }}>Trade</Text>
+          </LinearGradient>
         </Pressable>
       </View>
     </View>

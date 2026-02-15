@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, Text, Pressable, FlatList, ActivityIndicator, 
-  Animated, StyleSheet, Platform 
+import {
+  View, Text, Pressable, FlatList, ActivityIndicator,
+  Animated, StyleSheet, Platform
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient'; // グラデーション用
-import { 
-  Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight, 
-  TrendingUp, Star, LayoutGrid, Award, Calendar 
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight,
+  TrendingUp, Star, LayoutGrid, Award, Calendar
 } from 'lucide-react-native';
 
 import { api } from '../../services/api';
@@ -32,17 +32,25 @@ interface Strategy {
   createdAt: number;
 }
 
-// --- Colors (Web版と統一) ---
+// --- Colors (Web版と統一 - Metallic Gold Theme) ---
 const THEME = {
-  bg: '#000000', // Web: #000000 (body bg)
-  cardBg: '#1C1917', // Web: Stone 900
-  accent: '#D97706', // Web: Amber 600
-  text: '#FFFFFF',
-  textDim: 'rgba(255, 255, 255, 0.4)',
-  border: 'rgba(255, 255, 255, 0.1)',
-  success: '#4ade80', // Green 400
-  warning: '#facc15', // Yellow 400
+  bg: '#080503',
+  cardBg: '#140E08',
+  cardBgLight: '#221509',
+  accent: '#B8863F',
+  accentLight: '#D4A261',
+  accentDark: '#6B4420',
+  accentHighlight: '#E8C890',
+  text: '#F2E0C8',
+  textSecondary: '#B89860',
+  textDim: '#7A5A30',
+  border: 'rgba(184, 134, 63, 0.15)',
+  borderLight: 'rgba(184, 134, 63, 0.08)',
+  success: '#10B981',
+  warning: '#F59E0B',
 };
+
+const serifFont = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 
 // --- Helper Functions ---
 const formatCurrency = (val: number, currency: 'USD' | 'SOL') => {
@@ -99,8 +107,7 @@ export function ProfileScreen() {
     setLoading(true);
     try {
       const pubkeyStr = publicKey.toBase58();
-      
-      // Fetch Price & Data
+
       const [userRes, strategiesRes, watchlistRes, investedRes, leaderRes, priceRes] = await Promise.all([
         api.getUser(pubkeyStr),
         api.getUserStrategies(pubkeyStr),
@@ -110,16 +117,13 @@ export function ProfileScreen() {
         api.getSolPrice(),
       ]);
 
-      setSolPrice(typeof priceRes === 'number' ? priceRes : 150); // Fallback price
+      setSolPrice(typeof priceRes === 'number' ? priceRes : 150);
       setUserProfile(userRes.user);
       setMyStrategies(strategiesRes.strategies || strategiesRes || []);
       setWatchlist(watchlistRes.strategies || []);
       setInvestedStrategies(investedRes.strategies || []);
       setLeaderboard(leaderRes.leaderboard || leaderRes || []);
-
-      // Balance (Mock or fetch via RPC in real app)
-      // const bal = await connection.getBalance(publicKey); setSolBalance(bal / 1e9);
-      setSolBalance(12.5); // 仮
+      setSolBalance(12.5);
 
     } catch (e) {
       console.error('Load profile error:', e);
@@ -146,12 +150,19 @@ export function ProfileScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
         <View style={styles.iconCircle}>
-          <Wallet size={32} color="rgba(255,255,255,0.5)" />
+          <Wallet size={32} color={THEME.textDim} />
         </View>
         <Text style={styles.title}>Connect Wallet</Text>
         <Text style={styles.subtitle}>Access your portfolio, track referrals, and climb the leaderboard.</Text>
         <Pressable onPress={connect} style={styles.connectButton}>
-          <Text style={styles.connectButtonText}>Connect Wallet</Text>
+          <LinearGradient
+            colors={['#6B4420', '#B8863F', '#E8C890']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12 }}
+          >
+            <Text style={styles.connectButtonText}>Connect Wallet</Text>
+          </LinearGradient>
         </Pressable>
       </View>
     );
@@ -163,7 +174,7 @@ export function ProfileScreen() {
       {/* Net Worth Card */}
       <View style={styles.cardContainer}>
         <LinearGradient
-          colors={['#451a03', '#000000']}
+          colors={['#221509', '#080503']}
           start={{ x: 1, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.cardGradient}
@@ -177,9 +188,9 @@ export function ProfileScreen() {
                 <View style={styles.vipBadge}><Text style={styles.vipText}>VIP</Text></View>
               )}
             </View>
-            
+
             <View style={styles.cardControls}>
-              <Pressable 
+              <Pressable
                 onPress={() => setCurrencyMode(prev => prev === 'USD' ? 'SOL' : 'USD')}
                 style={styles.controlButton}
               >
@@ -215,7 +226,7 @@ export function ProfileScreen() {
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={styles.footerLabel}>RANK</Text>
-              <Text style={styles.footerValueWhite}>{userProfile?.rank_tier || 'Novice'}</Text>
+              <Text style={styles.footerValueAccent}>{userProfile?.rank_tier || 'Novice'}</Text>
             </View>
           </View>
         </LinearGradient>
@@ -224,8 +235,8 @@ export function ProfileScreen() {
       {/* Main Tabs */}
       <View style={styles.tabContainer}>
         {(['portfolio', 'leaderboard'] as MainTab[]).map(tab => (
-          <Pressable 
-            key={tab} 
+          <Pressable
+            key={tab}
             onPress={() => setMainTab(tab)}
             style={[styles.tabButton, mainTab === tab && styles.tabActive]}
           >
@@ -241,11 +252,10 @@ export function ProfileScreen() {
         <View style={styles.subTabContainer}>
           {(['created', 'invested', 'watchlist'] as SubTab[]).map(tab => {
             const isActive = subTab === tab;
-            // Get count based on tab
-            const count = tab === 'created' ? myStrategies.length 
-              : tab === 'invested' ? investedStrategies.length 
+            const count = tab === 'created' ? myStrategies.length
+              : tab === 'invested' ? investedStrategies.length
               : watchlist.length;
-            
+
             return (
               <Pressable
                 key={tab}
@@ -344,7 +354,7 @@ export function ProfileScreen() {
   };
 
   // Main Render
-  const activeData = mainTab === 'portfolio' 
+  const activeData = mainTab === 'portfolio'
     ? (subTab === 'created' ? myStrategies : subTab === 'invested' ? investedStrategies : watchlist)
     : leaderboard;
 
@@ -384,39 +394,39 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: THEME.text, fontFamily: Platform.OS === 'ios' ? 'serif' : 'serif' }, // Android needs font file for serif
-  
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: THEME.text, fontFamily: serifFont },
+
   // Connect Wallet Screen
   iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: THEME.cardBg, justifyContent: 'center', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: THEME.border },
-  title: { fontSize: 24, fontWeight: 'bold', color: THEME.text, marginBottom: 8 },
+  title: { fontSize: 24, fontWeight: 'bold', color: THEME.text, marginBottom: 8, fontFamily: serifFont },
   subtitle: { fontSize: 14, color: THEME.textDim, textAlign: 'center', marginBottom: 32, paddingHorizontal: 32 },
-  connectButton: { backgroundColor: THEME.accent, paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12 },
+  connectButton: { borderRadius: 12, overflow: 'hidden' },
   connectButtonText: { color: '#000', fontWeight: 'bold', fontSize: 16 },
 
   // Net Worth Card
   cardContainer: { marginBottom: 24, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: THEME.border },
   cardGradient: { padding: 24 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  walletBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: THEME.border },
+  walletBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(8, 5, 3, 0.6)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: THEME.border },
   walletText: { color: THEME.text, fontSize: 12, fontWeight: 'bold', marginLeft: 6, marginRight: 4 },
   vipBadge: { backgroundColor: THEME.accent, paddingHorizontal: 4, borderRadius: 4 },
   vipText: { fontSize: 8, fontWeight: 'bold', color: '#000' },
   cardControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  controlButton: { backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: THEME.border, marginRight: 8 },
+  controlButton: { backgroundColor: 'rgba(8, 5, 3, 0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: THEME.border, marginRight: 8 },
   controlText: { color: THEME.textDim, fontSize: 10, fontWeight: 'bold' },
-  
+
   valueContainer: { paddingVertical: 16 },
   label: { color: THEME.textDim, fontSize: 10, fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 },
-  mainValue: { color: THEME.text, fontSize: 40, fontWeight: 'bold', letterSpacing: -1 },
+  mainValue: { color: THEME.text, fontSize: 40, fontWeight: 'bold', letterSpacing: -1, fontFamily: serifFont },
   pnlBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, marginTop: 8, borderWidth: 1 },
-  pnlPos: { backgroundColor: 'rgba(74, 222, 128, 0.1)', borderColor: 'rgba(74, 222, 128, 0.2)' },
+  pnlPos: { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.2)' },
   pnlNeg: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' },
   pnlText: { fontSize: 12, fontWeight: 'bold', marginLeft: 4, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
 
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 8 },
   footerLabel: { color: THEME.textDim, fontSize: 10, fontWeight: 'bold', marginBottom: 2 },
   footerValue: { color: THEME.accent, fontSize: 14, fontWeight: 'bold', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  footerValueWhite: { color: THEME.text, fontSize: 14, fontWeight: 'bold' },
+  footerValueAccent: { color: THEME.accentLight, fontSize: 14, fontWeight: 'bold' },
 
   // Tabs
   tabContainer: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: THEME.border, marginBottom: 16 },
@@ -435,32 +445,32 @@ const styles = StyleSheet.create({
   strategyCard: { backgroundColor: THEME.cardBg, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: THEME.border },
   strategyName: { color: THEME.text, fontSize: 16, fontWeight: 'bold', marginBottom: 2 },
   strategyTicker: { color: THEME.textDim, fontSize: 10 },
-  strategyTvl: { color: THEME.text, fontSize: 14, fontWeight: 'bold', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  
-  tokenIconWrap: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: THEME.cardBg, overflow: 'hidden', backgroundColor: '#333' },
+  strategyTvl: { color: THEME.accent, fontSize: 14, fontWeight: 'bold', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+
+  tokenIconWrap: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: THEME.cardBg, overflow: 'hidden', backgroundColor: THEME.cardBgLight },
   tokenIcon: { width: '100%', height: '100%' },
-  extraTokenWrap: { backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-  extraTokenText: { color: 'rgba(255,255,255,0.6)', fontSize: 8, fontWeight: 'bold' },
+  extraTokenWrap: { backgroundColor: 'rgba(184, 134, 63, 0.1)', justifyContent: 'center', alignItems: 'center' },
+  extraTokenText: { color: THEME.textSecondary, fontSize: 8, fontWeight: 'bold' },
 
   cardFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: THEME.border },
-  activeBadge: { backgroundColor: 'rgba(74, 222, 128, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+  activeBadge: { backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
   activeText: { color: THEME.success, fontSize: 10, fontWeight: 'bold' },
   dateText: { color: THEME.textDim, fontSize: 10 },
 
   // Leaderboard
   leaderboardHeader: { flexDirection: 'row', paddingHorizontal: 12, paddingBottom: 8, marginBottom: 4 },
-  th: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 'bold' },
+  th: { color: THEME.textDim, fontSize: 10, fontWeight: 'bold' },
   leaderRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, backgroundColor: THEME.cardBg, marginBottom: 8, borderWidth: 1, borderColor: THEME.border },
-  leaderRowMe: { backgroundColor: 'rgba(217, 119, 6, 0.1)', borderColor: 'rgba(217, 119, 6, 0.5)' },
+  leaderRowMe: { backgroundColor: 'rgba(184, 134, 63, 0.1)', borderColor: 'rgba(184, 134, 63, 0.5)' },
   rankText: { width: 40, textAlign: 'center', fontWeight: 'bold', fontSize: 16, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: THEME.border },
-  avatarText: { color: 'rgba(255,255,255,0.5)', fontWeight: 'bold', fontSize: 12 },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(184, 134, 63, 0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: THEME.border },
+  avatarText: { color: THEME.textSecondary, fontWeight: 'bold', fontSize: 12 },
   userName: { color: THEME.text, fontSize: 14, fontWeight: 'bold' },
   userAddr: { color: THEME.textDim, fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-  xpText: { width: 80, textAlign: 'right', color: THEME.text, fontWeight: 'bold', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  xpText: { width: 80, textAlign: 'right', color: THEME.accent, fontWeight: 'bold', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
 
   // Empty State
   emptyState: { alignItems: 'center', paddingVertical: 48, borderWidth: 1, borderColor: THEME.border, borderStyle: 'dashed', borderRadius: 16 },
-  emptyTitle: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: 'bold', marginTop: 12 },
-  emptySub: { color: 'rgba(255,255,255,0.2)', fontSize: 12, marginTop: 4 },
+  emptyTitle: { color: THEME.textDim, fontSize: 14, fontWeight: 'bold', marginTop: 12 },
+  emptySub: { color: THEME.textDim, fontSize: 12, marginTop: 4 },
 });

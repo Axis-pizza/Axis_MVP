@@ -9,7 +9,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { TrendingUp, TrendingDown, Clock, Copy, ExternalLink, Wallet } from 'lucide-react-native';
-import { colors } from '../../config/theme';
+import { colors, serifFont } from '../../config/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
@@ -74,7 +74,7 @@ const timeAgo = (timestamp: number) => {
 const FormatChange = ({ value, className, iconSize = 14 }: { value: any, className?: string, iconSize?: number }) => {
   const c = Number(value);
   if (isNaN(c) || !isFinite(c)) {
-    return <Text className={`font-bold text-stone-500 ${className}`}>0.00%</Text>;
+    return <Text className={`font-bold ${className}`} style={{ color: colors.textMuted }}>0.00%</Text>;
   }
   const isPositive = c >= 0;
   return (
@@ -94,7 +94,7 @@ const FormatChange = ({ value, className, iconSize = 14 }: { value: any, classNa
 const TokenIcon = ({ symbol, src, address }: { symbol: string, src?: string | null, address?: string }) => {
   const getInitialSrc = () => {
     if (src && src.startsWith('http')) return src;
-    if (address) return `https://static.jup.ag/tokens/${address}.png`; 
+    if (address) return `https://static.jup.ag/tokens/${address}.png`;
     return `https://jup.ag/tokens/${symbol}.svg`;
   };
 
@@ -121,10 +121,10 @@ const TokenIcon = ({ symbol, src, address }: { symbol: string, src?: string | nu
   };
 
   return (
-    <Image 
+    <Image
       source={{ uri: imgSrc }}
       className="w-full h-full rounded-full"
-      style={{ backgroundColor: '#333' }}
+      style={{ backgroundColor: '#221509' }}
       onError={handleError}
     />
   );
@@ -146,7 +146,7 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
     .enabled(isTop)
     .onUpdate((e) => {
       translateX.value = e.translationX;
-      translateY.value = e.translationY * 0.2; // 少し動きを抑える
+      translateY.value = e.translationY * 0.2;
     })
     .onEnd((e) => {
       if (e.translationX > SWIPE_THRESHOLD) {
@@ -166,7 +166,7 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
     return {
       transform: [
         { translateX: translateX.value },
-        { translateY: translateY.value + index * 10 }, // 少しずらす
+        { translateY: translateY.value + index * 10 },
         { rotate: `${rotate}deg` },
         { scale: 1 - index * 0.05 },
       ],
@@ -197,34 +197,34 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
           },
         ]}
       >
-        <Pressable 
+        <Pressable
           onPress={isTop ? onTap : undefined}
           style={{ flex: 1 }}
         >
           <View
             className="w-full h-full rounded-[32px] overflow-hidden shadow-2xl relative"
             style={{
-              backgroundColor: '#121212',
-              borderColor: 'rgba(255,255,255,0.1)',
+              backgroundColor: '#140E08',
+              borderColor: 'rgba(184, 134, 63, 0.15)',
               borderWidth: 1,
             }}
           >
             {/* Background Glow Effect */}
-            <View 
+            <View
               className="absolute inset-0 opacity-60"
               style={{
                 backgroundColor: isPositive ? 'rgba(16, 185, 129, 0.03)' : 'rgba(239, 68, 68, 0.03)',
-              }} 
+              }}
             />
             {/* Gradient Overlay Simulation (Top Left) */}
-            <View 
+            <View
               className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-20"
               style={{
                 backgroundColor: isPositive ? '#10B981' : '#EF4444',
                 transform: [{ translateX: -80 }, { translateY: -80 }],
                 shadowOpacity: 0.5,
                 shadowRadius: 50,
-              }} 
+              }}
             />
 
             {/* Swipe Indicators */}
@@ -244,27 +244,27 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
             </Animated.View>
 
             {/* --- Content --- */}
-            
+
             {/* Header */}
             <View className="p-5 pb-2">
               <View className="flex-row justify-between items-start mb-2">
                 <View className="flex-1 mr-2">
-                  <View 
+                  <View
                     className="self-start px-2 py-0.5 rounded-full border mb-2"
-                    style={{ 
+                    style={{
                       backgroundColor: currentTypeStyle.bg,
-                      borderColor: currentTypeStyle.border 
+                      borderColor: currentTypeStyle.border
                     }}
                   >
                     <Text className={`text-[10px] font-bold uppercase ${currentTypeStyle.text}`}>
                       {strategy.type}
                     </Text>
                   </View>
-                  <Text className="text-2xl font-bold text-white leading-tight" numberOfLines={1}>
+                  <Text className="text-2xl font-bold leading-tight" numberOfLines={1} style={{ color: colors.text, fontFamily: serifFont }}>
                     ${strategy.ticker || strategy.name}
                   </Text>
                   {strategy.ticker && (
-                    <Text className="text-xs text-white/40 mt-0.5" numberOfLines={1}>
+                    <Text className="text-xs mt-0.5" numberOfLines={1} style={{ color: colors.textMuted }}>
                       {strategy.name}
                     </Text>
                   )}
@@ -272,32 +272,32 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
 
                 {/* Creator PFP */}
                 <View className="items-center">
-                  <View className="w-10 h-10 rounded-full bg-[#292524] p-0.5 border border-white/10 overflow-hidden">
+                  <View className="w-10 h-10 rounded-full p-0.5 overflow-hidden" style={{ backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.border }}>
                     <Image
                       source={{ uri: strategy.creatorPfpUrl || `https://api.dicebear.com/7.x/identicon/png?seed=${strategy.creatorAddress}` }}
                       className="w-full h-full rounded-full"
                     />
                   </View>
-                  <Text className="text-[9px] text-white/40 mt-1 font-mono">
+                  <Text className="text-[9px] mt-1 font-mono" style={{ color: colors.textMuted }}>
                     {strategy.creatorAddress.slice(0, 4)}
                   </Text>
                 </View>
               </View>
 
-              <Text className="text-xs text-white/60 leading-4 min-h-[32px]" numberOfLines={2}>
+              <Text className="text-xs leading-4 min-h-[32px]" numberOfLines={2} style={{ color: colors.textSecondary }}>
                 {strategy.description || "No description provided."}
               </Text>
 
               <View className="flex-row items-center gap-3 mt-3">
-                <View className="flex-row items-center gap-1.5 px-2 py-1 bg-white/5 rounded-lg border border-white/5">
-                  <Text className="text-[10px] text-white/40 font-mono">
+                <View className="flex-row items-center gap-1.5 px-2 py-1 rounded-lg" style={{ backgroundColor: 'rgba(184, 134, 63, 0.05)', borderWidth: 1, borderColor: 'rgba(184, 134, 63, 0.08)' }}>
+                  <Text className="text-[10px] font-mono" style={{ color: colors.textMuted }}>
                     {strategy.id.slice(0, 4)}...{strategy.id.slice(-4)}
                   </Text>
-                  <Copy size={10} color="rgba(255,255,255,0.2)" />
+                  <Copy size={10} color={colors.textMuted} />
                 </View>
                 <View className="flex-row items-center gap-1">
-                  <Clock size={10} color="rgba(255,255,255,0.4)" />
-                  <Text className="text-[10px] text-white/40">{timeAgo(strategy.createdAt)}</Text>
+                  <Clock size={10} color={colors.textMuted} />
+                  <Text className="text-[10px]" style={{ color: colors.textMuted }}>{timeAgo(strategy.createdAt)}</Text>
                 </View>
               </View>
             </View>
@@ -305,7 +305,7 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
             {/* Stats Grid */}
             <View className="px-5 py-2 flex-row gap-2">
               {/* 24h Change Card */}
-              <View 
+              <View
                 className="flex-1 p-3 rounded-2xl border items-center justify-center h-24"
                 style={{
                   backgroundColor: isPositive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
@@ -319,12 +319,12 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
               </View>
 
               {/* TVL Card */}
-              <View className="flex-1 p-3 bg-white/5 border border-white/5 rounded-2xl justify-center px-3 h-24">
-                <Text className="text-[10px] text-white/40 uppercase font-bold mb-1">TVL</Text>
-                <Text className="text-2xl font-bold text-white">
+              <View className="flex-1 p-3 rounded-2xl justify-center px-3 h-24" style={{ backgroundColor: 'rgba(184, 134, 63, 0.05)', borderWidth: 1, borderColor: 'rgba(184, 134, 63, 0.08)' }}>
+                <Text className="text-[10px] uppercase font-bold mb-1" style={{ color: colors.textMuted }}>TVL</Text>
+                <Text className="text-2xl font-bold" style={{ color: colors.text }}>
                   {strategy.tvl < 0.01 ? '< 0.01' : strategy.tvl.toFixed(2)}
                 </Text>
-                <Text className="text-xs text-white/50 font-normal">SOL</Text>
+                <Text className="text-xs font-normal" style={{ color: colors.textSecondary }}>SOL</Text>
               </View>
             </View>
 
@@ -332,37 +332,36 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
             <View className="flex-1 px-5 py-2 overflow-hidden">
               <View className="flex-row items-center justify-between mb-2">
                 <View className="flex-row items-center gap-1">
-                  <Wallet size={12} color="rgba(255,255,255,0.4)" />
-                  <Text className="text-xs font-bold text-white/40 uppercase tracking-widest">
+                  <Wallet size={12} color={colors.textMuted} />
+                  <Text className="text-xs font-bold uppercase tracking-widest" style={{ color: colors.textMuted }}>
                     Composition
                   </Text>
                 </View>
-                <Text className="text-[10px] text-white/20">{strategy.tokens.length} Assets</Text>
+                <Text className="text-[10px]" style={{ color: colors.textMuted }}>{strategy.tokens.length} Assets</Text>
               </View>
 
-              {/* In Swipe Cards, we usually limit items to avoid scrolling issues, or use nested scrolling carefully */}
               <View className="flex-1">
                 {strategy.tokens.slice(0, 4).map((token, i) => (
-                  <View 
-                    key={i} 
+                  <View
+                    key={i}
                     className="flex-row items-center justify-between p-3 mb-2 rounded-xl border"
                     style={{
-                      backgroundColor: 'rgba(255,255,255,0.03)',
-                      borderColor: 'rgba(255,255,255,0.05)'
+                      backgroundColor: 'rgba(184, 134, 63, 0.03)',
+                      borderColor: 'rgba(184, 134, 63, 0.08)'
                     }}
                   >
                     {/* Left */}
                     <View className="flex-row items-center gap-3">
-                      <View className="w-9 h-9 rounded-full bg-white/10 overflow-hidden border border-white/5">
-                        <TokenIcon 
-                          symbol={token.symbol} 
-                          src={token.logoURI} 
-                          address={token.address} 
+                      <View className="w-9 h-9 rounded-full overflow-hidden" style={{ backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.borderLight }}>
+                        <TokenIcon
+                          symbol={token.symbol}
+                          src={token.logoURI}
+                          address={token.address}
                         />
                       </View>
                       <View>
-                        <Text className="font-bold text-sm text-white">{token.symbol}</Text>
-                        <Text className="text-[11px] text-white/50 font-mono">
+                        <Text className="font-bold text-sm" style={{ color: colors.text }}>{token.symbol}</Text>
+                        <Text className="text-[11px] font-mono" style={{ color: colors.textSecondary }}>
                           {formatPrice(token.currentPrice)}
                         </Text>
                       </View>
@@ -370,14 +369,14 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
 
                     {/* Right */}
                     <View className="items-end min-w-[60px]">
-                      <Text className="font-bold text-sm text-white mb-0.5">{token.weight}%</Text>
+                      <Text className="font-bold text-sm mb-0.5" style={{ color: colors.text }}>{token.weight}%</Text>
                       {token.change24h !== undefined ? (
                         <FormatChange value={token.change24h} className="text-[10px]" iconSize={10} />
                       ) : (
-                        <View className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden" style={{ width: 40 }}>
-                          <View 
-                            className="h-full bg-orange-500 rounded-full" 
-                            style={{ width: `${token.weight}%` }} 
+                        <View className="h-1.5 rounded-full mt-1 overflow-hidden" style={{ width: 40, backgroundColor: 'rgba(184, 134, 63, 0.1)' }}>
+                          <View
+                            className="h-full rounded-full"
+                            style={{ width: `${token.weight}%`, backgroundColor: colors.accent }}
                           />
                         </View>
                       )}
@@ -385,7 +384,7 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
                   </View>
                 ))}
                 {strategy.tokens.length > 4 && (
-                  <Text className="text-center text-[10px] text-white/20 mt-1">
+                  <Text className="text-center text-[10px] mt-1" style={{ color: colors.textMuted }}>
                     +{strategy.tokens.length - 4} more assets
                   </Text>
                 )}
@@ -398,13 +397,13 @@ export function SwipeCard({ strategy, onSwipeLeft, onSwipeRight, onTap, isTop, i
                 const url = `https://solscan.io/token/${strategy.mintAddress || strategy.id}?cluster=devnet`;
                 Linking.openURL(url);
               }}
-              className="p-3 border-t bg-[#0C0A09] flex-row justify-center items-center gap-1"
-              style={{ borderColor: 'rgba(255,255,255,0.05)' }}
+              className="p-3 border-t flex-row justify-center items-center gap-1"
+              style={{ backgroundColor: '#0D0907', borderColor: 'rgba(184, 134, 63, 0.08)' }}
             >
-              <Text className="text-[10px] text-white/20 font-mono">
+              <Text className="text-[10px] font-mono" style={{ color: colors.textMuted }}>
                 Address: {(strategy.mintAddress || strategy.id).slice(0, 8)}...
               </Text>
-              <ExternalLink size={10} color="rgba(255,255,255,0.2)" />
+              <ExternalLink size={10} color={colors.textMuted} />
             </Pressable>
 
           </View>

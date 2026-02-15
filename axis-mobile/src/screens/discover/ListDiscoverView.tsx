@@ -78,13 +78,13 @@ export function ListDiscoverView({ onStrategySelect }: Props) {
       <Pressable onPress={() => onStrategySelect(item)} className="mx-4 mb-3">
         <View
           className="p-4 rounded-xl"
-          style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderLight }}
+          style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
         >
           <View className="flex-row items-center justify-between mb-2">
             <View className="flex-row items-center gap-2">
-              <Text className="text-white font-bold text-base" numberOfLines={1}>{item.name}</Text>
+              <Text className="font-bold text-base" numberOfLines={1} style={{ color: colors.text }}>{item.name}</Text>
               {item.ticker && (
-                <Text className="text-stone-500 text-xs">${item.ticker}</Text>
+                <Text className="text-xs" style={{ color: colors.textMuted }}>${item.ticker}</Text>
               )}
             </View>
             <View className="px-2 py-0.5 rounded" style={{ backgroundColor: `${typeColor}20` }}>
@@ -100,14 +100,14 @@ export function ListDiscoverView({ onStrategySelect }: Props) {
                   <Image
                     key={i}
                     source={{ uri: t.logoURI }}
-                    className="w-6 h-6 rounded-full border border-stone-800"
-                    style={{ marginLeft: i > 0 ? -8 : 0 }}
+                    className="w-6 h-6 rounded-full"
+                    style={{ borderWidth: 1, borderColor: colors.surface, marginLeft: i > 0 ? -8 : 0 }}
                   />
                 ) : (
                   <View
                     key={i}
-                    className="w-6 h-6 rounded-full border border-stone-800"
-                    style={{ backgroundColor: colors.surfaceLight, marginLeft: i > 0 ? -8 : 0 }}
+                    className="w-6 h-6 rounded-full"
+                    style={{ backgroundColor: colors.surfaceLight, borderWidth: 1, borderColor: colors.surface, marginLeft: i > 0 ? -8 : 0 }}
                   />
                 )
               ))}
@@ -115,7 +115,7 @@ export function ListDiscoverView({ onStrategySelect }: Props) {
 
             <View className="flex-1" />
 
-            <Text className="text-stone-400 text-xs">
+            <Text className="text-xs" style={{ color: colors.textSecondary }}>
               TVL: {typeof item.tvl === 'number' ? `${item.tvl.toFixed(1)} SOL` : item.tvl || '0'}
             </Text>
           </View>
@@ -138,15 +138,16 @@ export function ListDiscoverView({ onStrategySelect }: Props) {
       <View className="mx-4 mb-3">
         <View
           className="flex-row items-center px-3 py-2.5 rounded-xl"
-          style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderLight }}
+          style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
         >
-          <Search size={16} color={colors.textDim} />
+          <Search size={16} color={colors.textMuted} />
           <TextInput
             value={search}
             onChangeText={setSearch}
             placeholder="Search strategies..."
-            placeholderTextColor={colors.textDim}
-            className="flex-1 ml-2 text-white text-sm"
+            placeholderTextColor={colors.textMuted}
+            className="flex-1 ml-2 text-sm"
+            style={{ color: colors.text }}
           />
         </View>
       </View>
@@ -161,7 +162,7 @@ export function ListDiscoverView({ onStrategySelect }: Props) {
             style={{
               backgroundColor: filter === f ? `${colors.accent}20` : colors.surface,
               borderWidth: 1,
-              borderColor: filter === f ? colors.accent : colors.borderLight,
+              borderColor: filter === f ? colors.accent : colors.border,
             }}
           >
             <Text style={{ color: filter === f ? colors.accent : colors.textMuted, fontSize: 12, fontWeight: '600' }}>
@@ -180,7 +181,7 @@ export function ListDiscoverView({ onStrategySelect }: Props) {
         contentContainerStyle={{ paddingBottom: 100 }}
         ListEmptyComponent={
           <View className="items-center py-12">
-            <Text className="text-stone-500">No strategies found</Text>
+            <Text style={{ color: colors.textMuted }}>No strategies found</Text>
           </View>
         }
       />

@@ -63,7 +63,7 @@ export function CreateScreen() {
           <Pressable onPress={goBack} className="p-1 mr-3">
             <ArrowLeft size={22} color={colors.text} />
           </Pressable>
-          <Text className="text-white text-lg font-bold">
+          <Text className="text-lg font-bold" style={{ color: '#F2E0C8' }}>
             {step === 'BUILDER' ? 'Select Tokens' : step === 'IDENTITY' ? 'Strategy Info' : 'Review & Deploy'}
           </Text>
         </View>

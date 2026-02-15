@@ -60,15 +60,20 @@ app.post("/claim", async (c) => {
     try {
 
       const user = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
-      
+
       if (user) {
           const now = Math.floor(Date.now() / 1000);
-          
-          if (user.last_faucet_at && (now - user.last_faucet_at < 86400)) {
-              const nextTime = new Date((user.last_faucet_at + 86400) * 1000).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
-              return c.json({ 
-                  success: false, 
-                  message: `⏳ Limit reached. Next claim: ${nextTime}` 
+          const lastFaucet = user.last_faucet_at || 0;
+
+          // 日本時間(UTC+9)基準で同じ日かチェック
+          const JST_OFFSET = 9 * 3600;
+          const todayJST = Math.floor((now + JST_OFFSET) / 86400);
+          const lastClaimDayJST = Math.floor((lastFaucet + JST_OFFSET) / 86400);
+
+          if (lastFaucet > 0 && todayJST === lastClaimDayJST) {
+              return c.json({
+                  success: false,
+                  message: `⏳ Already claimed today. Resets at midnight (JST).`
               }, 429);
           }
       }
@@ -85,7 +90,7 @@ app.post("/claim", async (c) => {
           ).bind(Math.floor(Date.now() / 1000), wallet_address).run();
       }
 
-      return c.json({ success: true, signature, message: "💰 Sent 1,000 USDC (Devnet)" });
+      return c.json({ success: true, signature, message: "💰 Sent 1,000 USDC + 0.05 SOL (Devnet)" });
 
     } catch (e: any) {
         console.error("Faucet Error:", e);

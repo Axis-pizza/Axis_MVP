@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Shuffle } from 'lucide-react-native';
 import { colors } from '../../config/theme';
 
@@ -39,19 +40,20 @@ export function IdentityStep({ tokens, onComplete, onBack }: Props) {
       <ScrollView className="flex-1 px-4" showsVerticalScrollIndicator={false}>
         {/* Ticker */}
         <View className="mb-5 mt-4">
-          <Text className="text-stone-400 text-xs uppercase tracking-wider mb-2">Ticker Symbol</Text>
+          <Text className="text-xs uppercase tracking-wider mb-2" style={{ color: colors.textSecondary }}>Ticker Symbol</Text>
           <View className="flex-row items-center gap-2">
             <View
               className="flex-1 flex-row items-center px-4 py-3 rounded-xl"
-              style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderLight }}
+              style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
             >
-              <Text className="text-stone-500 mr-1">$</Text>
+              <Text className="mr-1" style={{ color: colors.textMuted }}>$</Text>
               <TextInput
                 value={ticker}
                 onChangeText={(v) => setTicker(v.toUpperCase().slice(0, 5))}
                 placeholder="TICKER"
-                placeholderTextColor={colors.textDim}
-                className="flex-1 text-white text-lg font-bold"
+                placeholderTextColor={colors.textMuted}
+                className="flex-1 text-lg font-bold"
+                style={{ color: colors.text }}
                 autoCapitalize="characters"
                 maxLength={5}
               />
@@ -68,63 +70,68 @@ export function IdentityStep({ tokens, onComplete, onBack }: Props) {
 
         {/* Name */}
         <View className="mb-5">
-          <Text className="text-stone-400 text-xs uppercase tracking-wider mb-2">Strategy Name</Text>
+          <Text className="text-xs uppercase tracking-wider mb-2" style={{ color: colors.textSecondary }}>Strategy Name</Text>
           <TextInput
             value={name}
             onChangeText={(v) => setName(v.slice(0, 30))}
             placeholder="e.g. DeFi Blue Chips"
-            placeholderTextColor={colors.textDim}
-            className="px-4 py-3 rounded-xl text-white text-base"
-            style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderLight }}
+            placeholderTextColor={colors.textMuted}
+            className="px-4 py-3 rounded-xl text-base"
+            style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, color: colors.text }}
             maxLength={30}
           />
-          <Text className="text-stone-600 text-xs mt-1 text-right">{name.length}/30</Text>
+          <Text className="text-xs mt-1 text-right" style={{ color: colors.textMuted }}>{name.length}/30</Text>
         </View>
 
         {/* Description */}
         <View className="mb-5">
-          <Text className="text-stone-400 text-xs uppercase tracking-wider mb-2">Description</Text>
+          <Text className="text-xs uppercase tracking-wider mb-2" style={{ color: colors.textSecondary }}>Description</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
             placeholder="Describe your strategy..."
-            placeholderTextColor={colors.textDim}
-            className="px-4 py-3 rounded-xl text-white text-sm"
+            placeholderTextColor={colors.textMuted}
+            className="px-4 py-3 rounded-xl text-sm"
             style={{
               backgroundColor: colors.surface,
               borderWidth: 1,
-              borderColor: colors.borderLight,
+              borderColor: colors.border,
               minHeight: 100,
               textAlignVertical: 'top',
+              color: colors.text,
             }}
             multiline
           />
         </View>
 
         {/* Summary */}
-        <View className="p-4 rounded-xl mb-6" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderLight }}>
-          <Text className="text-stone-400 text-xs uppercase tracking-wider mb-3">Summary</Text>
+        <View className="p-4 rounded-xl mb-6" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+          <Text className="text-xs uppercase tracking-wider mb-3" style={{ color: colors.textSecondary }}>Summary</Text>
           <View className="flex-row justify-between mb-2">
-            <Text className="text-stone-500 text-sm">Assets</Text>
-            <Text className="text-white text-sm font-medium">{tokens.length}</Text>
+            <Text className="text-sm" style={{ color: colors.textMuted }}>Assets</Text>
+            <Text className="text-sm font-medium" style={{ color: colors.text }}>{tokens.length}</Text>
           </View>
           <View className="flex-row justify-between">
-            <Text className="text-stone-500 text-sm">Fee</Text>
-            <Text className="text-white text-sm font-medium">1.0%</Text>
+            <Text className="text-sm" style={{ color: colors.textMuted }}>Fee</Text>
+            <Text className="text-sm font-medium" style={{ color: colors.text }}>1.0%</Text>
           </View>
         </View>
 
         {/* Deploy button */}
         <Pressable
           onPress={() => isValid && onComplete({ name: name.trim(), ticker: ticker.trim(), description: description.trim() })}
-          className="py-4 rounded-xl items-center mb-8"
-          style={{
-            backgroundColor: isValid ? colors.accent : colors.surfaceLight,
-            opacity: isValid ? 1 : 0.5,
-          }}
+          className="rounded-xl overflow-hidden mb-8"
+          style={{ opacity: isValid ? 1 : 0.5 }}
           disabled={!isValid}
         >
-          <Text className="text-white font-bold text-base">Continue to Deploy</Text>
+          <LinearGradient
+            colors={isValid ? ['#6B4420', '#B8863F', '#E8C890'] : [colors.surfaceLight, colors.surfaceLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ paddingVertical: 16, borderRadius: 12, alignItems: 'center' }}
+          >
+            <Text className="font-bold text-base" style={{ color: isValid ? '#000' : colors.textMuted }}>Continue to Deploy</Text>
+          </LinearGradient>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

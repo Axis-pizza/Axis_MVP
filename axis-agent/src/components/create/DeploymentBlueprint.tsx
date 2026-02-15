@@ -88,7 +88,11 @@ export const DeploymentBlueprint = ({
             transaction.recentBlockhash = blockhash;
             transaction.feePayer = wallet.publicKey;
             const signedTx = await wallet.signTransaction(transaction);
-            txSignature = await connection.sendRawTransaction(signedTx.serialize());
+            txSignature = await connection.sendRawTransaction(signedTx.serialize(), {
+              skipPreflight: false,
+              preflightCommitment: 'confirmed',
+              maxRetries: 3,
+            });
             showToast("Confirming Transaction...", "info");
             await connection.confirmTransaction({ signature: txSignature, blockhash, lastValidBlockHeight }, 'confirmed');
         }

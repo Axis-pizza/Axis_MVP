@@ -480,6 +480,15 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
 
     setInvestStatus('SIGNING');
     try {
+      // SOL残高チェック（ガス代 + ATA作成に最低 0.005 SOL 必要）
+      const solBalance = await connection.getBalance(wallet.publicKey);
+      if (solBalance < 5_000_000) { // 0.005 SOL
+        showToast("Not enough SOL for gas fees. Use the faucet first.", "error");
+        setInvestStatus('ERROR');
+        setTimeout(() => setInvestStatus('IDLE'), 2000);
+        return;
+      }
+
       const amount = parseFloat(amountStr);
       const transaction = new Transaction();
 
@@ -487,9 +496,11 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
         // USDC SPL transfer
         const { ata: fromAta, instruction: createFromIx } = await getOrCreateUsdcAta(connection, wallet.publicKey, wallet.publicKey);
         const { ata: toAta, instruction: createToIx } = await getOrCreateUsdcAta(connection, wallet.publicKey, vaultPubkey);
-        if (createFromIx) transaction.add(createFromIx);
-        if (createToIx) transaction.add(createToIx);
+        transaction.add(createFromIx);
+        transaction.add(createToIx);
         transaction.add(createUsdcTransferIx(fromAta, toAta, wallet.publicKey, amount));
+
+        console.log('[BUY] fromAta:', fromAta.toBase58(), 'toAta:', toAta.toBase58(), 'vault:', vaultPubkey.toBase58(), 'amount:', amount);
       }
       else {
         const userAta = await getAssociatedTokenAddress(MASTER_MINT_ADDRESS, wallet.publicKey);
@@ -507,23 +518,37 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
             TOKEN_PROGRAM_ID
           )
         );
+
+        console.log('[SELL] userAta:', userAta.toBase58(), 'vaultAta:', vaultAta.toBase58());
       }
 
-      const latestBlockhash = await connection.getLatestBlockhash();
+      const latestBlockhash = await connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.feePayer = wallet.publicKey;
 
       if (!wallet.signTransaction) throw new Error("Wallet not supported");
 
       const signedTx = await wallet.signTransaction(transaction);
+
+      // シミュレーション事前チェック（署名済み tx で実行）
+      const simResult = await connection.simulateTransaction(signedTx);
+      if (simResult.value.err) {
+        console.error('[Simulation Failed]', JSON.stringify(simResult.value.err));
+        console.error('[Simulation Logs]', simResult.value.logs);
+        throw new Error(`Simulation failed: ${JSON.stringify(simResult.value.err)}${simResult.value.logs ? '\n' + simResult.value.logs.join('\n') : ''}`);
+      }
+
       setInvestStatus('CONFIRMING');
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: true,
+        maxRetries: 3,
+      });
 
       await connection.confirmTransaction({
         signature,
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      });
+      }, 'confirmed');
 
       setInvestStatus('PROCESSING');
       
@@ -555,7 +580,9 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       }, 1500);
 
     } catch (e: any) {
-      showToast(e.message || "Transaction Failed", "error");
+      console.error('Transaction Error:', e);
+      const msg = e?.logs?.join('\n') || e?.message || "Transaction Failed";
+      showToast(msg.slice(0, 120), "error");
       setInvestStatus('ERROR');
       setTimeout(() => setInvestStatus('IDLE'), 2000);
     }

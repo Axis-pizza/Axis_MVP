@@ -3,6 +3,8 @@ import {
   Keypair,
   PublicKey,
   Transaction,
+  SystemProgram,
+  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import {
   getOrCreateAssociatedTokenAccount,
@@ -37,14 +39,24 @@ export async function claimFaucet(privateKey: string, walletAddress: string, rpc
 
   const amount = 1000 * 1_000_000; // 1000 USDC
 
-  const tx = new Transaction().add(
-    createTransferInstruction(
-      adminTokenAccount.address,
-      userTokenAccount.address,
-      adminKeypair.publicKey,
-      amount
+  const SOL_AMOUNT = 0.05 * LAMPORTS_PER_SOL; // 0.05 SOL for gas fees
+
+  const tx = new Transaction()
+    .add(
+      SystemProgram.transfer({
+        fromPubkey: adminKeypair.publicKey,
+        toPubkey: userPublicKey,
+        lamports: SOL_AMOUNT,
+      })
     )
-  );
+    .add(
+      createTransferInstruction(
+        adminTokenAccount.address,
+        userTokenAccount.address,
+        adminKeypair.publicKey,
+        amount
+      )
+    );
 
   const latest = await connection.getLatestBlockhash("processed");
   tx.recentBlockhash = latest.blockhash;

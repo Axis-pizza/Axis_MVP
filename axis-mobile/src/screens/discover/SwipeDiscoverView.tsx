@@ -124,7 +124,7 @@ export function SwipeDiscoverView({ onStrategySelect }: Props) {
     return (
       <View className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" color={colors.accent} />
-        <Text className="text-stone-500 mt-3">Loading strategies...</Text>
+        <Text className="mt-3" style={{ color: colors.textMuted }}>Loading strategies...</Text>
       </View>
     );
   }
@@ -132,8 +132,8 @@ export function SwipeDiscoverView({ onStrategySelect }: Props) {
   if (enrichedStrategies.length === 0) {
     return (
       <View className="flex-1 justify-center items-center px-8">
-        <Text className="text-stone-400 text-center text-lg">No strategies found</Text>
-        <Text className="text-stone-600 text-center mt-2">Check back later for new strategies</Text>
+        <Text className="text-center text-lg" style={{ color: colors.textSecondary }}>No strategies found</Text>
+        <Text className="text-center mt-2" style={{ color: colors.textMuted }}>Check back later for new strategies</Text>
       </View>
     );
   }
@@ -158,7 +158,7 @@ export function SwipeDiscoverView({ onStrategySelect }: Props) {
 
       {currentIndex >= enrichedStrategies.length && (
         <View className="absolute inset-0 justify-center items-center">
-          <Text className="text-stone-400 text-lg">No more strategies</Text>
+          <Text className="text-lg" style={{ color: colors.textSecondary }}>No more strategies</Text>
         </View>
       )}
     </View>

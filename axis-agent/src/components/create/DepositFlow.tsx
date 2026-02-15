@@ -83,7 +83,8 @@ export const DepositFlow = ({
       try {
          strategyPubkey = new PublicKey(strategyAddress);
       } catch {
-         strategyPubkey = new PublicKey("So11111111111111111111111111111111111111112");
+         // strategyAddress が無効な場合は publicKey (自分のウォレット) にフォールバック
+         strategyPubkey = publicKey;
       }
 
       const transaction = new Transaction();
@@ -105,13 +106,17 @@ export const DepositFlow = ({
 
       const signedTx = await signTransaction(transaction);
       const serializedTx = signedTx.serialize();
-      const signature = await connection.sendRawTransaction(serializedTx);
-      
+      const signature = await connection.sendRawTransaction(serializedTx, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+        maxRetries: 3,
+      });
+
       await connection.confirmTransaction({
         signature,
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      });
+      }, 'confirmed');
 
       setTxSignature(signature);
       
@@ -180,7 +185,9 @@ export const DepositFlow = ({
       setStatus('SUCCESS');
 
     } catch (e: any) {
-      setErrorMessage(e.message || 'Deposit failed');
+      console.error('Deposit Error:', e);
+      const msg = e?.logs?.join('\n') || e?.message || 'Deposit failed';
+      setErrorMessage(msg.slice(0, 200));
       setStatus('ERROR');
     }
   };

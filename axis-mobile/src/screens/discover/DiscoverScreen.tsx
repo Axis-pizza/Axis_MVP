@@ -32,7 +32,7 @@ export function DiscoverScreen() {
     <View className="flex-1" style={{ backgroundColor: colors.background, paddingTop: insets.top }}>
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3">
-        <Text className="text-white text-xl font-bold">Discover</Text>
+        <Text className="text-xl font-bold" style={{ color: '#F2E0C8', fontFamily: 'Georgia' }}>Discover</Text>
         <Pressable onPress={toggleView} className="p-2">
           {viewMode === 'swipe' ? (
             <List size={22} color={colors.textMuted} />
