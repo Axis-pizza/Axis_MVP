@@ -46,7 +46,6 @@ export const IdentityStep = ({
           >
             <ArrowLeft size={20} />
           </button>
-          <span className="font-semibold text-base">Strategy Identity</span>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-6 custom-scrollbar">
