@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useMotionValue, useTransform as useMotionTransform, useAnimation } from 'framer-motion';
 import { 
   ArrowLeft, Copy, Star, 
-  TrendingUp, TrendingDown, Layers, Activity, PieChart, Wallet, ArrowRight, X, Check, ArrowDown, Loader2, ChevronRight
+  TrendingUp, TrendingDown, Layers, Activity, PieChart, Wallet, ArrowRight, X, Check, ArrowDown, Loader2, ChevronRight, Settings
 } from 'lucide-react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction } from '@solana/web3.js';
@@ -92,7 +92,7 @@ const SwipeToConfirm = ({
       className={`relative h-16 w-full rounded-full overflow-hidden border select-none transition-all duration-300 ${
         isSuccess 
           ? 'bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.3)]' 
-          : 'bg-[#140E08] border-[rgba(184,134,63,0.15)] shadow-inner'
+          : 'bg-[#1C1C1E] border-[rgba(255,255,255,0.1)]'
       }`}
     >
       <motion.div
@@ -107,7 +107,7 @@ const SwipeToConfirm = ({
         style={{ opacity: textOpacity }}
       >
         <span className="font-bold text-xs tracking-[0.2em] text-white/50 animate-pulse">
-          {isLoading ? "PROCESSING..." : `SLIDE TO ${label}`}
+          {isLoading ? "PROCESSING..." : label}
         </span>
       </motion.div>
 
@@ -138,7 +138,7 @@ const SwipeToConfirm = ({
   );
 };
 
-// 2. InvestSheet
+// 2. InvestSheet (Full Screen Phantom Style)
 interface InvestSheetProps {
   isOpen: boolean;
   onClose: () => void;
@@ -214,128 +214,123 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBala
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60]"
-            onClick={status === 'IDLE' || status === 'ERROR' || status === 'SUCCESS' ? onClose : undefined}
-          />
-          <motion.div
-            key="sheet"
-            initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 bg-[#080503] rounded-t-[32px] z-[70] overflow-hidden flex flex-col safe-area-bottom border-t border-[rgba(184,134,63,0.15)] shadow-2xl"
-            style={{ maxHeight: '92vh' }}
-          >
-            <div className="w-full flex justify-center pt-4 pb-2" onClick={status === 'IDLE' ? onClose : undefined}>
-              <div className="w-12 h-1.5 bg-white/10 rounded-full" />
-            </div>
+        <motion.div
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          // ★変更: 全画面固定 (z-index最強, 背景色をPhantom風の黒へ)
+          className="fixed inset-0 z-[99999] bg-[#0C0C0C] flex flex-col"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 pt-12 pb-4 shrink-0 safe-area-top">
+             <button 
+               onClick={onClose}
+               className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1C1C1E] text-white hover:bg-white/10 transition-colors"
+             >
+               <X className="w-5 h-5" />
+             </button>
 
-            <div className="px-6 pt-2 pb-8 flex flex-col h-full">
-              {/* Buy/Sell Tabs */}
-              <div className="flex justify-center mb-6">
-                  <div className="flex bg-white/5 p-1 rounded-full border border-[rgba(184,134,63,0.08)]">
-                      <button
-                          onClick={() => setMode('BUY')}
-                          disabled={status !== 'IDLE' && status !== 'ERROR'}
-                          className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
-                              mode === 'BUY' ? 'bg-emerald-500 text-white shadow-lg' : 'text-[#78716C] hover:text-white'
-                          }`}
-                      >
-                          BUY
-                      </button>
-                      <button
-                          onClick={() => setMode('SELL')}
-                          disabled={status !== 'IDLE' && status !== 'ERROR'}
-                          className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
-                              mode === 'SELL' ? 'bg-red-500 text-white shadow-lg' : 'text-[#78716C] hover:text-white'
-                          }`}
-                      >
-                          SELL
-                      </button>
-                  </div>
-              </div>
+             {/* Mode Toggle Pills */}
+             <div className="flex bg-[#1C1C1E] p-1 rounded-full border border-white/5">
+                <button
+                    onClick={() => setMode('BUY')}
+                    className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                        mode === 'BUY' ? 'bg-[#B8863F] text-black' : 'text-[#78716C]'
+                    }`}
+                >
+                    Buy
+                </button>
+                <button
+                    onClick={() => setMode('SELL')}
+                    className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                        mode === 'SELL' ? 'bg-[#B8863F] text-black' : 'text-[#78716C]'
+                    }`}
+                >
+                    Sell
+                </button>
+             </div>
 
-              {/* Main Display */}
-              <div className="flex-1 flex flex-col justify-center items-center mb-8 relative">
-                 {status !== 'IDLE' && status !== 'ERROR' ? (
-                   <div className="flex flex-col items-center gap-6 py-4">
-                     <div className="text-center">
-                        <p className="text-sm font-bold text-white mb-1">Processing Transaction...</p>
-                        <p className="text-xs text-[#78716C]">{mode === 'BUY' ? 'Sending USDC...' : `Sending ${ticker}...`}</p>
-                     </div>
-                     <Loader2 className="w-12 h-12 text-[#B8863F] animate-spin" />
-                   </div>
-                 ) : (
-                   <>
-                     <div className="flex flex-col items-center z-10">
-                       <div className="flex items-baseline justify-center gap-2 mb-1">
-                         <span className={`font-serif font-bold text-white tracking-tighter text-6xl ${amount === '0' ? 'opacity-50' : ''}`}>
-                           {amount}
-                         </span>
-                         <span className={`text-xl font-bold ${mode === 'BUY' ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {mode === 'BUY' ? 'USDC' : ticker}
-                         </span>
-                       </div>
-                       
-                       <div className="flex items-center gap-2 text-xs text-[#78716C] font-mono bg-white/5 py-1.5 px-3 rounded-full border border-[rgba(184,134,63,0.08)]">
-                          <Wallet className="w-3 h-3" />
-                          <span>{currentBalance.toFixed(4)} Available</span>
-                          <button
-                            onClick={() => setAmount((currentBalance * (mode === 'BUY' ? 0.95 : 1)).toFixed(4))}
-                            className="text-[#B8863F] font-bold hover:text-[#D4A261]"
-                          >
-                            MAX
-                          </button>
-                       </div>
-                     </div>
+             <div className="w-10 h-10" /> {/* Spacer */}
+          </div>
 
-                     <div className="my-6 text-white/20">
-                        <ArrowDown className="w-6 h-6" />
-                     </div>
+          {/* Main Content (Center) */}
+          <div className="flex-1 flex flex-col justify-center items-center relative w-full px-6">
+             {/* Amount Display */}
+             <div className="flex flex-col items-center gap-2 mb-8">
+               <div className="flex items-baseline justify-center gap-1">
+                 <span className={`font-sans font-medium text-6xl tracking-tight ${amount === '0' ? 'text-[#57534E]' : 'text-white'}`}>
+                   {amount}
+                 </span>
+               </div>
+               <span className="text-[#78716C] font-bold text-lg">{mode === 'BUY' ? 'USDC' : ticker}</span>
+             </div>
 
-                     <div className="flex flex-col items-center">
-                        <div className="text-sm font-bold text-[#78716C] uppercase mb-1">You Receive (1:1 Rate)</div>
-                        <div className="flex items-center gap-2 text-3xl font-bold text-white">
-                           <span>{estimatedOutput}</span>
-                           <span className={mode === 'BUY' ? 'text-[#B8863F]' : 'text-emerald-500'}>
-                               {mode === 'BUY' ? ticker : 'USDC'}
-                           </span>
-                        </div>
-                     </div>
-                   </>
-                 )}
-              </div>
+             {/* Available Balance Pill */}
+             <div className="flex items-center gap-2 bg-[#1C1C1E] py-2 px-4 rounded-full border border-white/5 mb-8">
+                <Wallet className="w-3.5 h-3.5 text-[#78716C]" />
+                <span className="text-[#A8A29E] text-xs font-mono">
+                   Available: {currentBalance.toFixed(4)} {mode === 'BUY' ? 'USDC' : ticker}
+                </span>
+                <button 
+                   onClick={() => setAmount((currentBalance * (mode === 'BUY' ? 0.95 : 1)).toFixed(4))}
+                   className="text-[#B8863F] text-xs font-bold uppercase hover:text-white transition-colors"
+                >
+                  Max
+                </button>
+             </div>
 
-              {/* Numpad */}
-              {(status === 'IDLE' || status === 'ERROR') && (
-                <div className="grid grid-cols-3 gap-3 mb-8 max-w-[280px] mx-auto w-full">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0].map((key) => (
-                    <button
-                      key={key}
-                      onClick={() => handleNum(key.toString())}
-                      className="h-14 text-2xl font-medium text-white/90 hover:bg-white/5 active:bg-white/10 rounded-2xl transition-all flex items-center justify-center"
-                    >
-                      {key}
-                    </button>
-                  ))}
-                  <button onClick={handleBackspace} className="h-14 flex items-center justify-center text-[#78716C] hover:bg-white/5 rounded-2xl"><ArrowLeft /></button>
+             {/* Estimated Output (Optional) */}
+             {amount !== '0' && (
+                <div className="absolute bottom-4 flex items-center gap-2 text-sm text-[#78716C]">
+                   <ArrowDown className="w-4 h-4" />
+                   <span>Receive approx. {estimatedOutput} {mode === 'BUY' ? ticker : 'USDC'}</span>
                 </div>
-              )}
+             )}
+          </div>
 
-              {/* Swipe to Confirm */}
-              <div className="max-w-[320px] mx-auto w-full">
-                 <SwipeToConfirm
-                   onConfirm={handleExecute}
-                   isLoading={status !== 'IDLE' && status !== 'ERROR' && status !== 'SUCCESS'}
-                   isSuccess={status === 'SUCCESS'}
-                   label={`${mode} ${ticker}`}
-                 />
-              </div>
-            </div>
-          </motion.div>
-        </>
+          {/* Keypad & Action (Bottom) */}
+          <div className="shrink-0 w-full px-6 pb-[calc(env(safe-area-inset-bottom)+24px)] bg-[#0C0C0C]">
+             {/* Numpad */}
+             {(status === 'IDLE' || status === 'ERROR') && (
+               <div className="grid grid-cols-3 gap-y-4 gap-x-6 mb-8 max-w-[320px] mx-auto">
+                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0].map((key) => (
+                   <button
+                     key={key}
+                     onClick={() => handleNum(key.toString())}
+                     className="h-14 text-2xl font-medium text-white hover:bg-white/5 active:bg-white/10 rounded-full transition-all flex items-center justify-center select-none"
+                   >
+                     {key}
+                   </button>
+                 ))}
+                 <button 
+                   onClick={handleBackspace} 
+                   className="h-14 flex items-center justify-center text-white hover:bg-white/5 rounded-full active:scale-95 transition-all"
+                 >
+                   <ArrowLeft className="w-6 h-6" />
+                 </button>
+               </div>
+             )}
+
+             {/* Status / Swipe */}
+             <div className="max-w-[340px] mx-auto w-full">
+               {/* 修正: 処理中のステータスを明示的に指定 */}
+               {status === 'SIGNING' || status === 'CONFIRMING' || status === 'PROCESSING' ? (
+                  <div className="w-full h-16 bg-[#1C1C1E] rounded-full flex items-center justify-center gap-3 border border-white/5">
+                      <Loader2 className="w-5 h-5 text-[#B8863F] animate-spin" />
+                      <span className="text-white font-bold tracking-wide text-sm">PROCESSING...</span>
+                  </div>
+               ) : (
+                  <SwipeToConfirm
+                    onConfirm={handleExecute}
+                    isLoading={false}
+                    isSuccess={status === 'SUCCESS'}
+                    label={`SLIDE TO ${mode}`}
+                  />
+               )}
+             </div>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
@@ -593,7 +588,7 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
       
       {/* 1. Immersive Header */}
       <motion.div 
-        className="absolute top-0 inset-x-0 z-[100] flex items-center justify-between px-4 py-3 safe-area-top pointer-events-none"
+        className="absolute top-0 inset-x-0 z-[9999] flex items-center justify-between px-4 py-3 safe-area-top pointer-events-none"
       >
         <motion.div className="absolute inset-0 bg-black/80 backdrop-blur-md border-b border-[rgba(184,134,63,0.08)] pointer-events-auto" style={{ opacity: headerOpacity }} />
         
