@@ -41,9 +41,18 @@ export const ProfileEditModal = ({
   const [twitterLoading, setTwitterLoading] = useState(false);
   const [twitterLinked, setTwitterLinked] = useState(false);
   const [twitterName, setTwitterName] = useState('');
-  const [avatarKey, setAvatarKey] = useState(0); // for re-render animation
+  const [avatarKey, setAvatarKey] = useState(0);
+  
+  // モバイル判定用のステートを追加
+  const [isMobile, setIsMobile] = useState(false);
 
   const isExistingUser = !!currentProfile.username;
+
+  // モバイル判定ロジック
+  useEffect(() => {
+    // ユーザーエージェントで簡易判定（必要に応じて window.innerWidth < 768 なども追加可能）
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -63,7 +72,7 @@ export const ProfileEditModal = ({
     const user = event.data.user;
     if (user?.avatar_url) {
       setPfpUrl(user.avatar_url);
-      setAvatarKey(prev => prev + 1); // trigger avatar animation
+      setAvatarKey(prev => prev + 1);
     }
     if (user?.name) {
       setTwitterName(user.name);
@@ -90,7 +99,7 @@ export const ProfileEditModal = ({
       showToast("Wallet not connected", "error");
       return;
     }
-
+    // ここでの判定は念のため残しますが、UI側で非表示になるため到達しません
     setTwitterLoading(true);
     const authUrl = api.getTwitterAuthUrl(currentProfile.pubkey);
     const w = 500, h = 600;
@@ -102,7 +111,6 @@ export const ProfileEditModal = ({
       `width=${w},height=${h},left=${left},top=${top},popup=yes`
     );
 
-    // Detect popup close without completing auth
     const checkClosed = setInterval(() => {
       if (twitterPopupRef.current?.closed) {
         clearInterval(checkClosed);
@@ -218,8 +226,8 @@ export const ProfileEditModal = ({
                     </div>
                   </motion.div>
 
-                  {/* X badge on avatar */}
-                  {twitterLinked && (
+                  {/* X badge on avatar (モバイル以外の場合のみ表示) */}
+                  {twitterLinked && !isMobile && (
                     <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
@@ -234,39 +242,44 @@ export const ProfileEditModal = ({
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
                 <p className="text-xs text-white/30 mt-2">Tap to upload</p>
 
-                {/* Divider */}
-                <div className="flex items-center gap-3 w-full mt-3">
-                  <div className="flex-1 h-px bg-white/10" />
-                  <span className="text-xs text-white/30">or</span>
-                  <div className="flex-1 h-px bg-white/10" />
-                </div>
+                {/* X Connect Section - Mobileの場合は非表示にする */}
+                {!isMobile && (
+                  <>
+                    {/* Divider */}
+                    <div className="flex items-center gap-3 w-full mt-3">
+                      <div className="flex-1 h-px bg-white/10" />
+                      <span className="text-xs text-white/30">or</span>
+                      <div className="flex-1 h-px bg-white/10" />
+                    </div>
 
-                {/* Import from X button */}
-                {twitterLinked ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-[#1D9BF0]/10 border border-[#1D9BF0]/30 rounded-xl"
-                  >
-                    <XIcon className="w-4 h-4 fill-[#1D9BF0]" />
-                    <span className="text-sm text-[#1D9BF0] font-medium">
-                      {twitterName || 'Connected'}
-                    </span>
-                    <Check className="w-4 h-4 text-[#1D9BF0]" />
-                  </motion.div>
-                ) : (
-                  <button
-                    onClick={handleConnectTwitter}
-                    disabled={twitterLoading}
-                    className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-black border border-white/15 rounded-xl text-white/80 text-sm font-medium hover:bg-white/5 hover:border-white/25 transition-colors disabled:opacity-50"
-                  >
-                    {twitterLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                    {/* Import from X button */}
+                    {twitterLinked ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-[#1D9BF0]/10 border border-[#1D9BF0]/30 rounded-xl"
+                      >
+                        <XIcon className="w-4 h-4 fill-[#1D9BF0]" />
+                        <span className="text-sm text-[#1D9BF0] font-medium">
+                          {twitterName || 'Connected'}
+                        </span>
+                        <Check className="w-4 h-4 text-[#1D9BF0]" />
+                      </motion.div>
                     ) : (
-                      <XIcon className="w-4 h-4 fill-current" />
+                      <button
+                        onClick={handleConnectTwitter}
+                        disabled={twitterLoading}
+                        className="mt-3 flex items-center gap-2 px-5 py-2.5 bg-black border border-white/15 rounded-xl text-white/80 text-sm font-medium hover:bg-white/5 hover:border-white/25 transition-colors disabled:opacity-50"
+                      >
+                        {twitterLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <XIcon className="w-4 h-4 fill-current" />
+                        )}
+                        Import from X
+                      </button>
                     )}
-                    Import from X
-                  </button>
+                  </>
                 )}
               </div>
 

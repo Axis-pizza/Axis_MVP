@@ -94,6 +94,30 @@ export const api = {
     }
   },
 
+  connectTwitter(wallet: string) {
+    const url = this.getTwitterAuthUrl(wallet);
+    
+    // 簡易的なモバイル判定
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // モバイル: アプリ内ブラウザでスタックしないよう、現在のタブで遷移(リダイレクト)する
+      window.location.href = url;
+    } else {
+      // PC: 既存通りポップアップで開く
+      const width = 600;
+      const height = 600;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      window.open(url, 'Twitter Auth', `width=${width},height=${height},top=${top},left=${left}`);
+    }
+  },
+
+  getTwitterAuthUrl(wallet: string): string {
+    // 現在のページURLをコールバック後に戻る場所として指定したい場合、バックエンドの仕様に合わせてクエリパラメータを追加しても良いです
+    // 例: return `${API_BASE}/auth/twitter?wallet=${wallet}&redirect=${encodeURIComponent(window.location.href)}`;
+    return `${API_BASE}/auth/twitter?wallet=${wallet}`;
+  },
 
   async updateProfile(data: { wallet_address: string; name?: string; username?: string; bio?: string; avatar_url?: string; pfpUrl?: string }) {
     try {
@@ -495,7 +519,5 @@ export const api = {
     return res.json();
   },
 
-  getTwitterAuthUrl(wallet: string): string {
-    return `${API_BASE}/auth/twitter?wallet=${wallet}`;
-  }
+  
 };
