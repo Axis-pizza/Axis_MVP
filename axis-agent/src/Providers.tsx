@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { FC, ReactNode } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
+// 削除: import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom'; 
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
 
@@ -15,10 +15,8 @@ export const Providers: FC<{ children: ReactNode }> = ({ children }) => {
     [network]
   );
 
-  // Explicitly add Phantom as a fallback for environments without Wallet Standard support.
-  // WalletProvider automatically deduplicates, so this won't cause duplicate entries.
   const wallets = useMemo(
-    () => [new PhantomWalletAdapter()],
+    () => [],
     []
   );
 
