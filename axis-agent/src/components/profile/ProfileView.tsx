@@ -43,7 +43,10 @@ const formatCurrency = (val: number, currency: 'USD' | 'USDC') => {
   return `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-const formatAddress = (address: string) => `${address.slice(0, 4)}...${address.slice(-4)}`;
+const formatAddress = (address: string | null | undefined) => {
+  if (!address) return 'Unknown'; // または '' (空文字)
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+};
 
 interface ProfileViewProps {
   onStrategySelect?: (strategy: any) => void;
