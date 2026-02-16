@@ -6,6 +6,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { TokenImage } from '../../common/TokenImage';
 import { WeightControl } from './WeightControl';
 import { TabSelector } from './TabSelector';
+import { PredictionEventCard } from './PredictionEventCard';
 import { formatCompactUSD, abbreviateAddress } from '../../../utils/formatNumber';
 import type { JupiterToken } from '../../../services/jupiter';
 import type { AssetItem, BuilderProps } from './types';
@@ -158,7 +159,8 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
     hasSelection,
     isValidAllocation,
     sortedVisibleTokens,
-    displayTokens,
+    // displayTokens, // 削除
+    groupedPredictions, // Hookから取得
     allTokens,
     activeTab,
     setActiveTab,
@@ -173,6 +175,8 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
   } = dashboard;
 
   const { publicKey } = useWallet();
+
+  // useMemo でのローカル計算を削除 (Hook側に移動済み)
 
   // Virtual scrolling
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -394,7 +398,7 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
 
             <div className="flex justify-between items-center mt-2 px-1">
               <span className="text-xs text-amber-800/40">
-                {searchQuery ? `${displayTokens.length} results` : `${allTokens.length.toLocaleString()} tokens`}
+                {searchQuery ? `${allTokens.length.toLocaleString()} tokens` : `${allTokens.length.toLocaleString()} tokens`}
               </span>
               {hasSelection && (
                 <span className="text-xs text-amber-600 flex items-center gap-1">
@@ -406,9 +410,6 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
 
             {/* Sub Filters + Verified Only Toggle */}
             <div className="flex items-center justify-between mt-2">
-              
-
-              {/* Verified Only Toggle */}
               <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-2">
                 <span className="text-[10px] text-white/30 font-bold">Verified</span>
                 <div
@@ -429,7 +430,7 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
 
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar">
             {/* Favorites Bar */}
-            {!searchQuery && preferences.favorites.size > 0 && (
+            {!searchQuery && preferences.favorites.size > 0 && activeTab !== 'prediction' && (
               <div className="px-2 py-2 mb-1 border-b border-white/5">
                 <span className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block px-1">Favorites</span>
                 <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
@@ -451,22 +452,26 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
               </div>
             )}
 
-            {/* Column Headers */}
-            {!isLoading && sortedVisibleTokens.length > 0 && (
-              <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-white/20 uppercase tracking-wider">
-                <div className="w-5" />
-                <div className="w-9" />
-                <div className="flex-1">Token</div>
-                <div className="w-[50px] text-right">MC</div>
-                <div className="w-[50px] text-right">VOL</div>
-                <div className="w-7" />
-              </div>
-            )}
-
             {isLoading ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3">
                 <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
                 <span className="text-sm text-amber-800/50">Loading tokens...</span>
+              </div>
+            ) : activeTab === 'prediction' ? (
+              // --- Prediction専用ビュー ---
+              <div className="px-2 pt-4">
+                {groupedPredictions.map(group => (
+                  <PredictionEventCard 
+                    key={`pred-${group.marketId}`} 
+                    group={group} 
+                    isYesSelected={group.yesToken ? selectedIds.has(group.yesToken.address) : false}
+                    isNoSelected={group.noToken ? selectedIds.has(group.noToken.address) : false}
+                    onSelect={handleTokenSelect}
+                  />
+                ))}
+                {groupedPredictions.length === 0 && (
+                  <div className="text-center py-20 text-white/20 text-sm">No predictions found</div>
+                )}
               </div>
             ) : sortedVisibleTokens.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-amber-800/30">
@@ -474,39 +479,50 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
                 <span className="text-sm">No tokens found</span>
               </div>
             ) : (
-              <div
-                style={{
-                  height: `${virtualizer.getTotalSize()}px`,
-                  width: '100%',
-                  position: 'relative',
-                }}
-              >
-                {virtualizer.getVirtualItems().map((virtualRow) => {
-                  const token = sortedVisibleTokens[virtualRow.index];
-                  const isSelected = selectedIds.has(token.address);
-                  return (
-                    <div
-                      key={token.address}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: `${virtualRow.size}px`,
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      <DesktopTokenListItem
-                        token={token}
-                        isSelected={isSelected}
-                        onSelect={() => handleTokenSelect(token)}
-                        isFavorite={preferences.isFavorite(token.address)}
-                        onToggleFavorite={() => preferences.toggleFavorite(token.address)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+              // --- 通常のリストビュー ---
+              <>
+                <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-white/20 uppercase tracking-wider">
+                  <div className="w-5" />
+                  <div className="w-9" />
+                  <div className="flex-1">Token</div>
+                  <div className="w-[50px] text-right">MC</div>
+                  <div className="w-[50px] text-right">VOL</div>
+                  <div className="w-7" />
+                </div>
+                <div
+                  style={{
+                    height: `${virtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  {virtualizer.getVirtualItems().map((virtualRow) => {
+                    const token = sortedVisibleTokens[virtualRow.index];
+                    const isSelected = selectedIds.has(token.address);
+                    return (
+                      <div
+                        key={token.address}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: `${virtualRow.size}px`,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                      >
+                        <DesktopTokenListItem
+                          token={token}
+                          isSelected={isSelected}
+                          onSelect={() => handleTokenSelect(token)}
+                          isFavorite={preferences.isFavorite(token.address)}
+                          onToggleFavorite={() => preferences.toggleFavorite(token.address)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
         </div>

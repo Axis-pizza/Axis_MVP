@@ -140,6 +140,29 @@ export const api = {
     }
   },
 
+  async getPredictionMarkets() {
+    // キャッシュが必要ならここで実装 (例: 1分間キャッシュ)
+    const cacheKey = 'dflow_markets';
+    const cached = _getCached(cacheKey, 60 * 1000);
+    if (cached) return cached;
+
+    try {
+      // axis-api の /api/dflow/markets を叩く
+      const res = await fetch(`${API_BASE}/dflow/markets`); 
+      if (!res.ok) return [];
+      
+      const data = await res.json();
+      // レスポンスの構造に合わせて調整 (data.markets なのか data そのままなのか確認が必要ですが、一旦そのまま保存)
+      const result = Array.isArray(data) ? data : (data.markets || []);
+      
+      _setCache(cacheKey, result);
+      return result;
+    } catch (e) {
+      console.error("Failed to fetch prediction markets:", e);
+      return [];
+    }
+  },
+
   async requestInvite(email: string) {
     try {
       const res = await fetch(`${API_BASE}/request-invite`, {
