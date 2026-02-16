@@ -5,7 +5,7 @@ import { JupiterService, WalletService, type JupiterToken } from '../services/ju
 import { fetchPredictionTokens, fetchStockTokens, fetchCommodityTokens } from '../services/dflow';
 import { fetchMarketCapMap } from '../services/coingecko';
 import { toast } from 'sonner';
-import type { StrategyConfig, AssetItem, ManualDashboardProps } from '../components/create/manual/types';
+import type { StrategyConfig, AssetItem, ManualDashboardProps, TabType } from '../components/create/manual/types';
 
 const POPULAR_SYMBOLS = ['SOL', 'USDC', 'USDT', 'JUP', 'JLP', 'BONK', 'WIF', 'TRUMP', 'ETH', 'JitoSOL'];
 
@@ -16,31 +16,20 @@ export const useManualDashboard = ({
   verifiedOnly = false,
 }: Pick<ManualDashboardProps, 'onDeploySuccess' | 'initialConfig' | 'initialTokens'> & { verifiedOnly?: boolean }) => {
   
-  // Haptic feedback helper
-  const triggerHaptic = useCallback(() => {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
-  }, []);
-
+  // --- 1. State Definitions ---
   const [step, setStep] = useState<'builder' | 'identity'>('builder');
-  
-  // Tabs State
-  const [activeTab, setActiveTab] = useState<'all' | 'your_tokens' | 'trending' | 'meme'>('all');
-  
+  const [activeTab, setActiveTab] = useState<TabType>('all');
   const [allTokens, setAllTokens] = useState<JupiterToken[]>([]);
-  
-  // Data specific to tabs
   const [userTokens, setUserTokens] = useState<JupiterToken[]>([]);
   const [trendingIds, setTrendingIds] = useState<Set<string>>(new Set());
-
   const [portfolio, setPortfolio] = useState<AssetItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  const { connected, publicKey } = useWallet();
-  const { connection } = useConnection();
-  const { setVisible } = useWalletModal();
-
+  const [searchResults, setSearchResults] = useState<JupiterToken[]>([]);
+  const [caFallbackToken, setCaFallbackToken] = useState<JupiterToken | null>(null);
+  const [tokenFilter, setTokenFilter] = useState<'all' | 'crypto' | 'stock' | 'commodity' | 'prediction'>('all');
+  
   const [config, setConfig] = useState<StrategyConfig>({
     name: initialConfig?.name || '',
     ticker: initialConfig?.ticker || '',
@@ -48,18 +37,132 @@ export const useManualDashboard = ({
   });
 
   const [focusedField, setFocusedField] = useState<'ticker' | 'name' | 'desc' | null>('ticker');
-  const [flyingToken, setFlyingToken] = useState<JupiterToken | null>(null); // Type check fix
+  const [flyingToken, setFlyingToken] = useState<JupiterToken | null>(null);
   const [flyingCoords, setFlyingCoords] = useState<{x: number, y: number} | null>(null);
-
-  const [tokenFilter, setTokenFilter] = useState<'all' | 'crypto' | 'stock' | 'commodity' | 'prediction'>('all');
+  
+  const { connected, publicKey } = useWallet();
+  const { connection } = useConnection();
+  const { setVisible } = useWalletModal();
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const caFetchRef = useRef<string | null>(null);
 
-  // Server-side search results
-  const [searchResults, setSearchResults] = useState<JupiterToken[]>([]);
+  // --- 2. Helper Handlers ---
+  const triggerHaptic = useCallback(() => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+  }, []);
 
-  // --- Computed ---
-  const totalWeight = useMemo(() => portfolio.reduce((sum, i) => sum + i.weight, 0), [portfolio]);
+  // --- 3. Computed Values ---
+
+  // A. 通常リストの表示ロジック (ハイブリッド検索の実装)
+  const sortedVisibleTokens = useMemo(() => {
+    // Predictionタブは専用ロジック(groupedPredictions)に任せるため空配列を返す
+    if (activeTab === 'prediction') return [];
+
+    if (searchQuery.trim()) {
+      const lowerQ = searchQuery.trim().toLowerCase();
+      
+      // 1. Local Search (手元の全リストから検索) - これが最速かつ情報リッチ
+      // Predictionトークン(source='dflow')は通常の検索結果には混ぜない（ノイズになるため）
+      const localMatches = allTokens.filter(t => {
+        if (t.source === 'dflow') return false; 
+        return (
+          t.symbol.toLowerCase().includes(lowerQ) || 
+          t.name.toLowerCase().includes(lowerQ) || 
+          t.address === searchQuery // アドレス完全一致
+        );
+      });
+
+      // 2. API Results (searchResults) - ローカルにないものだけ追加
+      // これにより、Memeコインなどの「手元にないトークン」もAPI経由で表示される
+      const uniqueApiResults = searchResults.filter(apiToken => 
+        !localMatches.some(local => local.address === apiToken.address)
+      );
+
+      // 3. Merge & Address Search
+      let combined = [...localMatches, ...uniqueApiResults];
+
+      // アドレス検索でヒットしたフォールバックがあれば先頭に追加
+      if (caFallbackToken && !combined.find(t => t.address === caFallbackToken.address)) {
+        combined.unshift(caFallbackToken);
+      }
+
+      return combined;
+    }
+
+    // --- 以下、検索クエリがない場合のタブごとの表示ロジック ---
+    let baseList: JupiterToken[] = [];
+    if (activeTab === 'your_tokens') baseList = userTokens;
+    else if (activeTab === 'stock') baseList = allTokens.filter(t => t.source === 'stock');
+    else if (activeTab === 'meme') {
+      baseList = allTokens.filter(t => t.tags.includes('meme') || ['WIF', 'BONK', 'POPCAT'].includes(t.symbol.toUpperCase()));
+      if (trendingIds.size > 0) baseList = [...baseList].sort((a, b) => (trendingIds.has(b.address) ? 1 : 0) - (trendingIds.has(a.address) ? 1 : 0));
+    } else if (activeTab === 'trending') {
+      if (trendingIds.size > 0) {
+        const trending = allTokens.filter(t => trendingIds.has(t.address));
+        const others = allTokens.filter(t => !trendingIds.has(t.address) && t.isVerified).slice(0, 20);
+        baseList = [...trending, ...others];
+      } else baseList = allTokens.filter(t => t.tags.includes('birdeye-trending') || (t.dailyVolume && t.dailyVolume > 1000000));
+    } else baseList = allTokens; // 'all' タブ
+
+    // カテゴリフィルタ (Allタブ内での絞り込み)
+    if (activeTab === 'all' && tokenFilter !== 'all') {
+      if (tokenFilter === 'crypto') baseList = baseList.filter(t => !t.source || t.source === 'jupiter');
+      else if (tokenFilter === 'stock') baseList = baseList.filter(t => t.source === 'stock');
+      else if (tokenFilter === 'commodity') baseList = baseList.filter(t => t.source === 'commodity');
+      else if (tokenFilter === 'prediction') baseList = baseList.filter(t => t.source === 'dflow');
+    }
+
+    if (verifiedOnly) baseList = baseList.filter(t => t.isVerified || t.source === 'stock' || t.source === 'dflow');
+    return baseList;
+  }, [allTokens, userTokens, activeTab, searchQuery, tokenFilter, trendingIds, verifiedOnly, caFallbackToken, searchResults]);
+
+  const displayTokens = sortedVisibleTokens;
+
+  // B. Predictionのグループ化・検索・ソート
+  const groupedPredictions = useMemo(() => {
+    if (activeTab !== 'prediction') return [];
+    
+    const sourceList = allTokens.filter(t => t.source === 'dflow');
+    const groups: Record<string, any> = {};
+
+    sourceList.forEach(token => {
+      const meta = token.predictionMeta;
+      if (!meta) return;
+
+      if (!groups[meta.marketId]) {
+        groups[meta.marketId] = {
+          marketId: meta.marketId,
+          marketQuestion: meta.marketQuestion,
+          eventTitle: meta.eventTitle,
+          image: token.logoURI || '',
+          expiry: meta.expiry,
+          totalVolume: 0,
+        };
+      }
+      
+      if (token.dailyVolume) groups[meta.marketId].totalVolume += token.dailyVolume;
+      if (meta.side === 'YES') groups[meta.marketId].yesToken = token;
+      if (meta.side === 'NO') groups[meta.marketId].noToken = token;
+    });
+
+    let result = Object.values(groups);
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((g: any) => 
+        g.marketQuestion.toLowerCase().includes(q) || 
+        g.eventTitle.toLowerCase().includes(q) ||
+        (g.yesToken && g.yesToken.symbol.toLowerCase().includes(q))
+      );
+    }
+
+    result.sort((a: any, b: any) => (b.totalVolume || 0) - (a.totalVolume || 0));
+    return result;
+  }, [allTokens, searchQuery, activeTab]);
+
+  // C. その他の計算
   const selectedIds = useMemo(() => new Set(portfolio.map(p => p.token.address)), [portfolio]);
+  const totalWeight = useMemo(() => portfolio.reduce((sum, i) => sum + i.weight, 0), [portfolio]);
   const hasSelection = portfolio.length > 0;
   const isValidAllocation = totalWeight === 100 && portfolio.length >= 2;
 
@@ -70,22 +173,17 @@ export const useManualDashboard = ({
     prediction: allTokens.filter(t => t.source === 'dflow').length,
   }), [allTokens]);
 
-  // --- CA fallback: async fetch for unknown mint addresses ---
-  const [caFallbackToken, setCaFallbackToken] = useState<JupiterToken | null>(null);
-  const caFetchRef = useRef<string | null>(null);
+  // --- 4. Effects ---
 
+  // CA Search Fallback
   useEffect(() => {
     const q = searchQuery.trim();
-    // Looks like a Solana address (32-44 chars, base58)
     if (q.length >= 32 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(q)) {
       const hasMatch = allTokens.some(t => t.address.toLowerCase() === q.toLowerCase());
       if (!hasMatch && caFetchRef.current !== q) {
         caFetchRef.current = q;
-        setCaFallbackToken(null);
         JupiterService.fetchTokenByMint(q).then(token => {
-          if (token && caFetchRef.current === q) {
-            setCaFallbackToken(token);
-          }
+          if (token && caFetchRef.current === q) setCaFallbackToken(token);
         });
       }
     } else {
@@ -94,81 +192,9 @@ export const useManualDashboard = ({
     }
   }, [searchQuery, allTokens]);
 
-  // --- Logic for displaying tokens based on Tabs & Filters ---
-  const sortedVisibleTokens = useMemo(() => {
-    if (searchQuery.trim()) {
-      const lowerQ = searchQuery.trim().toLowerCase();
-      const isAddress = lowerQ.length >= 32;
-
-      if (isAddress) {
-        // CA search: check allTokens + caFallbackToken
-        const results: JupiterToken[] = [];
-        const match = allTokens.find(t => t.address.toLowerCase() === lowerQ);
-        if (match) results.push(match);
-        if (caFallbackToken && !results.find(t => t.address === caFallbackToken.address)) {
-          results.unshift(caFallbackToken);
-        }
-        return results;
-      }
-
-      // Symbol/name search: use server-side search results
-      const results = [...searchResults];
-      if (caFallbackToken && !results.find(t => t.address === caFallbackToken.address)) {
-        results.unshift(caFallbackToken);
-      }
-      return results;
-    }
-
-    // --- 以下、検索クエリがない場合のタブごとの表示ロジック ---
-    let baseList: JupiterToken[] = [];
-
-    // 1. Tab Filtering
-    if (activeTab === 'your_tokens') {
-        baseList = userTokens;
-    } else if (activeTab === 'meme') {
-        baseList = allTokens.filter(t =>
-            t.tags.includes('meme') ||
-            ['WIF', 'BONK', 'POPCAT', 'MEW', 'BOME', 'PNUT', 'MOG', 'TRUMP', 'MELANIA'].includes(t.symbol.toUpperCase())
-        );
-        if (trendingIds.size > 0) {
-            baseList = [...baseList].sort((a, b) => (trendingIds.has(b.address) ? 1 : 0) - (trendingIds.has(a.address) ? 1 : 0));
-        }
-    } else if (activeTab === 'trending') {
-        if (trendingIds.size > 0) {
-            const trending = allTokens.filter(t => trendingIds.has(t.address));
-            const others = allTokens.filter(t => !trendingIds.has(t.address) && t.isVerified).slice(0, 20);
-            baseList = [...trending, ...others];
-        } else {
-            baseList = allTokens.filter(t => t.tags.includes('birdeye-trending') || (t.dailyVolume && t.dailyVolume > 1000000));
-        }
-    } else {
-        // 'all' tab
-        baseList = allTokens;
-    }
-
-    // 2. Category Filter (Allタブかつ検索なしの時のみ有効)
-    if (activeTab === 'all' && tokenFilter !== 'all') {
-        if (tokenFilter === 'crypto') baseList = baseList.filter(t => !t.source || t.source === 'jupiter');
-        else if (tokenFilter === 'stock') baseList = baseList.filter(t => t.source === 'stock');
-        else if (tokenFilter === 'commodity') baseList = baseList.filter(t => t.source === 'commodity');
-        else if (tokenFilter === 'prediction') baseList = baseList.filter(t => t.source === 'dflow');
-    }
-
-    // 3. Verified Only filter
-    if (verifiedOnly) {
-      baseList = baseList.filter(t => t.isVerified);
-    }
-
-    return baseList;
-  }, [allTokens, userTokens, activeTab, searchQuery, tokenFilter, trendingIds, verifiedOnly, caFallbackToken, searchResults]);
-
-  // エイリアス (互換性のため)
-  const displayTokens = sortedVisibleTokens;
-
-  // --- Effects ---
-
-  // Init Load
+  // Initial Load (重複排除の実装)
   useEffect(() => {
+    let isMounted = true;
     const init = async () => {
       setIsLoading(true);
       try {
@@ -177,163 +203,113 @@ export const useManualDashboard = ({
           fetchPredictionTokens().catch(() => []),
           fetchStockTokens().catch(() => []),
           fetchCommodityTokens().catch(() => []),
-          fetchMarketCapMap().catch(() => ({ byAddress: new Map<string, number>(), bySymbol: new Map<string, number>() })),
+          fetchMarketCapMap().catch(() => ({ byAddress: new Map(), bySymbol: new Map() })),
         ]);
+        if (!isMounted) return;
 
-        // 人気トークンを上位に表示するための並び替え
-        const popular = POPULAR_SYMBOLS
-          .map(sym => list.find(t => t.symbol === sym))
-          .filter((t): t is JupiterToken => t !== undefined);
+        const uniqueMap = new Map<string, JupiterToken>();
         
-        // 重複排除のためのSet
-        const popularIds = new Set(popular.map(t => t.address));
-        const others = list.filter(t => !popularIds.has(t.address));
+        POPULAR_SYMBOLS.forEach(sym => { const t = list.find(x => x.symbol === sym); if (t) uniqueMap.set(t.address, t); });
+        [...predictionTokens, ...stockTokens, ...commodityTokens].forEach(t => uniqueMap.set(t.address, t));
+        list.forEach(t => { if (!uniqueMap.has(t.address)) uniqueMap.set(t.address, t); });
 
-        // 全トークンをマージ (Source情報を付与したトークンも含む)
-        // Note: fetchXxxTokens で取得したトークンには既に source プロパティがついている前提
-        const merged = [
-            ...popular,
-            ...predictionTokens,
-            ...stockTokens,
-            ...commodityTokens,
-            ...others
-        ];
-
-        // Enrich with market cap from CoinGecko
-        const enriched = merged.map(t => {
+        const enriched = Array.from(uniqueMap.values()).map(t => {
           const mc = mcMaps.byAddress.get(t.address) ?? mcMaps.bySymbol.get(t.symbol.toUpperCase());
           return mc ? { ...t, marketCap: mc } : t;
         });
 
         setAllTokens(enriched);
-        
-        // 初期トークン設定 (もしあれば)
+
         if (initialTokens && initialTokens.length > 0) {
           const initialAssets: AssetItem[] = [];
           initialTokens.forEach(p => {
-            const t = enriched.find(x => x.symbol === p.symbol);
-            if (t) {
-                initialAssets.push({ 
-                    token: t, 
-                    weight: p.weight, 
-                    locked: true, 
-                    id: t.address 
-                });
+            const t = enriched.find(x => x.symbol === p.symbol || x.address === (p as any).address);
+            if (t && !initialAssets.some(e => e.token.address === t.address)) {
+                initialAssets.push({ token: t, weight: p.weight, locked: true, id: t.address });
             }
           });
-          // 重複排除してセット
-          const uniqueAssets = Array.from(new Map(initialAssets.map(item => [item.token.address, item])).values());
-          setPortfolio(uniqueAssets);
+          setPortfolio(initialAssets);
         }
-      } catch (e) {
-        console.error("Failed to load tokens:", e);
-        toast.error('Failed to load tokens');
-      } finally {
-        setIsLoading(false);
-      }
+      } catch (e) { console.error(e); }
+      finally { if (isMounted) setIsLoading(false); }
     };
     init();
-  }, []); // initialTokens 依存を外して初回のみ実行にするのが一般的だが、要件による
+    return () => { isMounted = false; };
+  }, []);
 
-  // Fetch User Tokens
+  // Fetch User Tokens / Trending
   useEffect(() => {
     if (activeTab === 'your_tokens' && publicKey && connected) {
       setIsLoading(true);
-      WalletService.getUserTokens(connection, publicKey)
-        .then(tokens => {
-            setUserTokens(tokens);
-        })
-        .catch(console.error)
-        .finally(() => setIsLoading(false));
+      WalletService.getUserTokens(connection, publicKey).then(setUserTokens).finally(() => setIsLoading(false));
     }
   }, [activeTab, publicKey, connected, connection]);
 
-  // Fetch Trending (Jupiter v2 returns JupiterToken[])
   useEffect(() => {
     if ((activeTab === 'trending' || activeTab === 'meme') && trendingIds.size === 0) {
-       JupiterService.getTrendingTokens().then(tokens => {
-           if (tokens.length > 0) {
-             setTrendingIds(new Set(tokens.map(t => t.address)));
-           }
-       });
+       JupiterService.getTrendingTokens().then(tokens => { if (tokens.length > 0) setTrendingIds(new Set(tokens.map(t => t.address))); });
     }
   }, [activeTab, trendingIds.size]);
 
-  // Search Debounce — async API call for symbol/name search
+  // Search Debounce (API Call)
   useEffect(() => {
     const q = searchQuery.trim();
-    if (!q) {
+    if (!q || (q.length >= 32 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(q))) {
       setIsSearching(false);
-      setSearchResults([]);
+      if (!q) setSearchResults([]);
       return;
     }
-
-    // CA queries are handled by the caFallback effect, not the search API
-    if (q.length >= 32 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(q)) {
-      setIsSearching(false);
-      return;
-    }
-
     setIsSearching(true);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-
     searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const results = await JupiterService.searchTokens(q);
-        setSearchResults(results);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
+      // API検索はPrediction以外のときに走らせる（Predictionはローカルで十分なため）
+      if (activeTab !== 'prediction') {
+        try { const results = await JupiterService.searchTokens(q); setSearchResults(results); } 
+        catch { setSearchResults([]); } 
       }
+      setIsSearching(false);
     }, 300);
-
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
-  }, [searchQuery]);
+  }, [searchQuery, activeTab]);
 
-  // Tab変更時にサブフィルタをリセット
-  useEffect(() => {
-    if (activeTab !== 'all') {
-      setTokenFilter('all');
-    }
-  }, [activeTab]);
+  useEffect(() => { if (activeTab !== 'all') setTokenFilter('all'); }, [activeTab]);
 
-  // --- Handlers ---
-  const handleToIdentity = useCallback(() => {
-    triggerHaptic();
-    setStep('identity');
-    setFocusedField('ticker');
-  }, [triggerHaptic]);
-
-  const handleBackToBuilder = useCallback(() => {
-    setStep('builder');
+  // --- 5. Action Handlers ---
+  const addTokenDirect = useCallback((token: JupiterToken) => {
+    setPortfolio(prev => {
+      if (prev.some(p => p.token.address === token.address)) return prev;
+      const currentW = prev.reduce((s, i) => s + i.weight, 0);
+      let nextW = 0;
+      if (currentW < 100) {
+        nextW = Math.max(1, Math.floor((100 - currentW) / 2));
+        if (nextW === 0 && currentW < 100) nextW = 100 - currentW;
+      }
+      return [...prev, { token, weight: nextW, locked: false, id: token.address }];
+    });
+    setSearchQuery('');
   }, []);
 
+  const removeToken = useCallback((address: string) => { triggerHaptic(); setPortfolio(prev => prev.filter(p => p.token.address !== address)); }, [triggerHaptic]);
+  const updateWeight = useCallback((address: string, val: number) => { setPortfolio(prev => prev.map(p => p.token.address === address ? { ...p, weight: val } : p)); }, []);
+  const distributeEvenly = useCallback(() => {
+    triggerHaptic();
+    if (portfolio.length === 0) return;
+    const count = portfolio.length;
+    const evenWeight = Math.floor(100 / count);
+    const remainder = 100 - (evenWeight * count);
+    setPortfolio(prev => prev.map((p, i) => ({ ...p, weight: evenWeight + (i === 0 ? remainder : 0) })));
+  }, [portfolio.length, triggerHaptic]);
+
+  const handleToIdentity = useCallback(() => { triggerHaptic(); setStep('identity'); setFocusedField('ticker'); }, [triggerHaptic]);
+  const handleBackToBuilder = useCallback(() => setStep('builder'), []);
   const handleDeploy = useCallback(async () => {
     triggerHaptic();
-    if (!config.name || !config.ticker) {
-      toast.error("Required Fields", { description: "Please enter a Name and Ticker." });
-      return;
-    }
-    if (!connected || !publicKey) {
-      setVisible(true);
-      return;
-    }
-    
-    // Deployment Logic here (usually passing data up)
-    const mappedTokens = portfolio.map(p => ({
-      symbol: p.token.symbol,
-      weight: p.weight,
-      mint: p.token.address,
-      logoURI: p.token.logoURI,
-    }));
-    
-    onDeploySuccess({
-      tokens: mappedTokens,
-      config,
-    });
+    if (!config.name || !config.ticker) { toast.error("Required Fields", { description: "Enter Name and Ticker." }); return; }
+    if (!connected || !publicKey) { setVisible(true); return; }
+    const mappedTokens = portfolio.map(p => ({ symbol: p.token.symbol, weight: p.weight, mint: p.token.address, logoURI: p.token.logoURI }));
+    onDeploySuccess({ tokens: mappedTokens, config });
   }, [config, connected, publicKey, setVisible, onDeploySuccess, portfolio, triggerHaptic]);
-
+  
   const generateRandomTicker = useCallback(() => {
     triggerHaptic();
     const prefixes = ['MOON', 'CHAD', 'PEPE', 'SOL', 'DEGEN', 'ALPHA'];
@@ -350,82 +326,18 @@ export const useManualDashboard = ({
 
   const handleAnimationComplete = useCallback(() => {
     if (!flyingToken) return;
-    
-    setPortfolio(prev => {
-      // 既に存在する場合は追加しない
-      if (prev.some(p => p.token.address === flyingToken.address)) return prev;
-
-      const currentW = prev.reduce((s, i) => s + i.weight, 0);
-      // 残りパーセントの半分、または最大50%を割り当て
-      let nextW = 0;
-      if (currentW < 100) {
-          nextW = Math.max(1, Math.floor((100 - currentW) / 2));
-          if (nextW === 0 && currentW < 100) nextW = 100 - currentW; // 残り全部
-      }
-      
-      return [...prev, { token: flyingToken, weight: nextW, locked: false, id: flyingToken.address }];
-    });
-    
+    addTokenDirect(flyingToken);
     triggerHaptic();
     setFlyingToken(null);
     setFlyingCoords(null);
     setSearchQuery('');
-  }, [flyingToken, triggerHaptic]);
-
-  const addTokenDirect = useCallback((token: JupiterToken) => {
-    if (portfolio.some(p => p.token.address === token.address)) return;
-    
-    setPortfolio(prev => {
-      const currentW = prev.reduce((s, i) => s + i.weight, 0);
-      let nextW = 0;
-      if (currentW < 100) {
-          nextW = Math.max(1, Math.floor((100 - currentW) / 2));
-           if (nextW === 0 && currentW < 100) nextW = 100 - currentW;
-      }
-      return [...prev, { token, weight: nextW, locked: false, id: token.address }];
-    });
-    setSearchQuery('');
-  }, [portfolio]);
-
-  const removeToken = useCallback((address: string) => {
-    triggerHaptic();
-    setPortfolio(prev => prev.filter(p => p.token.address !== address));
-  }, [triggerHaptic]);
-
-  const updateWeight = useCallback((address: string, val: number) => {
-    setPortfolio(prev => prev.map(p =>
-      p.token.address === address ? { ...p, weight: val } : p
-    ));
-  }, []);
-
-  const distributeEvenly = useCallback(() => {
-    triggerHaptic();
-    if (portfolio.length === 0) return;
-    const count = portfolio.length;
-    const evenWeight = Math.floor(100 / count);
-    const remainder = 100 - (evenWeight * count);
-    
-    setPortfolio(prev => prev.map((p, i) => ({
-      ...p,
-      weight: evenWeight + (i === 0 ? remainder : 0),
-    })));
-  }, [portfolio.length, triggerHaptic]);
+  }, [flyingToken, triggerHaptic, addTokenDirect]);
 
   return {
-    step, setStep,
-    allTokens, displayTokens,
-    portfolio, searchQuery, setSearchQuery,
-    isSearching, isLoading,
-    config, setConfig,
-    focusedField, setFocusedField,
-    flyingToken, flyingCoords,
-    activeTab, setActiveTab,
-    totalWeight, selectedIds, hasSelection, isValidAllocation,
-    sortedVisibleTokens, filterCounts,
-    tokenFilter, setTokenFilter,
-    connected,
-    handleToIdentity, handleBackToBuilder, handleDeploy,
-    generateRandomTicker, triggerAddAnimation, handleAnimationComplete,
+    step, setStep, allTokens, displayTokens, portfolio, searchQuery, setSearchQuery, isSearching, isLoading, config, setConfig,
+    focusedField, setFocusedField, flyingToken, flyingCoords, activeTab, setActiveTab, totalWeight, selectedIds, hasSelection,
+    isValidAllocation, sortedVisibleTokens, filterCounts, tokenFilter, setTokenFilter, connected, groupedPredictions,
+    handleToIdentity, handleBackToBuilder, handleDeploy, generateRandomTicker, triggerAddAnimation, handleAnimationComplete,
     addTokenDirect, removeToken, updateWeight, distributeEvenly, triggerHaptic,
   };
 };

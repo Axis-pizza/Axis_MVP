@@ -11,7 +11,7 @@ import kagemushaRoutes from './routes/kagemusha';
 import uploadRoutes from './routes/upload';
 import shareRoutes from './routes/share';
 import { runPriceSnapshot } from './services/snapshot';
-
+import dflowRoutes from './routes/dflow';
 // @ts-ignore
 import { EmailMessage } from "cloudflare:email";
 import { createMimeMessage } from "mimetext";
@@ -64,6 +64,7 @@ app.route('/', kagemushaRoutes);
 app.route('/upload', uploadRoutes);
 app.route('/share', shareRoutes);
 app.route('/api/jupiter', jupiterRouter);
+app.route('/api/dflow', dflowRoutes);
 app.post('/report', async (c) => {
   try {
    

@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { Search, Flame, Sparkles, Wallet } from 'lucide-react';
+import { Search, Flame, Sparkles, Wallet,TrendingUp,
+  BarChart3} from 'lucide-react';
 import type { TabType } from './types';
 
 interface TabSelectorProps {
@@ -13,10 +14,11 @@ export const TabSelector = ({
   setActiveTab, 
   isWalletConnected 
 }: TabSelectorProps) => {
-  // "Your tokens" を配列の先頭に追加し、disabled判定を入れる
   const tabs = [
     { id: 'your_tokens', label: 'Your tokens', icon: Wallet, disabled: !isWalletConnected },
     { id: 'trending', label: 'Trending', icon: Flame, disabled: false },
+    { id: 'stock', label: 'Stock', icon: TrendingUp, disabled: false },         // Added
+    { id: 'prediction', label: 'Prediction', icon: BarChart3, disabled: false }, // Added
     { id: 'meme', label: 'Meme', icon: Sparkles, disabled: false },
     { id: 'all', label: 'All tokens', icon: Search, disabled: false },
   ] as const;

@@ -30,10 +30,9 @@ export interface ManualDashboardProps {
   initialTokens?: { symbol: string; weight: number }[];
 }
 
-// Tab型
-export type TabType = 'all' | 'your_tokens' | 'trending' | 'meme';
 
-// フックの型 (Mobile/Desktop Builderで使用)
+export type TabType = 'all' | 'your_tokens' | 'trending' | 'meme' | 'stock' | 'prediction';
+
 import type { ManualDashboardHook } from '../../../hooks/useManualDashboard';
 import type { TokenPreferences } from '../../../hooks/useTokenPreferences';
 export type ExtendedDashboardHook = ManualDashboardHook;

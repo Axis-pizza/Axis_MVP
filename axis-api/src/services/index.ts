@@ -13,3 +13,5 @@ export { JitoBundleService } from './blockchain';
 
 // Legacy exports (for backward compatibility during migration)
 export { Prompts } from './prompts';
+
+export { DFlowService } from './dflow';
