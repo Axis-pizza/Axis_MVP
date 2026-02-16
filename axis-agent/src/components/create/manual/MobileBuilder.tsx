@@ -9,6 +9,7 @@ import { TabSelector } from './TabSelector';
 import { PredictionEventCard } from './PredictionEventCard'; 
 import type { JupiterToken } from '../../../services/jupiter';
 import type { BuilderProps } from './types';
+import { StockTokenCard } from './StockTokenCard';
 
 export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) => {
   const {
@@ -369,7 +370,30 @@ export const MobileBuilder = ({ dashboard, preferences, onBack }: BuilderProps) 
                         <div className="text-center py-20 text-white/20 text-sm">No predictions found</div>
                       )}
                     </div>
-                  ) : sortedVisibleTokens.length === 0 ? (
+
+                    ) : activeTab === 'stock' ? (
+                      // ★★★ ここを追加: Stock専用グリッドビュー ★★★
+                      <div className="px-3 pt-4 pb-10">
+                        {sortedVisibleTokens.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-48 gap-3 text-white/20">
+                            <Search size={32} />
+                            <span className="text-sm">No stocks found</span>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-3">
+                            {sortedVisibleTokens.map((token) => (
+                              <StockTokenCard
+                                key={token.address}
+                                token={token}
+                                isSelected={selectedIds.has(token.address)}
+                                onSelect={() => handleTokenSelect(token)}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : sortedVisibleTokens.length === 0 ? (
+                  
                     <div className="flex flex-col items-center justify-center h-48 gap-3 text-white/20">
                       <Search size={32} />
                       <span className="text-sm">No tokens found</span>

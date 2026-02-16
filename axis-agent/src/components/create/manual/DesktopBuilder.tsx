@@ -1,12 +1,13 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Search, ArrowLeft, ChevronRight, Check, Loader2, AlertCircle, Percent, X, Sparkles, Plus, Star, ClipboardPaste } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion'; // motion を追加
+import { Search, ArrowLeft, ChevronRight, Check, Loader2, AlertCircle, Percent, X, Sparkles, Plus, Star, ClipboardPaste } from 'lucide-react'; // ChevronRight を追加
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { TokenImage } from '../../common/TokenImage';
 import { WeightControl } from './WeightControl';
 import { TabSelector } from './TabSelector';
 import { PredictionEventCard } from './PredictionEventCard';
+import { StockTokenCard } from './StockTokenCard';
 import { formatCompactUSD, abbreviateAddress } from '../../../utils/formatNumber';
 import type { JupiterToken } from '../../../services/jupiter';
 import type { AssetItem, BuilderProps } from './types';
@@ -159,8 +160,7 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
     hasSelection,
     isValidAllocation,
     sortedVisibleTokens,
-    // displayTokens, // 削除
-    groupedPredictions, // Hookから取得
+    groupedPredictions,
     allTokens,
     activeTab,
     setActiveTab,
@@ -175,8 +175,6 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
   } = dashboard;
 
   const { publicKey } = useWallet();
-
-  // useMemo でのローカル計算を削除 (Hook側に移動済み)
 
   // Virtual scrolling
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -233,6 +231,7 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
       </div>
 
       <div className="flex-1 flex min-h-0">
+        {/* Left Panel: Portfolio */}
         <div className="w-[55%] flex flex-col min-h-0 border-r border-white/5">
           <div className="px-6 py-4 flex justify-between items-center border-b border-amber-900/10 bg-gradient-to-r from-[#050505] to-amber-950/5">
             <div className="flex items-center gap-4">
@@ -332,6 +331,7 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
           </div>
         </div>
 
+        {/* Right Panel: Token Selector */}
         <div className="w-[45%] flex flex-col min-h-0 bg-[#0a0a0a]">
           <div className="px-4 py-4 border-b border-white/5">
             <div className="relative mb-4">
@@ -430,7 +430,7 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
 
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar">
             {/* Favorites Bar */}
-            {!searchQuery && preferences.favorites.size > 0 && activeTab !== 'prediction' && (
+            {!searchQuery && preferences.favorites.size > 0 && activeTab !== 'prediction' && activeTab !== 'stock' && (
               <div className="px-2 py-2 mb-1 border-b border-white/5">
                 <span className="text-[10px] text-white/25 uppercase tracking-wider font-bold mb-1.5 block px-1">Favorites</span>
                 <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
@@ -458,7 +458,7 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
                 <span className="text-sm text-amber-800/50">Loading tokens...</span>
               </div>
             ) : activeTab === 'prediction' ? (
-              // --- Prediction専用ビュー ---
+              // --- Prediction View ---
               <div className="px-2 pt-4">
                 {groupedPredictions.map(group => (
                   <PredictionEventCard 
@@ -473,13 +473,34 @@ export const DesktopBuilder = ({ dashboard, preferences, onBack }: BuilderProps)
                   <div className="text-center py-20 text-white/20 text-sm">No predictions found</div>
                 )}
               </div>
+            ) : activeTab === 'stock' ? (
+              // --- Stock View (Grid) ---
+              <div className="px-2 pt-4">
+                {sortedVisibleTokens.length === 0 ? (
+                   <div className="flex flex-col items-center justify-center h-40 gap-3 text-amber-800/30">
+                     <Search size={32} strokeWidth={1.5} />
+                     <span className="text-sm">No stocks found</span>
+                   </div>
+                ) : (
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                    {sortedVisibleTokens.map((token) => (
+                      <StockTokenCard
+                        key={token.address}
+                        token={token}
+                        isSelected={selectedIds.has(token.address)}
+                        onSelect={() => handleTokenSelect(token)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : sortedVisibleTokens.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-amber-800/30">
                 <Search size={32} strokeWidth={1.5} />
                 <span className="text-sm">No tokens found</span>
               </div>
             ) : (
-              // --- 通常のリストビュー ---
+              // --- Default List View ---
               <>
                 <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-white/20 uppercase tracking-wider">
                   <div className="w-5" />

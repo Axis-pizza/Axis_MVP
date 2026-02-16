@@ -16,7 +16,7 @@ export const useManualDashboard = ({
   verifiedOnly = false,
 }: Pick<ManualDashboardProps, 'onDeploySuccess' | 'initialConfig' | 'initialTokens'> & { verifiedOnly?: boolean }) => {
   
-  // --- 1. State Definitions (すべての状態変数を最初に定義) ---
+  // --- 1. State Definitions ---
   const [step, setStep] = useState<'builder' | 'identity'>('builder');
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [allTokens, setAllTokens] = useState<JupiterToken[]>([]);
@@ -51,32 +51,48 @@ export const useManualDashboard = ({
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
   }, []);
 
-  // --- 3. Computed Values (定義済みのStateを使って計算) ---
+  // --- 3. Computed Values ---
 
-  // A. 表示対象のリスト計算
+  // A. 通常リストの表示ロジック (ハイブリッド検索の実装)
   const sortedVisibleTokens = useMemo(() => {
+    // Predictionタブは専用ロジック(groupedPredictions)に任せるため空配列を返す
+    if (activeTab === 'prediction') return [];
+
     if (searchQuery.trim()) {
       const lowerQ = searchQuery.trim().toLowerCase();
-      if (lowerQ.length >= 32) {
-        const results: JupiterToken[] = [];
-        const match = allTokens.find(t => t.address.toLowerCase() === lowerQ);
-        if (match) results.push(match);
-        if (caFallbackToken && !results.find(t => t.address === caFallbackToken.address)) {
-            results.unshift(caFallbackToken);
-        }
-        return results;
+      
+      // 1. Local Search (手元の全リストから検索) - これが最速かつ情報リッチ
+      // Predictionトークン(source='dflow')は通常の検索結果には混ぜない（ノイズになるため）
+      const localMatches = allTokens.filter(t => {
+        if (t.source === 'dflow') return false; 
+        return (
+          t.symbol.toLowerCase().includes(lowerQ) || 
+          t.name.toLowerCase().includes(lowerQ) || 
+          t.address === searchQuery // アドレス完全一致
+        );
+      });
+
+      // 2. API Results (searchResults) - ローカルにないものだけ追加
+      // これにより、Memeコインなどの「手元にないトークン」もAPI経由で表示される
+      const uniqueApiResults = searchResults.filter(apiToken => 
+        !localMatches.some(local => local.address === apiToken.address)
+      );
+
+      // 3. Merge & Address Search
+      let combined = [...localMatches, ...uniqueApiResults];
+
+      // アドレス検索でヒットしたフォールバックがあれば先頭に追加
+      if (caFallbackToken && !combined.find(t => t.address === caFallbackToken.address)) {
+        combined.unshift(caFallbackToken);
       }
-      const results = [...searchResults];
-      if (caFallbackToken && !results.find(t => t.address === caFallbackToken.address)) {
-          results.unshift(caFallbackToken);
-      }
-      return results;
+
+      return combined;
     }
 
+    // --- 以下、検索クエリがない場合のタブごとの表示ロジック ---
     let baseList: JupiterToken[] = [];
     if (activeTab === 'your_tokens') baseList = userTokens;
     else if (activeTab === 'stock') baseList = allTokens.filter(t => t.source === 'stock');
-    else if (activeTab === 'prediction') baseList = allTokens.filter(t => t.source === 'dflow');
     else if (activeTab === 'meme') {
       baseList = allTokens.filter(t => t.tags.includes('meme') || ['WIF', 'BONK', 'POPCAT'].includes(t.symbol.toUpperCase()));
       if (trendingIds.size > 0) baseList = [...baseList].sort((a, b) => (trendingIds.has(b.address) ? 1 : 0) - (trendingIds.has(a.address) ? 1 : 0));
@@ -86,8 +102,9 @@ export const useManualDashboard = ({
         const others = allTokens.filter(t => !trendingIds.has(t.address) && t.isVerified).slice(0, 20);
         baseList = [...trending, ...others];
       } else baseList = allTokens.filter(t => t.tags.includes('birdeye-trending') || (t.dailyVolume && t.dailyVolume > 1000000));
-    } else baseList = allTokens;
+    } else baseList = allTokens; // 'all' タブ
 
+    // カテゴリフィルタ (Allタブ内での絞り込み)
     if (activeTab === 'all' && tokenFilter !== 'all') {
       if (tokenFilter === 'crypto') baseList = baseList.filter(t => !t.source || t.source === 'jupiter');
       else if (tokenFilter === 'stock') baseList = baseList.filter(t => t.source === 'stock');
@@ -101,15 +118,17 @@ export const useManualDashboard = ({
 
   const displayTokens = sortedVisibleTokens;
 
-  // B. Predictionのグループ化
+  // B. Predictionのグループ化・検索・ソート
   const groupedPredictions = useMemo(() => {
     if (activeTab !== 'prediction') return [];
-    const groups: Record<string, any> = {};
-    const baseList = searchQuery.trim() ? sortedVisibleTokens : allTokens.filter(t => t.source === 'dflow');
     
-    baseList.forEach(token => {
+    const sourceList = allTokens.filter(t => t.source === 'dflow');
+    const groups: Record<string, any> = {};
+
+    sourceList.forEach(token => {
       const meta = token.predictionMeta;
       if (!meta) return;
+
       if (!groups[meta.marketId]) {
         groups[meta.marketId] = {
           marketId: meta.marketId,
@@ -117,13 +136,29 @@ export const useManualDashboard = ({
           eventTitle: meta.eventTitle,
           image: token.logoURI || '',
           expiry: meta.expiry,
+          totalVolume: 0,
         };
       }
+      
+      if (token.dailyVolume) groups[meta.marketId].totalVolume += token.dailyVolume;
       if (meta.side === 'YES') groups[meta.marketId].yesToken = token;
       if (meta.side === 'NO') groups[meta.marketId].noToken = token;
     });
-    return Object.values(groups);
-  }, [sortedVisibleTokens, allTokens, searchQuery, activeTab]);
+
+    let result = Object.values(groups);
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((g: any) => 
+        g.marketQuestion.toLowerCase().includes(q) || 
+        g.eventTitle.toLowerCase().includes(q) ||
+        (g.yesToken && g.yesToken.symbol.toLowerCase().includes(q))
+      );
+    }
+
+    result.sort((a: any, b: any) => (b.totalVolume || 0) - (a.totalVolume || 0));
+    return result;
+  }, [allTokens, searchQuery, activeTab]);
 
   // C. その他の計算
   const selectedIds = useMemo(() => new Set(portfolio.map(p => p.token.address)), [portfolio]);
@@ -172,10 +207,8 @@ export const useManualDashboard = ({
         ]);
         if (!isMounted) return;
 
-        // 重複排除ロジック
         const uniqueMap = new Map<string, JupiterToken>();
         
-        // 優先順位: 人気トークン > 特殊ソース > 一般リスト
         POPULAR_SYMBOLS.forEach(sym => { const t = list.find(x => x.symbol === sym); if (t) uniqueMap.set(t.address, t); });
         [...predictionTokens, ...stockTokens, ...commodityTokens].forEach(t => uniqueMap.set(t.address, t));
         list.forEach(t => { if (!uniqueMap.has(t.address)) uniqueMap.set(t.address, t); });
@@ -204,7 +237,7 @@ export const useManualDashboard = ({
     return () => { isMounted = false; };
   }, []);
 
-  // Fetch User Tokens
+  // Fetch User Tokens / Trending
   useEffect(() => {
     if (activeTab === 'your_tokens' && publicKey && connected) {
       setIsLoading(true);
@@ -212,14 +245,13 @@ export const useManualDashboard = ({
     }
   }, [activeTab, publicKey, connected, connection]);
 
-  // Fetch Trending
   useEffect(() => {
     if ((activeTab === 'trending' || activeTab === 'meme') && trendingIds.size === 0) {
        JupiterService.getTrendingTokens().then(tokens => { if (tokens.length > 0) setTrendingIds(new Set(tokens.map(t => t.address))); });
     }
   }, [activeTab, trendingIds.size]);
 
-  // Search Debounce
+  // Search Debounce (API Call)
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q || (q.length >= 32 && /^[1-9A-HJ-NP-Za-km-z]+$/.test(q))) {
@@ -230,20 +262,21 @@ export const useManualDashboard = ({
     setIsSearching(true);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(async () => {
-      try { const results = await JupiterService.searchTokens(q); setSearchResults(results); } 
-      catch { setSearchResults([]); } 
-      finally { setIsSearching(false); }
+      // API検索はPrediction以外のときに走らせる（Predictionはローカルで十分なため）
+      if (activeTab !== 'prediction') {
+        try { const results = await JupiterService.searchTokens(q); setSearchResults(results); } 
+        catch { setSearchResults([]); } 
+      }
+      setIsSearching(false);
     }, 300);
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
-  }, [searchQuery]);
+  }, [searchQuery, activeTab]);
 
   useEffect(() => { if (activeTab !== 'all') setTokenFilter('all'); }, [activeTab]);
 
   // --- 5. Action Handlers ---
-
   const addTokenDirect = useCallback((token: JupiterToken) => {
     setPortfolio(prev => {
-      // 既存チェックをここで行い、キー重複を防ぐ
       if (prev.some(p => p.token.address === token.address)) return prev;
       const currentW = prev.reduce((s, i) => s + i.weight, 0);
       let nextW = 0;
@@ -293,7 +326,7 @@ export const useManualDashboard = ({
 
   const handleAnimationComplete = useCallback(() => {
     if (!flyingToken) return;
-    addTokenDirect(flyingToken); // ロジック統一
+    addTokenDirect(flyingToken);
     triggerHaptic();
     setFlyingToken(null);
     setFlyingCoords(null);
