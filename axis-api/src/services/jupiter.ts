@@ -1,3 +1,5 @@
+import { Bindings } from '../config/env';
+
 export interface JupiterToken {
   address: string;
   chainId: number;
@@ -12,7 +14,8 @@ export interface JupiterToken {
 // メモリキャッシュ (Serverlessのウォームスタート間で共有される可能性あり)
 let tokenListCache: JupiterToken[] | null = null;
 let lastTokenListFetch = 0;
-const CACHE_TTL = 1000 * 60 * 60; // 1時間
+// 【修正】キャッシュ時間を1時間(3600000)から5分(300000)に短縮
+const CACHE_TTL = 1000 * 60 * 5; 
 
 const JUP_TOKEN_API_V2 = 'https://api.jup.ag/tokens/v2';
 const JUP_PRICE_API_V2 = 'https://api.jup.ag/price/v2';
@@ -52,6 +55,9 @@ export const JupiterService = {
     // Jupiter Token API v2 を試行
     try {
       console.log('Fetching verified token list from Jupiter v2...');
+      // 制限を感じる場合、ここを '/tokens' にすれば全トークン取得可能ですが、
+      // 数万件になりペイロードが巨大化するため、基本は verified 推奨です。
+      // 鮮度は CACHE_TTL の短縮で対応します。
       const response = await fetch(
         `${JUP_TOKEN_API_V2}/tag?query=verified`,
         { headers: buildHeaders(apiKey) }
@@ -102,7 +108,7 @@ export const JupiterService = {
 
     const q = query.trim();
 
-    // Jupiter v2 検索を試行
+    // Jupiter v2 検索を試行 (Unverified もヒットします)
     try {
       const url = `${JUP_TOKEN_API_V2}/search?query=${encodeURIComponent(q)}`;
       const response = await fetch(url, { headers: buildHeaders(apiKey) });

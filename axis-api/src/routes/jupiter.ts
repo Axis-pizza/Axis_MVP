@@ -13,7 +13,8 @@ jupiterRouter.get('/tokens', async (c) => {
     const apiKey = c.env.JUPITER_API_KEY;
     const tokens = await JupiterService.getTokens(apiKey);
 
-    c.header('Cache-Control', 'public, max-age=3600');
+    // 【修正】ブラウザキャッシュを1時間(3600)から5分(300)に短縮
+    c.header('Cache-Control', 'public, max-age=300');
 
     return c.json({
       success: true,
@@ -43,7 +44,9 @@ jupiterRouter.get('/search', async (c) => {
     const apiKey = c.env.JUPITER_API_KEY;
     const tokens = await JupiterService.searchTokens(query, apiKey);
 
-    c.header('Cache-Control', 'public, max-age=30');
+    // 【修正】検索結果は鮮度が命なのでキャッシュしない(0)、またはごく短くする
+    c.header('Cache-Control', 'public, max-age=0');
+    
     return c.json({ success: true, tokens });
   } catch (e) {
     console.error(e);

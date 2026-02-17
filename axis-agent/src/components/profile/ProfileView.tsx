@@ -4,7 +4,7 @@ import {
   TrendingUp, Star, LayoutGrid
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+// 削除: import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { api } from '../../services/api';
 import { getUsdcBalance } from '../../services/usdc';
 import { TokenImage } from '../common/TokenImage';
@@ -44,7 +44,7 @@ const formatCurrency = (val: number, currency: 'USD' | 'USDC') => {
 };
 
 const formatAddress = (address: string | null | undefined) => {
-  if (!address) return 'Unknown'; // または '' (空文字)
+  if (!address) return 'Unknown';
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 };
 
@@ -53,13 +53,13 @@ interface ProfileViewProps {
 }
 
 export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
-  const { publicKey } = useWallet();
+  // 変更: connect を取得
+  const { publicKey, connect } = useWallet();
   const { connection } = useConnection();
   
   // --- UI State ---
   const [activeTab, setActiveTab] = useState<'portfolio' | 'leaderboard'>('portfolio');
   const [portfolioSubTab, setPortfolioSubTab] = useState<'created' | 'invested' | 'watchlist'>('created');
-  const [leaderboardTab] = useState<'points'>('points'); // pointsに固定
   
   const [currencyMode, setCurrencyMode] = useState<'USD' | 'USDC'>('USD');
   const [isHidden, setIsHidden] = useState(false);
@@ -74,7 +74,6 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
 
   // --- 1. Init (USDC Balance) ---
-  // USDC ≈ $1 fixed, no price fetching needed
   useEffect(() => {
     if (!publicKey || !connection) return;
     const fetchBalance = async () => {
@@ -169,7 +168,6 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   }, [activeTab, publicKey]);
 
   // --- Logic & Display Values ---
-  // USDC ≈ $1, so USD value = USDC value
   const investedAmountUSD = useMemo(() =>
     myStrategies.reduce((sum, s) => sum + (s.tvl || 0), 0),
     [myStrategies]
@@ -196,7 +194,13 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
           Access your portfolio, track referrals, and climb the leaderboard.
         </p>
         <div className="w-full max-w-xs">
-           <WalletMultiButton style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #6B4420, #B8863F, #E8C890)', borderRadius: '12px', fontWeight: 'bold' }} />
+           {/* 変更: WalletMultiButton を Privy 用のカスタムボタンに置き換え */}
+           <button
+             onClick={connect}
+             className="w-full py-3.5 bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] hover:brightness-110 text-black font-bold rounded-xl active:scale-95 transition-all shadow-lg shadow-[#B8863F]/20"
+           >
+             Connect Wallet
+           </button>
         </div>
       </div>
     );
@@ -345,7 +349,7 @@ const EmptyState = memo(({ icon: Icon, title, sub }: any) => (
 ));
 
 const StrategyCard = memo(({ strategy, onSelect }: { strategy: Strategy; onSelect?: (strategy: any) => void }) => {
-  const tvlUSD = strategy.tvl || 0; // USDC ≈ $1
+  const tvlUSD = strategy.tvl || 0;
   const tokens = Array.isArray(strategy.tokens) ? strategy.tokens : [];
   const displayTokens = tokens.slice(0, 5);
   const extraCount = tokens.length - 5;

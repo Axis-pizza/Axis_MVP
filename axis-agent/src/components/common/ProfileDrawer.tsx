@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Trophy, LogOut, CheckCircle, Sparkles, Edit, User, Droplets, Wallet, QrCode, Share2 } from 'lucide-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+// 削除: import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWallet } from '../../hooks/useWallet';
 import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -81,9 +81,9 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const [isWalletModalPending, setIsWalletModalPending] = useState(false);
-  const { setVisible, visible: walletModalVisible } = useWalletModal();
-  const { publicKey, disconnect, ready, connected } = useWallet();
+  
+  // 変更: connectを追加で取得
+  const { publicKey, disconnect, ready, connected, connect } = useWallet();
 
   const resetUserData = useCallback(() => {
     setUserData(null);
@@ -95,7 +95,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       return;
     }
      
-    
     try {
       const res = await api.getUser(publicKey.toBase58());
       if (res.success || res.user) {
@@ -126,13 +125,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       fetchUser();
     }
   }, [isOpen, publicKey, connected, fetchUser]);
-
-
-  useEffect(() => {
-    if (isWalletModalPending && !walletModalVisible) {
-      setIsWalletModalPending(false);
-    }
-  }, [walletModalVisible, isWalletModalPending]);
 
   const handleCheckIn = async () => {
     if (!publicKey) return;
@@ -204,16 +196,14 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   };
 
   const handleConnect = () => {
-    setIsWalletModalPending(true);
+    // ドロワーを閉じてからPrivyのログインモーダルを開く
     onClose();
-    setTimeout(() => {
-      setVisible(true);
-    }, 150);
+    connect();
   };
 
   const showConnectView = !connected || !publicKey;
-  const drawerZIndex = walletModalVisible ? 'z-[100]' : 'z-[9999]';
-  const backdropZIndex = walletModalVisible ? 'z-[99]' : 'z-[9998]';
+  const drawerZIndex = 'z-[9999]';
+  const backdropZIndex = 'z-[9998]';
 
   return createPortal(
     <>
