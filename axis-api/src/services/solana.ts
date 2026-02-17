@@ -19,6 +19,7 @@ export async function claimFaucet(privateKey: string, walletAddress: string, rpc
   // Decode private key
   const secret = bs58.decode(privateKey);
   const adminKeypair = Keypair.fromSecretKey(secret);
+  console.log("Faucet Wallet Address:", adminKeypair.publicKey.toBase58());
 
   const connection = new Connection(rpcUrl, "processed");
   const userPublicKey = new PublicKey(walletAddress);
