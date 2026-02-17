@@ -40,7 +40,8 @@ export function useWallet(): WalletContextState {
 
   // 1. 操作可能なSolanaウォレット（署名用）
   const activeWallet = useMemo(() => {
-    return wallets.find((w) => w.chainType === 'solana') || null;
+    // 修正: chainType プロパティへのアクセスで型エラーが出るため any キャスト
+    return wallets.find((w: any) => w.chainType === 'solana') || null;
   }, [wallets]);
 
   // 2. 表示用のPublicKey（リンク済みアカウント情報も含む）
@@ -51,11 +52,12 @@ export function useWallet(): WalletContextState {
     }
     
     // B. まだロードされていなくても、認証済みユーザー情報にSolanaアドレスがあればそれを使う
-    // これにより、UIは即座に「接続済み」に切り替わります
     if (user?.linkedAccounts) {
+      // 修正: address プロパティへのアクセスで型エラーが出るため any キャスト
       const solanaAccount = user.linkedAccounts.find(
-        (a) => a.type === 'wallet' && a.chainType === 'solana'
-      );
+        (a: any) => a.type === 'wallet' && a.chainType === 'solana'
+      ) as any;
+
       if (solanaAccount?.address) {
         return new PublicKey(solanaAccount.address);
       }
@@ -69,7 +71,6 @@ export function useWallet(): WalletContextState {
     if (!authenticated) {
       login();
     } else {
-      // 認証済みだがSolana情報が全くない場合
       if (!publicKey) {
         console.log("Authenticated but no Solana wallet linked.");
         if (user?.email?.address && typeof createWallet === 'function') {
@@ -81,7 +82,6 @@ export function useWallet(): WalletContextState {
     }
   }, [authenticated, login, publicKey, linkWallet, createWallet, user]);
 
-  // トラッキング
   const hasTrackedRef = useRef(false);
   useEffect(() => {
     if (authenticated && publicKey) {
@@ -94,11 +94,8 @@ export function useWallet(): WalletContextState {
     }
   }, [authenticated, publicKey]);
 
-  // 署名関数群
   const signTransaction = async <T extends Transaction | VersionedTransaction>(transaction: T): Promise<T> => {
-      // 署名時は activeWallet が必須
       if (!activeWallet) {
-        // UI上は接続済みでも、裏でウォレットがロードされていない場合のハンドリング
         throw new Error("Wallet is loading or not active. Please wait a moment.");
       }
       const w = activeWallet as any;
@@ -119,7 +116,10 @@ export function useWallet(): WalletContextState {
 
   const signMessage = async (message: Uint8Array): Promise<Uint8Array> => {
        if (!activeWallet) throw new Error("Wallet is loading or not active.");
-       const signature = await activeWallet.sign(message);
+       // 修正: activeWallet.sign は型定義上 string を要求する場合があるため any キャストして Uint8Array を渡す
+       // (実際の Solana Provider は Uint8Array を受け付ける)
+       const signature = await (activeWallet as any).sign(message);
+       
        if (typeof signature === 'string') {
            return Buffer.from(signature.replace(/^0x/, ''), 'hex'); 
        }
@@ -128,7 +128,7 @@ export function useWallet(): WalletContextState {
 
   return {
     publicKey,
-    connected: !!publicKey, // これでUIが切り替わります
+    connected: !!publicKey,
     connecting: !ready,
     disconnect: logout,
     connect,

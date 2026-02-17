@@ -19,9 +19,8 @@ export const Providers: FC<{ children: ReactNode }> = ({ children }) => {
     shouldAutoConnect: true,
   }), []);
 
-  // Solanaチェーン設定オブジェクト
   const solanaChain = useMemo(() => ({
-    id: 101, // Privy内部識別ID (Solana Mainnet)
+    id: 101,
     network: 'mainnet-beta',
     name: 'Solana',
     nativeCurrency: {
@@ -57,22 +56,19 @@ export const Providers: FC<{ children: ReactNode }> = ({ children }) => {
           walletList: ['phantom', 'solflare', 'backpack'],
         },
         embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
+          solana: {
+            createOnLogin: 'users-without-wallets',
+          },
         },
         externalWallets: {
             solana: {
                 connectors: solanaConnectors,
             },
         },
-        // 重要: supportedChains に solanaChain を含め、それを defaultChain に指定
+        // solanaChain オブジェクトでRPC設定も行っているため、
+        // 古い solanaClusters プロパティは削除します。
         supportedChains: [solanaChain],
         defaultChain: solanaChain,
-        solanaClusters: [
-            {
-                name: 'mainnet-beta',
-                rpcUrl: endpoint
-            }
-        ]
       }}
     >
       <ConnectionProvider endpoint={endpoint}>
