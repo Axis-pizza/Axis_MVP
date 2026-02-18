@@ -20,53 +20,53 @@ sequenceDiagram
 
 ### User Management
 
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|-------------|----------|
-| GET | `/user?wallet={pubkey}&ref={ref}` | Get user (empty if not registered) | query: wallet, ref (optional) | `{ name, username, pfpUrl, avatar_url, total_xp, rank_tier, ... }` |
-| POST | `/user` | Update profile | `{ wallet_address, name, bio, avatar_url }` | TBD |
-| POST | `/register` | Register new user | `{ email, wallet_address, invite_code_used, avatar_url?, name?, bio? }` | TBD |
-| POST | `/request-invite` | Request invitation | `{ email }` | TBD |
-| POST | `/users/{pubkey}/checkin` | Daily check-in | None | TBD |
-| POST | `/user/stats` | Sync user stats | `{ wallet_address, pnl_percent, total_invested_usd }` | None (fire-and-forget) |
+| Method | Endpoint                          | Description                        | Request Body                                                            | Response                                                           |
+| ------ | --------------------------------- | ---------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| GET    | `/user?wallet={pubkey}&ref={ref}` | Get user (empty if not registered) | query: wallet, ref (optional)                                           | `{ name, username, pfpUrl, avatar_url, total_xp, rank_tier, ... }` |
+| POST   | `/user`                           | Update profile                     | `{ wallet_address, name, bio, avatar_url }`                             | TBD                                                                |
+| POST   | `/register`                       | Register new user                  | `{ email, wallet_address, invite_code_used, avatar_url?, name?, bio? }` | TBD                                                                |
+| POST   | `/request-invite`                 | Request invitation                 | `{ email }`                                                             | TBD                                                                |
+| POST   | `/users/{pubkey}/checkin`         | Daily check-in                     | None                                                                    | TBD                                                                |
+| POST   | `/user/stats`                     | Sync user stats                    | `{ wallet_address, pnl_percent, total_invested_usd }`                   | None (fire-and-forget)                                             |
 
 ### Strategy
 
-| Method | Endpoint | Description | Request Body | Response |
-|--------|----------|-------------|-------------|----------|
-| POST | `/strategies` | Create strategy | `{ owner_pubkey, name, ticker, description?, type, tokens: [{symbol, mint, weight, logoURI?}], address, config? }` | TBD |
-| GET | `/strategies/{pubkey}` | List user's strategies | — | TBD |
-| GET | `/strategies/{id}/chart?period={7d}&type={line\|candle}` | Strategy chart data | query: period, type | TBD |
-| POST | `/strategies/{id}/watchlist` | Toggle watchlist | `{ userPubkey }` | TBD |
-| GET | `/strategies/{id}/watchlist?user={pubkey}` | Check watchlist status | query: user | TBD |
-| GET | `/discover?limit={50}&offset={0}` | Discover strategies | query: limit, offset | TBD |
+| Method | Endpoint                                                 | Description            | Request Body                                                                                                       | Response |
+| ------ | -------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------ | -------- |
+| POST   | `/strategies`                                            | Create strategy        | `{ owner_pubkey, name, ticker, description?, type, tokens: [{symbol, mint, weight, logoURI?}], address, config? }` | TBD      |
+| GET    | `/strategies/{pubkey}`                                   | List user's strategies | —                                                                                                                  | TBD      |
+| GET    | `/strategies/{id}/chart?period={7d}&type={line\|candle}` | Strategy chart data    | query: period, type                                                                                                | TBD      |
+| POST   | `/strategies/{id}/watchlist`                             | Toggle watchlist       | `{ userPubkey }`                                                                                                   | TBD      |
+| GET    | `/strategies/{id}/watchlist?user={pubkey}`               | Check watchlist status | query: user                                                                                                        | TBD      |
+| GET    | `/discover?limit={50}&offset={0}`                        | Discover strategies    | query: limit, offset                                                                                               | TBD      |
 
 ### Token
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/tokens` | Token list |
-| GET | `/tokens/search?q={query}&limit={20}` | Token search |
-| GET | `/tokens/{address}/history?interval={1h\|1d\|1w}` | Token price history |
-| GET | `/price/sol` | Get SOL price → `{ price: number }` |
+| Method | Endpoint                                          | Description                         |
+| ------ | ------------------------------------------------- | ----------------------------------- |
+| GET    | `/tokens`                                         | Token list                          |
+| GET    | `/tokens/search?q={query}&limit={20}`             | Token search                        |
+| GET    | `/tokens/{address}/history?interval={1h\|1d\|1w}` | Token price history                 |
+| GET    | `/price/sol`                                      | Get SOL price → `{ price: number }` |
 
 ### Deployment
 
-| Method | Endpoint | Description | Request Body |
-|--------|----------|-------------|-------------|
-| GET | `/prepare-deployment` | Prepare deployment | — |
-| POST | `/deploy` | Execute deployment | `{ signature, ...strategyData }` |
+| Method | Endpoint              | Description        | Request Body                     |
+| ------ | --------------------- | ------------------ | -------------------------------- |
+| GET    | `/prepare-deployment` | Prepare deployment | —                                |
+| POST   | `/deploy`             | Execute deployment | `{ signature, ...strategyData }` |
 
 ### Other
 
-| Method | Endpoint | Description | Request Body |
-|--------|----------|-------------|-------------|
-| GET | `/leaderboard?sort={points\|volume\|created}` | Leaderboard | query: sort |
-| GET | `/vaults` | Vault list | — |
-| POST | `/upload/image` | Image upload | FormData: `{ image: File, wallet_address, type: 'profile'\|'strategy' }` |
-| GET | `/upload/image/{key}` | Image retrieval (proxy) | — |
-| POST | `/analyze` | AI strategy analysis | `{ directive, tags: string[], customInput? }` |
-| POST | `/art/generate` | Strategy art generation | `{ tokens: string[], strategyType, walletAddress }` |
-| POST | `/claim` | Faucet (get Devnet SOL) | `{ wallet_address }` |
+| Method | Endpoint                                      | Description             | Request Body                                                             |
+| ------ | --------------------------------------------- | ----------------------- | ------------------------------------------------------------------------ |
+| GET    | `/leaderboard?sort={points\|volume\|created}` | Leaderboard             | query: sort                                                              |
+| GET    | `/vaults`                                     | Vault list              | —                                                                        |
+| POST   | `/upload/image`                               | Image upload            | FormData: `{ image: File, wallet_address, type: 'profile'\|'strategy' }` |
+| GET    | `/upload/image/{key}`                         | Image retrieval (proxy) | —                                                                        |
+| POST   | `/analyze`                                    | AI strategy analysis    | `{ directive, tags: string[], customInput? }`                            |
+| POST   | `/art/generate`                               | Strategy art generation | `{ tokens: string[], strategyType, walletAddress }`                      |
+| POST   | `/claim`                                      | Faucet (get Devnet SOL) | `{ wallet_address }`                                                     |
 
 > **Note**: Many response formats are marked "TBD" — verify exact types against the backend source.
 
@@ -175,36 +175,36 @@ pub struct Strategy {
 
 ### Jupiter Lite API v2
 
-| Endpoint | Purpose |
-|----------|---------|
+| Endpoint                                           | Purpose             |
+| -------------------------------------------------- | ------------------- |
 | `GET lite-api.jup.ag/tokens/v2/tag?query=verified` | Verified token list |
-| `GET lite-api.jup.ag/tokens/v2/search?query={q}` | Token search |
-| `GET lite-api.jup.ag/price/v3?ids={mint1,mint2}` | Batch price fetch |
+| `GET lite-api.jup.ag/tokens/v2/search?query={q}`   | Token search        |
+| `GET lite-api.jup.ag/price/v3?ids={mint1,mint2}`   | Batch price fetch   |
 
 Auth: `x-api-key` header (env: `VITE_JUPITER_API_KEY`)
 
 ### CoinGecko API v3
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET api.coingecko.com/api/v3/coins/markets?category=solana-ecosystem&...` | Solana tokens by market cap |
-| `GET api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses={mints}` | Price by mint address |
+| Endpoint                                                                            | Purpose                     |
+| ----------------------------------------------------------------------------------- | --------------------------- |
+| `GET api.coingecko.com/api/v3/coins/markets?category=solana-ecosystem&...`          | Solana tokens by market cap |
+| `GET api.coingecko.com/api/v3/simple/token_price/solana?contract_addresses={mints}` | Price by mint address       |
 
 Auth: None (rate-limited; TBD: whether a Pro key exists)
 
 ### DexScreener API
 
-| Endpoint | Purpose |
-|----------|---------|
+| Endpoint                                                      | Purpose                            |
+| ------------------------------------------------------------- | ---------------------------------- |
 | `GET api.dexscreener.com/latest/dex/tokens/{mint1,mint2,...}` | Price & 24h change (chunked by 30) |
 
 Auth: None (300 req/min)
 
 ### GeckoTerminal API v2
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET api.geckoterminal.com/api/v2/networks/solana/tokens/{address}/pools?page=1&limit=1` | Get top pool for a token |
+| Endpoint                                                                                    | Purpose                      |
+| ------------------------------------------------------------------------------------------- | ---------------------------- |
+| `GET api.geckoterminal.com/api/v2/networks/solana/tokens/{address}/pools?page=1&limit=1`    | Get top pool for a token     |
 | `GET api.geckoterminal.com/api/v2/networks/solana/pools/{pool}/ohlcv/{timeframe}?limit=100` | OHLCV data (day/hour/minute) |
 
 Auth: None
@@ -219,7 +219,7 @@ Auth: None
 interface TokenInfo {
   symbol: string;
   name: string;
-  address: string;       // Solana mint address
+  address: string; // Solana mint address
   logoURI?: string;
   sector?: string;
   price?: number;
@@ -235,7 +235,7 @@ interface TokenAllocation {
   symbol: string;
   address?: string;
   mint?: string;
-  weight: number;         // 0–1 ratio
+  weight: number; // 0–1 ratio
   logoURI?: string;
   token?: TokenInfo;
 }
@@ -301,10 +301,16 @@ interface TacticalStore {
   selectedTags: string[];
   generatedTactics: Tactic[];
   selectedTactic: Tactic | null;
-  pizzaComposition: Token[];    // Final token composition
+  pizzaComposition: Token[]; // Final token composition
 
   // Actions
-  setStep, setDirective, toggleTag, setTactics, selectTactic, updatePizza, addToken
+  setStep;
+  setDirective;
+  toggleTag;
+  setTactics;
+  selectTactic;
+  updatePizza;
+  addToken;
 }
 ```
 

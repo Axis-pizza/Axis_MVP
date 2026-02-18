@@ -1,7 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  ArrowLeft, Rocket, Sparkles, RefreshCw, Type, FileText, Fingerprint,
-} from 'lucide-react';
+import { ArrowLeft, Rocket, Sparkles, RefreshCw, Type, FileText, Fingerprint } from 'lucide-react';
 import type { StrategyConfig } from './types';
 
 interface IdentityStepProps {
@@ -32,10 +30,10 @@ export const IdentityStep = ({
   <AnimatePresence>
     {visible && (
       <motion.div
-        initial={{ y: "100%" }}
+        initial={{ y: '100%' }}
         animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         className="fixed inset-0 z-40 bg-black flex flex-col"
       >
         {/* Header */}
@@ -70,10 +68,14 @@ export const IdentityStep = ({
             <div
               onClick={() => setFocusedField('ticker')}
               className={`rounded-3xl border p-5 transition-all ${
-                focusedField === 'ticker' ? 'border-amber-700/50 bg-[#141414]' : 'border-white/5 bg-[#0c0c0c]'
+                focusedField === 'ticker'
+                  ? 'border-amber-700/50 bg-[#141414]'
+                  : 'border-white/5 bg-[#0c0c0c]'
               }`}
             >
-              <div className={`flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider ${focusedField === 'ticker' ? 'text-amber-600' : 'text-white/30'}`}>
+              <div
+                className={`flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider ${focusedField === 'ticker' ? 'text-amber-600' : 'text-white/30'}`}
+              >
                 <Sparkles size={14} /> Ticker
               </div>
               <div className="flex items-center gap-4">
@@ -88,13 +90,18 @@ export const IdentityStep = ({
                   maxLength={5}
                   value={config.ticker}
                   onFocus={() => setFocusedField('ticker')}
-                  onChange={(e) => setConfig(prev => ({ ...prev, ticker: e.target.value.toUpperCase() }))}
+                  onChange={(e) =>
+                    setConfig((prev) => ({ ...prev, ticker: e.target.value.toUpperCase() }))
+                  }
                   placeholder="MEME"
                   className="flex-1 bg-transparent text-4xl tracking-widest placeholder:text-white/10 focus:outline-none uppercase text-white"
                   style={{ fontFamily: '"Times New Roman", serif' }}
                 />
                 <button
-                  onClick={(e) => { e.stopPropagation(); onGenerateRandomTicker(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onGenerateRandomTicker();
+                  }}
                   className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-white/30 active:text-white active:bg-white/10"
                 >
                   <RefreshCw size={22} />
@@ -106,10 +113,14 @@ export const IdentityStep = ({
             <div
               onClick={() => setFocusedField('name')}
               className={`rounded-3xl border p-5 transition-all ${
-                focusedField === 'name' ? 'border-amber-700/50 bg-[#141414]' : 'border-white/5 bg-[#0c0c0c]'
+                focusedField === 'name'
+                  ? 'border-amber-700/50 bg-[#141414]'
+                  : 'border-white/5 bg-[#0c0c0c]'
               }`}
             >
-              <div className={`flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider ${focusedField === 'name' ? 'text-amber-600' : 'text-white/30'}`}>
+              <div
+                className={`flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider ${focusedField === 'name' ? 'text-amber-600' : 'text-white/30'}`}
+              >
                 <Type size={14} /> Name
               </div>
               <input
@@ -117,7 +128,7 @@ export const IdentityStep = ({
                 maxLength={30}
                 value={config.name}
                 onFocus={() => setFocusedField('name')}
-                onChange={(e) => setConfig(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => setConfig((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="My Alpha Fund"
                 className="w-full bg-transparent text-xl placeholder:text-white/10 focus:outline-none text-white py-2"
               />
@@ -127,17 +138,21 @@ export const IdentityStep = ({
             <div
               onClick={() => setFocusedField('desc')}
               className={`rounded-3xl border p-5 transition-all ${
-                focusedField === 'desc' ? 'border-amber-700/50 bg-[#141414]' : 'border-white/5 bg-[#0c0c0c]'
+                focusedField === 'desc'
+                  ? 'border-amber-700/50 bg-[#141414]'
+                  : 'border-white/5 bg-[#0c0c0c]'
               }`}
             >
-              <div className={`flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider ${focusedField === 'desc' ? 'text-amber-600' : 'text-white/30'}`}>
+              <div
+                className={`flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider ${focusedField === 'desc' ? 'text-amber-600' : 'text-white/30'}`}
+              >
                 <FileText size={14} /> Description
               </div>
               <textarea
                 rows={4}
                 value={config.description}
                 onFocus={() => setFocusedField('desc')}
-                onChange={(e) => setConfig(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) => setConfig((prev) => ({ ...prev, description: e.target.value }))}
                 placeholder="Investment thesis..."
                 className="w-full bg-transparent text-base text-white/90 placeholder:text-white/10 focus:outline-none resize-none leading-relaxed"
               />
@@ -173,12 +188,18 @@ export const IdentityStep = ({
             onClick={onDeploy}
             disabled={!config.ticker || !config.name}
             className={`w-full py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3 shadow-2xl transition-all active:scale-[0.98] ${
-              (!config.ticker || !config.name)
+              !config.ticker || !config.name
                 ? 'bg-[#222] text-white/20 cursor-not-allowed'
                 : 'bg-gradient-to-r from-amber-700 via-amber-600 to-amber-700 text-black'
             }`}
           >
-            {connected ? <>Deploy <Rocket size={24} /></> : "Connect Wallet"}
+            {connected ? (
+              <>
+                Deploy <Rocket size={24} />
+              </>
+            ) : (
+              'Connect Wallet'
+            )}
           </button>
         </div>
       </motion.div>

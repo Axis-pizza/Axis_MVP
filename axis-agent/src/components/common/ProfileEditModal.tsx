@@ -29,7 +29,6 @@ export const ProfileEditModal = ({
   currentProfile,
   onUpdate,
 }: ProfileEditModalProps) => {
-
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const twitterPopupRef = useRef<Window | null>(null);
@@ -42,7 +41,7 @@ export const ProfileEditModal = ({
   const [twitterLinked, setTwitterLinked] = useState(false);
   const [twitterName, setTwitterName] = useState('');
   const [avatarKey, setAvatarKey] = useState(0);
-  
+
   // モバイル判定用のステートを追加
   const [isMobile, setIsMobile] = useState(false);
 
@@ -65,28 +64,31 @@ export const ProfileEditModal = ({
   }, [isOpen, currentProfile.username, currentProfile.bio, currentProfile.avatar_url]);
 
   // Listen for Twitter OAuth postMessage callback
-  const handleTwitterMessage = useCallback((event: MessageEvent) => {
-    if (event.data?.type !== 'AXIS_AUTH_SUCCESS') return;
-    if (event.data?.provider !== 'twitter') return;
+  const handleTwitterMessage = useCallback(
+    (event: MessageEvent) => {
+      if (event.data?.type !== 'AXIS_AUTH_SUCCESS') return;
+      if (event.data?.provider !== 'twitter') return;
 
-    const user = event.data.user;
-    if (user?.avatar_url) {
-      setPfpUrl(user.avatar_url);
-      setAvatarKey(prev => prev + 1);
-    }
-    if (user?.name) {
-      setTwitterName(user.name);
-      if (!username) {
-        setUsername(user.name);
+      const user = event.data.user;
+      if (user?.avatar_url) {
+        setPfpUrl(user.avatar_url);
+        setAvatarKey((prev) => prev + 1);
       }
-    }
+      if (user?.name) {
+        setTwitterName(user.name);
+        if (!username) {
+          setUsername(user.name);
+        }
+      }
 
-    setTwitterLinked(true);
-    setTwitterLoading(false);
-    twitterPopupRef.current?.close();
-    twitterPopupRef.current = null;
-    showToast("X account linked successfully!", "success");
-  }, [showToast, username]);
+      setTwitterLinked(true);
+      setTwitterLoading(false);
+      twitterPopupRef.current?.close();
+      twitterPopupRef.current = null;
+      showToast('X account linked successfully!', 'success');
+    },
+    [showToast, username]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -96,13 +98,14 @@ export const ProfileEditModal = ({
 
   const handleConnectTwitter = () => {
     if (!currentProfile.pubkey) {
-      showToast("Wallet not connected", "error");
+      showToast('Wallet not connected', 'error');
       return;
     }
     // ここでの判定は念のため残しますが、UI側で非表示になるため到達しません
     setTwitterLoading(true);
     const authUrl = api.getTwitterAuthUrl(currentProfile.pubkey);
-    const w = 500, h = 600;
+    const w = 500,
+      h = 600;
     const left = window.screenX + (window.outerWidth - w) / 2;
     const top = window.screenY + (window.outerHeight - h) / 2;
     twitterPopupRef.current = window.open(
@@ -125,7 +128,7 @@ export const ProfileEditModal = ({
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      showToast("File too large (Max 5MB)", "error");
+      showToast('File too large (Max 5MB)', 'error');
       return;
     }
 
@@ -134,13 +137,13 @@ export const ProfileEditModal = ({
       const res = await api.uploadProfileImage(file, currentProfile.pubkey);
       if (res.success && res.key) {
         setPfpUrl(res.key);
-        setAvatarKey(prev => prev + 1);
-        showToast("Image Uploaded", "success");
+        setAvatarKey((prev) => prev + 1);
+        showToast('Image Uploaded', 'success');
       } else {
-        showToast("Upload Failed", "error");
+        showToast('Upload Failed', 'error');
       }
     } catch {
-      showToast("Error uploading image", "error");
+      showToast('Error uploading image', 'error');
     } finally {
       setUploading(false);
     }
@@ -157,14 +160,14 @@ export const ProfileEditModal = ({
       });
 
       if (res.success) {
-        showToast(isExistingUser ? "Profile Updated!" : "Welcome to Axis!", "success");
+        showToast(isExistingUser ? 'Profile Updated!' : 'Welcome to Axis!', 'success');
         onUpdate();
         onClose();
       } else {
-        showToast(res.error || "Save Failed", "error");
+        showToast(res.error || 'Save Failed', 'error');
       }
     } catch (e) {
-      showToast("System Error", "error");
+      showToast('System Error', 'error');
     } finally {
       setLoading(false);
     }
@@ -239,7 +242,13 @@ export const ProfileEditModal = ({
                   )}
                 </div>
 
-                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  className="hidden"
+                />
                 <p className="text-xs text-white/30 mt-2">Tap to upload</p>
 
                 {/* X Connect Section - Mobileの場合は非表示にする */}
@@ -308,7 +317,11 @@ export const ProfileEditModal = ({
                 disabled={loading || uploading}
                 className="w-full py-4 bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] text-[#140D07] font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 shadow-[0_0_12px_rgba(184,134,63,0.35)]"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
                 {isExistingUser ? 'Save Changes' : 'Complete Registration'}
               </button>
             </div>

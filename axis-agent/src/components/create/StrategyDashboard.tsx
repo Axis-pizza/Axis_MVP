@@ -5,10 +5,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  TrendingUp, TrendingDown, Settings, RefreshCw, 
-  Wallet, Clock, Shield, Zap, Target, Activity,
-  Plus, Loader2
+import {
+  TrendingUp,
+  TrendingDown,
+  Settings,
+  RefreshCw,
+  Wallet,
+  Clock,
+  Shield,
+  Zap,
+  Target,
+  Activity,
+  Plus,
+  Loader2,
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
 import { getUsdcBalance } from '../../services/usdc';
@@ -58,8 +67,7 @@ export const StrategyDashboard = ({
       try {
         const bal = await getUsdcBalance(connection, publicKey);
         setUsdcBalance(bal);
-      } catch {
-      }
+      } catch {}
     };
     fetchBalance();
   }, [publicKey, connection]);
@@ -104,13 +112,17 @@ export const StrategyDashboard = ({
         <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
           <p className="text-xs text-white/50 mb-1">Total P&L</p>
           <div className="flex items-center gap-2">
-            <p className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {totalPnl >= 0 ? '+' : ''}{totalPnl.toFixed(2)}
+            <p
+              className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+            >
+              {totalPnl >= 0 ? '+' : ''}
+              {totalPnl.toFixed(2)}
             </p>
-            {totalPnl >= 0 ? 
-              <TrendingUp className="w-4 h-4 text-emerald-400" /> : 
+            {totalPnl >= 0 ? (
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+            ) : (
               <TrendingDown className="w-4 h-4 text-red-400" />
-            }
+            )}
           </div>
         </div>
       </div>
@@ -127,7 +139,7 @@ export const StrategyDashboard = ({
       {/* Strategy List */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-white/70 mb-2">Your Strategies</h3>
-        
+
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-white/30" />
@@ -177,11 +189,8 @@ const StrategyCard = ({
   onDeposit: () => void;
   onRebalance: () => void;
 }) => {
-
   return (
-    <div 
-      className="p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/[0.07] transition-colors"
-    >
+    <div className="p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/[0.07] transition-colors">
       {/* Main Content */}
       <div className="flex items-center gap-4" onClick={onSelect}>
         {/* Pizza Chart */}
@@ -193,14 +202,19 @@ const StrategyCard = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h4 className="font-bold truncate">{strategy.name}</h4>
-            <span className={`px-2 py-0.5 rounded text-xs bg-gradient-to-r ${typeColors[strategy.type]} text-white`}>
+            <span
+              className={`px-2 py-0.5 rounded text-xs bg-gradient-to-r ${typeColors[strategy.type]} text-white`}
+            >
               {typeIcons[strategy.type]}
             </span>
           </div>
           <div className="flex items-center gap-3 text-xs">
-            <span className="text-white/50">TVL: <span className="text-white">{strategy.tvl.toFixed(2)} USDC</span></span>
+            <span className="text-white/50">
+              TVL: <span className="text-white">{strategy.tvl.toFixed(2)} USDC</span>
+            </span>
             <span className={strategy.pnlPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-              {strategy.pnlPercent >= 0 ? '+' : ''}{strategy.pnlPercent.toFixed(1)}%
+              {strategy.pnlPercent >= 0 ? '+' : ''}
+              {strategy.pnlPercent.toFixed(1)}%
             </span>
           </div>
         </div>

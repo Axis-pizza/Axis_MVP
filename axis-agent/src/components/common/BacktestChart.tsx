@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 interface BacktestChartProps {
   data: {
     timestamps?: number[]; // Optional
-    values: number[];      // Required: Array of prices/values
+    values: number[]; // Required: Array of prices/values
     sharpeRatio?: number;
     maxDrawdown?: number;
     volatility?: number;
@@ -18,11 +18,11 @@ interface BacktestChartProps {
   label?: string; // Custom label (e.g., "ROI (30d)")
 }
 
-export const BacktestChart = ({ 
-  data, 
-  height = 140, 
+export const BacktestChart = ({
+  data,
+  height = 140,
   showMetrics = true,
-  label = "ROI (30d)" 
+  label = 'ROI (30d)',
 }: BacktestChartProps) => {
   const { path, areaPath, change, benchmarkPath, isValid } = useMemo(() => {
     // データが空、または配列でない場合は描画しない
@@ -44,7 +44,7 @@ export const BacktestChart = ({
       return { x, y };
     });
 
-    const pathStr = `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`;
+    const pathStr = `M ${points.map((p) => `${p.x},${p.y}`).join(' L ')}`;
     const areaStr = `${pathStr} L ${width},${h} L 0,${h} Z`;
 
     // Benchmark line (dotted) - Draw a straight line from start price
@@ -72,8 +72,11 @@ export const BacktestChart = ({
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-xs text-white/40 mb-1 font-bold uppercase tracking-wider">{label}</p>
-          <span className={`text-2xl font-mono font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-            {isPositive ? '+' : ''}{change.toFixed(2)}%
+          <span
+            className={`text-2xl font-mono font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}
+          >
+            {isPositive ? '+' : ''}
+            {change.toFixed(2)}%
           </span>
         </div>
         {showMetrics && (

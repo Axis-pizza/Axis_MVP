@@ -88,51 +88,58 @@ export default function Home() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-900/10 blur-[120px] rounded-full" />
       </div>
 
-        {/* DISCOVER VIEW */}
-        {view === 'DISCOVER' && (
-          <div className="relative z-10 pb-32">
-            <DiscoverView onStrategySelect={handleStrategySelect} onOverlayChange={setIsOverlayActive} />
-          </div>
-        )}
+      {/* DISCOVER VIEW */}
+      {view === 'DISCOVER' && (
+        <div className="relative z-10 pb-32">
+          <DiscoverView
+            onStrategySelect={handleStrategySelect}
+            onOverlayChange={setIsOverlayActive}
+          />
+        </div>
+      )}
 
-        {/* CREATE VIEW */}
-        {view === 'CREATE' && (
-          <div className="relative z-10 pb-32">
-            <KagemushaFlow
-              onStepChange={(step) => setHideNavInCreate(step !== 'LANDING' && step !== 'DASHBOARD')}
-            />
-          </div>
-        )}
+      {/* CREATE VIEW */}
+      {view === 'CREATE' && (
+        <div className="relative z-10 pb-32">
+          <KagemushaFlow
+            onStepChange={(step) => {
+              setHideNavInCreate(step !== 'LANDING' && step !== 'DASHBOARD');
 
-        {/* PROFILE VIEW */}
-        {view === 'PROFILE' && (
-          <div className="relative z-10 pb-32">
-            <ProfileView onStrategySelect={handleStrategySelect} />
-          </div>
-        )}
+              if (step === 'DASHBOARD') {
+                setView('DISCOVER');
+                setHideNavInCreate(false);
+              }
+            }}
+          />
+        </div>
+      )}
 
-        {/* STRATEGY DETAIL */}
-        {view === 'STRATEGY_DETAIL' && selectedStrategy && (
-          <div className="fixed inset-0 z-[200] bg-[#030303]">
-            <StrategyDetailView
-              initialData={selectedStrategy}
-              onBack={handleBackFromDetail}
-            />
-          </div>
-        )}
+      {/* PROFILE VIEW */}
+      {view === 'PROFILE' && (
+        <div className="relative z-10 pb-32">
+          <ProfileView onStrategySelect={handleStrategySelect} />
+        </div>
+      )}
+
+      {/* STRATEGY DETAIL */}
+      {view === 'STRATEGY_DETAIL' && selectedStrategy && (
+        <div className="fixed inset-0 z-[200] bg-[#030303]">
+          <StrategyDetailView initialData={selectedStrategy} onBack={handleBackFromDetail} />
+        </div>
+      )}
 
       {/* Floating Navigation (Tutorial targets this) */}
       {view !== 'STRATEGY_DETAIL' && !hideNavInCreate && !isOverlayActive && (
-        <FloatingNav
-          currentView={view as ViewState}
-          onNavigate={handleNavigate}
-        />
+        <FloatingNav currentView={view as ViewState} onNavigate={handleNavigate} />
       )}
 
       {/* Luxury Tutorial Overlay */}
       <AnimatePresence>
         {showTutorial && (
-          <TutorialOverlay onComplete={handleTutorialComplete} onConnectWallet={handleConnectWallet} />
+          <TutorialOverlay
+            onComplete={handleTutorialComplete}
+            onConnectWallet={handleConnectWallet}
+          />
         )}
       </AnimatePresence>
     </div>

@@ -83,24 +83,24 @@ flowchart LR
 
 All services output logs via `console.log` / `console.warn` / `console.error` with prefixes:
 
-| Service | Log Prefix |
-|---------|-----------|
-| Jupiter | `[Jupiter]` |
-| CoinGecko | `[CoinGecko]` |
-| DexScreener | `[DexScreener]` |
-| GeckoTerminal | `[GeckoTerminal]` |
-| api.ts | Varies: `"Fetch User Error:"`, `"Create Strategy Failed:"`, etc. |
+| Service       | Log Prefix                                                       |
+| ------------- | ---------------------------------------------------------------- |
+| Jupiter       | `[Jupiter]`                                                      |
+| CoinGecko     | `[CoinGecko]`                                                    |
+| DexScreener   | `[DexScreener]`                                                  |
+| GeckoTerminal | `[GeckoTerminal]`                                                |
+| api.ts        | Varies: `"Fetch User Error:"`, `"Create Strategy Failed:"`, etc. |
 
 ### Cache Troubleshooting
 
 If token data appears stale or incorrect:
 
-| Service | Cache Type | TTL | How to Clear |
-|---------|-----------|-----|-------------|
-| Jupiter (tokens) | Memory + localStorage (`jup_tokens_v3_lite`) | 6 hours | Delete localStorage key, or call `JupiterService.clearCache()` in console |
-| Jupiter (prices) | Memory only | 30 seconds | Page reload |
-| CoinGecko | Memory only | 5 minutes | Page reload |
-| DexScreener | Memory only | 30 seconds | Page reload |
+| Service          | Cache Type                                   | TTL        | How to Clear                                                              |
+| ---------------- | -------------------------------------------- | ---------- | ------------------------------------------------------------------------- |
+| Jupiter (tokens) | Memory + localStorage (`jup_tokens_v3_lite`) | 6 hours    | Delete localStorage key, or call `JupiterService.clearCache()` in console |
+| Jupiter (prices) | Memory only                                  | 30 seconds | Page reload                                                               |
+| CoinGecko        | Memory only                                  | 5 minutes  | Page reload                                                               |
+| DexScreener      | Memory only                                  | 30 seconds | Page reload                                                               |
 
 ### On-Chain
 

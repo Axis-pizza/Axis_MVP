@@ -10,7 +10,10 @@ import { USDC_MINT, USDC_DECIMALS } from '../config/constants';
 /**
  * Get the USDC balance for a wallet (returns human-readable amount, e.g. 10.5 USDC)
  */
-export async function getUsdcBalance(connection: Connection, publicKey: PublicKey): Promise<number> {
+export async function getUsdcBalance(
+  connection: Connection,
+  publicKey: PublicKey
+): Promise<number> {
   try {
     const ata = await getAssociatedTokenAddress(USDC_MINT, publicKey);
     const account = await connection.getTokenAccountBalance(ata);
@@ -31,7 +34,10 @@ export async function getOrCreateUsdcAta(
 ): Promise<{ ata: PublicKey; instruction: TransactionInstruction }> {
   const ata = await getAssociatedTokenAddress(USDC_MINT, owner);
   const instruction = createAssociatedTokenAccountIdempotentInstruction(
-    payer, ata, owner, USDC_MINT
+    payer,
+    ata,
+    owner,
+    USDC_MINT
   );
   return { ata, instruction };
 }

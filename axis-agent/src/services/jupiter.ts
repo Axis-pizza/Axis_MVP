@@ -1,6 +1,6 @@
-import { Connection, PublicKey } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { api } from "./api";
+import { Connection, PublicKey } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { api } from './api';
 
 export interface JupiterToken {
   address: string;
@@ -29,8 +29,28 @@ export interface JupiterToken {
 
 // Minimum fallback token list
 const CRITICAL_FALLBACK: JupiterToken[] = [
-  { address: "So11111111111111111111111111111111111111112", chainId: 101, decimals: 9, name: "Wrapped SOL", symbol: "SOL", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png", tags: ["verified"], isVerified: true },
-  { address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", chainId: 101, decimals: 6, name: "USD Coin", symbol: "USDC", logoURI: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png", tags: ["verified"], isVerified: true },
+  {
+    address: 'So11111111111111111111111111111111111111112',
+    chainId: 101,
+    decimals: 9,
+    name: 'Wrapped SOL',
+    symbol: 'SOL',
+    logoURI:
+      'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png',
+    tags: ['verified'],
+    isVerified: true,
+  },
+  {
+    address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    chainId: 101,
+    decimals: 6,
+    name: 'USD Coin',
+    symbol: 'USDC',
+    logoURI:
+      'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png',
+    tags: ['verified'],
+    isVerified: true,
+  },
 ];
 
 // Client-side memory cache
@@ -45,10 +65,10 @@ export const JupiterService = {
 
     pendingListPromise = (async () => {
       try {
-        console.log("Fetching tokens via Axis API...");
+        console.log('Fetching tokens via Axis API...');
         // Call our own API endpoint
         const response = await api.get('/jupiter/tokens');
-        
+
         if (response && response.tokens && Array.isArray(response.tokens)) {
           // Derive isVerified from tags if not already set
           const tokens: JupiterToken[] = response.tokens.map((t: JupiterToken) => ({
@@ -60,7 +80,7 @@ export const JupiterService = {
         }
         throw new Error('Invalid token list format');
       } catch (e) {
-        console.warn("Axis API token list fetch failed, using fallback", e);
+        console.warn('Axis API token list fetch failed, using fallback', e);
         return CRITICAL_FALLBACK;
       }
     })();
@@ -75,7 +95,9 @@ export const JupiterService = {
   // Fetch trending tokens via BFF (Jupiter v2 API)
   getTrendingTokens: async (): Promise<JupiterToken[]> => {
     try {
-      const response = await api.get('/jupiter/trending?category=toptrending&interval=24h&limit=50');
+      const response = await api.get(
+        '/jupiter/trending?category=toptrending&interval=24h&limit=50'
+      );
       if (response && response.tokens && Array.isArray(response.tokens)) {
         return response.tokens.map((t: JupiterToken) => ({
           ...t,
@@ -91,13 +113,13 @@ export const JupiterService = {
         const data = await res.json();
         if (data.pairs) {
           const mints = data.pairs
-              .filter((p: any) => p.chainId === 'solana')
-              .map((p: any) => p.baseToken.address);
+            .filter((p: any) => p.chainId === 'solana')
+            .map((p: any) => p.baseToken.address);
           const uniqueMints = Array.from(new Set(mints)) as string[];
           // Convert mint addresses to JupiterToken objects using cache
           const list = liteCache || [];
           return uniqueMints
-            .map(m => list.find(t => t.address === m))
+            .map((m) => list.find((t) => t.address === m))
             .filter((t): t is JupiterToken => t !== undefined);
         }
         return [];
@@ -109,23 +131,23 @@ export const JupiterService = {
 
   // Fetch prices via backend
   getPrices: async (mintAddresses: string[]): Promise<Record<string, number>> => {
-    const validMints = mintAddresses.filter(m => m && m.length > 30);
+    const validMints = mintAddresses.filter((m) => m && m.length > 30);
     if (validMints.length === 0) return {};
 
     try {
       const idsParam = validMints.join(',');
       const response = await api.get(`/jupiter/prices?ids=${idsParam}`);
-      
+
       if (response && response.prices) {
         return response.prices;
       }
       return {};
     } catch (e) {
-      console.error("Axis API price fetch failed:", e);
+      console.error('Axis API price fetch failed:', e);
       return {};
     }
   },
-  
+
   // Server-side search via BFF (Jupiter v2 API)
   searchTokens: async (query: string): Promise<JupiterToken[]> => {
     const q = query.trim();
@@ -135,7 +157,9 @@ export const JupiterService = {
     if (q.length > 30) {
       const lowerQ = q.toLowerCase();
       if (liteCache) {
-        const match = liteCache.find(t => t.address === lowerQ || t.address.toLowerCase() === lowerQ);
+        const match = liteCache.find(
+          (t) => t.address === lowerQ || t.address.toLowerCase() === lowerQ
+        );
         if (match) return [match];
       }
       const fetched = await JupiterService.fetchTokenByMint(q);
@@ -156,16 +180,17 @@ export const JupiterService = {
       // Fallback to client-side filtering if BFF search fails
       const list = await JupiterService.getLiteList();
       const lowerQ = q.toLowerCase();
-      return list.filter(t =>
-        t.symbol.toLowerCase().includes(lowerQ) ||
-        t.name.toLowerCase().includes(lowerQ)
-      ).slice(0, 50);
+      return list
+        .filter(
+          (t) => t.symbol.toLowerCase().includes(lowerQ) || t.name.toLowerCase().includes(lowerQ)
+        )
+        .slice(0, 50);
     }
   },
 
   getToken: async (mint: string): Promise<JupiterToken | null> => {
     const list = await JupiterService.getLiteList();
-    const cached = list.find(t => t.address === mint);
+    const cached = list.find((t) => t.address === mint);
     if (cached) return cached;
     return JupiterService.fetchTokenByMint(mint);
   },
@@ -191,7 +216,7 @@ export const JupiterService = {
         isVerified: Array.isArray(data.tags) && data.tags.includes('verified'),
       };
       // Add to cache for future lookups
-      if (liteCache && !liteCache.find(t => t.address === token.address)) {
+      if (liteCache && !liteCache.find((t) => t.address === token.address)) {
         liteCache.push(token);
       }
       return token;
@@ -204,7 +229,10 @@ export const JupiterService = {
 };
 
 export const WalletService = {
-  getUserTokens: async (connection: Connection, walletPublicKey: PublicKey): Promise<JupiterToken[]> => {
+  getUserTokens: async (
+    connection: Connection,
+    walletPublicKey: PublicKey
+  ): Promise<JupiterToken[]> => {
     try {
       const tokenAccounts = await connection.getParsedTokenAccountsByOwner(walletPublicKey, {
         programId: TOKEN_PROGRAM_ID,
@@ -213,19 +241,22 @@ export const WalletService = {
       const heldTokens = tokenAccounts.value
         .map((account) => ({
           mint: account.account.data.parsed.info.mint as string,
-          amount: account.account.data.parsed.info.tokenAmount.uiAmount as number
+          amount: account.account.data.parsed.info.tokenAmount.uiAmount as number,
         }))
         .filter((t) => t.amount > 0);
 
       const solBalance = await connection.getBalance(walletPublicKey);
       if (solBalance > 0) {
-        heldTokens.push({ mint: "So11111111111111111111111111111111111111112", amount: solBalance / 1e9 });
+        heldTokens.push({
+          mint: 'So11111111111111111111111111111111111111112',
+          amount: solBalance / 1e9,
+        });
       }
 
       const allTokens = await JupiterService.getLiteList();
-      
+
       const result = heldTokens.map((held) => {
-        const meta = allTokens.find(t => t.address === held.mint);
+        const meta = allTokens.find((t) => t.address === held.mint);
         if (meta) {
           return { ...meta, balance: held.amount };
         } else {
@@ -233,12 +264,12 @@ export const WalletService = {
             address: held.mint,
             chainId: 101,
             decimals: 0,
-            name: "Unknown",
-            symbol: "UNKNOWN",
-            logoURI: "",
-            tags: ["unknown"],
+            name: 'Unknown',
+            symbol: 'UNKNOWN',
+            logoURI: '',
+            tags: ['unknown'],
             isVerified: false,
-            balance: held.amount
+            balance: held.amount,
           };
         }
       });
@@ -247,5 +278,5 @@ export const WalletService = {
     } catch {
       return [];
     }
-  }
+  },
 };

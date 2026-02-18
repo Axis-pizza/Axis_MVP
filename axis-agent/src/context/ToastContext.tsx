@@ -16,7 +16,7 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = Date.now();
     setToast({ message, type, id });
-    
+
     // ✅ IDを使って正確に3秒後に消す（上書きされた時に前のタイマーが新しいのを消さないように）
     setTimeout(() => {
       setToast((current) => (current?.id === id ? null : current));
@@ -26,15 +26,15 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      
+
       {/* ✅ 最前面(z-[9999])で AnimatePresence を発火させる */}
       <div className="fixed top-0 left-0 right-0 z-[10000] pointer-events-none flex justify-center pt-6">
         <AnimatePresence mode="wait">
           {toast && (
-            <Toast 
+            <Toast
               key={toast.id} // keyが変わることでAnimatePresenceがリセットを検知
-              message={toast.message} 
-              type={toast.type} 
+              message={toast.message}
+              type={toast.type}
             />
           )}
         </AnimatePresence>

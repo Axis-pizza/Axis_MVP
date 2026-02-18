@@ -48,7 +48,6 @@ export function isPredictionToken(token: any): token is PredictionToken {
   return token && token.source === 'dflow' && 'predictionMeta' in token;
 }
 
-
 // ==========================================
 // 2. User & Profile Types
 // ==========================================
@@ -63,7 +62,6 @@ export interface UserProfile {
   referralCount?: number;
   is_vip?: boolean; // Used for VIP/OG status checks
 }
-
 
 // ==========================================
 // 3. Existing Strategy & Vault Types

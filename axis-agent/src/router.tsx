@@ -1,8 +1,8 @@
-import { createBrowserRouter, Outlet } from "react-router-dom";
-import Home from "./Home";
-import { TermsPage } from "./components/terms/TermsPage";
-import { AnalyticsTracker } from "./components/common/AnalyticsTracker";
-import { StrategyDetailPage } from "./pages/StrategyDetailPage";
+import { createBrowserRouter, Outlet } from 'react-router-dom';
+import Home from './Home';
+import { TermsPage } from './components/terms/TermsPage';
+import { AnalyticsTracker } from './components/common/AnalyticsTracker';
+import { StrategyDetailPage } from './pages/StrategyDetailPage';
 
 const RootLayout = () => (
   <>
@@ -16,19 +16,19 @@ const router = createBrowserRouter([
     element: <RootLayout />,
     children: [
       {
-        path: "/",
+        path: '/',
         element: <Home />,
       },
       {
-        path: "/terms",
+        path: '/terms',
         element: <TermsPage />,
       },
       {
-        path: "/strategy/:id", // Strategy detail page route
+        path: '/strategy/:id', // Strategy detail page route
         element: <StrategyDetailPage />,
       },
-    ]
-  }
+    ],
+  },
 ]);
 
 export default router;

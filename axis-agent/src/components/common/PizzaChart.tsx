@@ -19,7 +19,6 @@ interface PizzaChartProps {
   animated?: boolean;
 }
 
-
 const SLICE_COLORS = [
   '#B8863F', // Bronze (Amber 600)
   '#8B5E28', // Deep Bronze (Amber 700)
@@ -31,7 +30,12 @@ const SLICE_COLORS = [
   '#0F766E', // Deep Teal (Emerald 700)
 ];
 
-export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = true }: PizzaChartProps) => {
+export const PizzaChart = ({
+  slices,
+  size = 200,
+  showLabels = true,
+  animated = true,
+}: PizzaChartProps) => {
   const { paths, labels } = useMemo(() => {
     if (!slices.length) return { paths: [], labels: [] };
 
@@ -114,7 +118,10 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
   }
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size + 80, height: size + 80 }}>
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: size + 80, height: size + 80 }}
+    >
       <svg
         width={size + 80}
         height={size + 80}
@@ -145,7 +152,7 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
           strokeOpacity="0.8"
           className="drop-shadow-lg"
         />
-        
+
         {/* 背景の皿/ベース */}
         <circle
           cx={size / 2}
@@ -167,11 +174,11 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
             initial={animated ? { scale: 0.8, opacity: 0 } : false}
             animate={{ scale: 1, opacity: 0.9 }} // わずかに透過させてガラス感を出す
             transition={{ delay: i * 0.08, type: 'spring', stiffness: 100, damping: 20 }}
-            whileHover={{ 
-              scale: 1.05, 
+            whileHover={{
+              scale: 1.05,
               opacity: 1,
               filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(217, 119, 6, 0.5))',
-              zIndex: 10
+              zIndex: 10,
             }}
             className="cursor-pointer"
             style={{ transformOrigin: `${size / 2}px ${size / 2}px` }}
@@ -182,7 +189,7 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
         <circle
           cx={size / 2}
           cy={size / 2}
-          r={size / 2 * 0.22}
+          r={(size / 2) * 0.22}
           fill="#080503"
           stroke="#B8863F"
           strokeWidth="0.5"
@@ -190,46 +197,53 @@ export const PizzaChart = ({ slices, size = 200, showLabels = true, animated = t
         />
 
         {/* Labels */}
-        {showLabels && labels.map((label, i) => (
-          <motion.g
-            key={label.symbol}
-            initial={animated ? { opacity: 0, y: 5 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 + i * 0.05 }}
-          >
-            {/* 接続線 (Connector Line) */}
-            <line 
-                x1={size/2 + (size/2 - 10) * Math.cos(Math.atan2(label.y - size/2, label.x - size/2))}
-                y1={size/2 + (size/2 - 10) * Math.sin(Math.atan2(label.y - size/2, label.x - size/2))}
+        {showLabels &&
+          labels.map((label, i) => (
+            <motion.g
+              key={label.symbol}
+              initial={animated ? { opacity: 0, y: 5 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 + i * 0.05 }}
+            >
+              {/* 接続線 (Connector Line) */}
+              <line
+                x1={
+                  size / 2 +
+                  (size / 2 - 10) * Math.cos(Math.atan2(label.y - size / 2, label.x - size / 2))
+                }
+                y1={
+                  size / 2 +
+                  (size / 2 - 10) * Math.sin(Math.atan2(label.y - size / 2, label.x - size / 2))
+                }
                 x2={label.x}
                 y2={label.y}
                 stroke="#B8863F"
                 strokeWidth="0.5"
                 strokeOpacity="0.3"
-            />
-            
-            <text
-              x={label.x}
-              y={label.y - 4}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className="text-[11px] font-serif font-bold fill-[#E7E5E4] drop-shadow-md"
-              style={{ fontFamily: '"Times New Roman", serif' }}
-            >
-              {label.symbol}
-            </text>
-            <text
-              x={label.x}
-              y={label.y + 8}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className="text-[10px] font-serif fill-[#B8863F]"
-              style={{ fontFamily: '"Times New Roman", serif' }}
-            >
-              {label.weight}%
-            </text>
-          </motion.g>
-        ))}
+              />
+
+              <text
+                x={label.x}
+                y={label.y - 4}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="text-[11px] font-serif font-bold fill-[#E7E5E4] drop-shadow-md"
+                style={{ fontFamily: '"Times New Roman", serif' }}
+              >
+                {label.symbol}
+              </text>
+              <text
+                x={label.x}
+                y={label.y + 8}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="text-[10px] font-serif fill-[#B8863F]"
+                style={{ fontFamily: '"Times New Roman", serif' }}
+              >
+                {label.weight}%
+              </text>
+            </motion.g>
+          ))}
       </svg>
     </div>
   );

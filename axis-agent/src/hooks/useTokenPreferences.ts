@@ -16,7 +16,9 @@ function loadFavorites(): Set<string> {
   try {
     const raw = localStorage.getItem(FAVORITES_KEY);
     if (raw) return new Set(JSON.parse(raw) as string[]);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return new Set();
 }
 
@@ -24,14 +26,18 @@ function loadHistory(): SearchHistoryItem[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
     if (raw) return JSON.parse(raw) as SearchHistoryItem[];
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return [];
 }
 
 function loadVerifiedOnly(): boolean {
   try {
     return localStorage.getItem(VERIFIED_KEY) === 'true';
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 export function useTokenPreferences() {
@@ -55,7 +61,7 @@ export function useTokenPreferences() {
   }, [verifiedOnly]);
 
   const toggleFavorite = useCallback((address: string) => {
-    setFavorites(prev => {
+    setFavorites((prev) => {
       const next = new Set(prev);
       if (next.has(address)) {
         next.delete(address);
@@ -69,8 +75,8 @@ export function useTokenPreferences() {
   const isFavorite = useCallback((address: string) => favorites.has(address), [favorites]);
 
   const addToSearchHistory = useCallback((item: SearchHistoryItem) => {
-    setSearchHistory(prev => {
-      const filtered = prev.filter(h => h.address !== item.address);
+    setSearchHistory((prev) => {
+      const filtered = prev.filter((h) => h.address !== item.address);
       return [item, ...filtered].slice(0, MAX_HISTORY);
     });
   }, []);

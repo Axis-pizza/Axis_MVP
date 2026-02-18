@@ -13,7 +13,12 @@ interface PriceChartProps {
   color?: string;
 }
 
-export const PriceChart = ({ tokenAddress, height = 120, showControls = true, color = '#10b981' }: PriceChartProps) => {
+export const PriceChart = ({
+  tokenAddress,
+  height = 120,
+  showControls = true,
+  color = '#10b981',
+}: PriceChartProps) => {
   const [data, setData] = useState<{ timestamp: number; price: number }[]>([]);
   const [interval, setInterval] = useState<'1h' | '1d' | '1w'>('1d');
   const [loading, setLoading] = useState(true);
@@ -40,7 +45,7 @@ export const PriceChart = ({ tokenAddress, height = 120, showControls = true, co
   const { path, change, minPrice, maxPrice } = useMemo(() => {
     if (data.length < 2) return { path: '', change: 0, minPrice: 0, maxPrice: 0 };
 
-    const prices = data.map(d => d.price);
+    const prices = data.map((d) => d.price);
     const min = Math.min(...prices);
     const max = Math.max(...prices);
     const range = max - min || 1;
@@ -88,8 +93,11 @@ export const PriceChart = ({ tokenAddress, height = 120, showControls = true, co
       {showControls && (
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <span className={`text-lg font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-              {isPositive ? '+' : ''}{change.toFixed(2)}%
+            <span
+              className={`text-lg font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}
+            >
+              {isPositive ? '+' : ''}
+              {change.toFixed(2)}%
             </span>
           </div>
           <div className="flex gap-1">
@@ -98,9 +106,7 @@ export const PriceChart = ({ tokenAddress, height = 120, showControls = true, co
                 key={i}
                 onClick={() => setInterval(i)}
                 className={`px-2 py-1 text-xs rounded-lg transition-all ${
-                  interval === i 
-                    ? 'bg-white/10 text-white' 
-                    : 'text-white/40 hover:text-white'
+                  interval === i ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'
                 }`}
               >
                 {i.toUpperCase()}

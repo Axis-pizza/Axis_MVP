@@ -9,20 +9,8 @@
   "instructions": [
     {
       "name": "deposit",
-      "docs": [
-        "Deposit tokens into a strategy vault.",
-        "Creates or updates the user's position."
-      ],
-      "discriminator": [
-        242,
-        35,
-        198,
-        137,
-        82,
-        225,
-        242,
-        182
-      ],
+      "docs": ["Deposit tokens into a strategy vault.", "Creates or updates the user's position."],
+      "discriminator": [242, 35, 198, 137, 82, 225, 242, 182],
       "accounts": [
         {
           "name": "strategy",
@@ -35,16 +23,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  115,
-                  105,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
+                "value": [112, 111, 115, 105, 116, 105, 111, 110]
               },
               {
                 "kind": "account",
@@ -64,9 +43,7 @@
         },
         {
           "name": "owner",
-          "relations": [
-            "strategy"
-          ]
+          "relations": ["strategy"]
         },
         {
           "name": "user_token_account",
@@ -102,16 +79,7 @@
         "* `strategy_type` - 0: Sniper, 1: Fortress, 2: Wave",
         "* `target_weights` - Token weights in basis points (must sum to 10000)"
       ],
-      "discriminator": [
-        208,
-        119,
-        144,
-        145,
-        178,
-        57,
-        105,
-        252
-      ],
+      "discriminator": [208, 119, 144, 145, 178, 57, 105, 252],
       "accounts": [
         {
           "name": "strategy",
@@ -120,16 +88,7 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  114,
-                  97,
-                  116,
-                  101,
-                  103,
-                  121
-                ]
+                "value": [115, 116, 114, 97, 116, 101, 103, 121]
               },
               {
                 "kind": "account",
@@ -175,16 +134,7 @@
         "Execute a tactical rebalance via Jupiter swap.",
         "Only callable by the strategy owner."
       ],
-      "discriminator": [
-        111,
-        219,
-        97,
-        115,
-        139,
-        154,
-        231,
-        202
-      ],
+      "discriminator": [111, 219, 97, 115, 139, 154, 231, 202],
       "accounts": [
         {
           "name": "strategy",
@@ -193,9 +143,7 @@
         {
           "name": "owner",
           "signer": true,
-          "relations": [
-            "strategy"
-          ]
+          "relations": ["strategy"]
         },
         {
           "name": "jupiter_program"
@@ -232,29 +180,11 @@
   "accounts": [
     {
       "name": "StrategyVault",
-      "discriminator": [
-        159,
-        204,
-        238,
-        219,
-        38,
-        201,
-        136,
-        177
-      ]
+      "discriminator": [159, 204, 238, 219, 38, 201, 136, 177]
     },
     {
       "name": "UserPosition",
-      "discriminator": [
-        251,
-        248,
-        209,
-        245,
-        83,
-        234,
-        17,
-        27
-      ]
+      "discriminator": [251, 248, 209, 245, 83, 234, 17, 27]
     }
   ],
   "errors": [
@@ -306,28 +236,19 @@
         "fields": [
           {
             "name": "owner",
-            "docs": [
-              "The owner (Shogun) who created this strategy"
-            ],
+            "docs": ["The owner (Shogun) who created this strategy"],
             "type": "pubkey"
           },
           {
             "name": "name",
-            "docs": [
-              "Human-readable name (max 32 chars)"
-            ],
+            "docs": ["Human-readable name (max 32 chars)"],
             "type": {
-              "array": [
-                "u8",
-                32
-              ]
+              "array": ["u8", 32]
             }
           },
           {
             "name": "strategy_type",
-            "docs": [
-              "Strategy type: 0 = Sniper, 1 = Fortress, 2 = Wave"
-            ],
+            "docs": ["Strategy type: 0 = Sniper, 1 = Fortress, 2 = Wave"],
             "type": "u8"
           },
           {
@@ -337,52 +258,37 @@
               "Each element represents the weight for a token in the composition"
             ],
             "type": {
-              "array": [
-                "u16",
-                10
-              ]
+              "array": ["u16", 10]
             }
           },
           {
             "name": "num_tokens",
-            "docs": [
-              "Number of active tokens in the composition"
-            ],
+            "docs": ["Number of active tokens in the composition"],
             "type": "u8"
           },
           {
             "name": "is_active",
-            "docs": [
-              "Whether the strategy is actively rebalancing"
-            ],
+            "docs": ["Whether the strategy is actively rebalancing"],
             "type": "bool"
           },
           {
             "name": "tvl",
-            "docs": [
-              "Total value locked in the vault (in lamports equivalent)"
-            ],
+            "docs": ["Total value locked in the vault (in lamports equivalent)"],
             "type": "u64"
           },
           {
             "name": "fees_collected",
-            "docs": [
-              "Accumulated fees collected"
-            ],
+            "docs": ["Accumulated fees collected"],
             "type": "u64"
           },
           {
             "name": "last_rebalance",
-            "docs": [
-              "Last rebalance timestamp"
-            ],
+            "docs": ["Last rebalance timestamp"],
             "type": "i64"
           },
           {
             "name": "bump",
-            "docs": [
-              "PDA bump seed"
-            ],
+            "docs": ["PDA bump seed"],
             "type": "u8"
           }
         ]
@@ -390,52 +296,38 @@
     },
     {
       "name": "UserPosition",
-      "docs": [
-        "Tracks individual user deposits into a strategy vault."
-      ],
+      "docs": ["Tracks individual user deposits into a strategy vault."],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "vault",
-            "docs": [
-              "The strategy vault this position belongs to"
-            ],
+            "docs": ["The strategy vault this position belongs to"],
             "type": "pubkey"
           },
           {
             "name": "user",
-            "docs": [
-              "The user who owns this position"
-            ],
+            "docs": ["The user who owns this position"],
             "type": "pubkey"
           },
           {
             "name": "lp_shares",
-            "docs": [
-              "Amount of LP tokens representing share ownership"
-            ],
+            "docs": ["Amount of LP tokens representing share ownership"],
             "type": "u64"
           },
           {
             "name": "deposit_time",
-            "docs": [
-              "Timestamp of initial deposit"
-            ],
+            "docs": ["Timestamp of initial deposit"],
             "type": "i64"
           },
           {
             "name": "entry_value",
-            "docs": [
-              "Entry value in USDC (for PnL calculation)"
-            ],
+            "docs": ["Entry value in USDC (for PnL calculation)"],
             "type": "u64"
           },
           {
             "name": "bump",
-            "docs": [
-              "PDA bump seed"
-            ],
+            "docs": ["PDA bump seed"],
             "type": "u8"
           }
         ]

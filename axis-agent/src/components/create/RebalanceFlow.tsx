@@ -5,10 +5,18 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  RefreshCw, ArrowLeft, TrendingUp, AlertCircle,
-  Loader2, CheckCircle2, Sliders,
-  Minus, Plus, Info, Zap
+import {
+  RefreshCw,
+  ArrowLeft,
+  TrendingUp,
+  AlertCircle,
+  Loader2,
+  CheckCircle2,
+  Sliders,
+  Minus,
+  Plus,
+  Info,
+  Zap,
 } from 'lucide-react';
 import { useWallet } from '../../hooks/useWallet';
 import { PizzaChart } from '../common/PizzaChart';
@@ -37,7 +45,7 @@ export const RebalanceFlow = ({
   onComplete,
 }: Omit<RebalanceFlowProps, 'strategyAddress'>) => {
   const { publicKey, signTransaction } = useWallet();
-  
+
   const [tokens, setTokens] = useState<TokenAllocation[]>(currentTokens);
   const [status, setStatus] = useState<RebalanceStatus>('ADJUST');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -48,12 +56,10 @@ export const RebalanceFlow = ({
   const isValidDistribution = Math.abs(totalWeight - 100) < 0.01;
 
   // Check if weights have changed
-  const hasChanges = tokens.some((t, i) => 
-    t.weight !== currentTokens[i]?.weight
-  );
+  const hasChanges = tokens.some((t, i) => t.weight !== currentTokens[i]?.weight);
 
   const adjustWeight = (index: number, delta: number) => {
-    setTokens(prev => {
+    setTokens((prev) => {
       const newTokens = [...prev];
       const newWeight = Math.max(0, Math.min(100, newTokens[index].weight + delta));
       newTokens[index] = { ...newTokens[index], weight: newWeight };
@@ -62,7 +68,7 @@ export const RebalanceFlow = ({
   };
 
   const setWeight = (index: number, weight: number) => {
-    setTokens(prev => {
+    setTokens((prev) => {
       const newTokens = [...prev];
       newTokens[index] = { ...newTokens[index], weight: Math.max(0, Math.min(100, weight)) };
       return newTokens;
@@ -78,8 +84,8 @@ export const RebalanceFlow = ({
     try {
       // Simulate rebalance for demo
       // In production, this would call the tactical_rebalance instruction
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       setStatus('SUCCESS');
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : 'Rebalance failed';
@@ -118,11 +124,7 @@ export const RebalanceFlow = ({
 
       <AnimatePresence mode="wait">
         {status === 'SUCCESS' ? (
-          <RebalanceSuccess 
-            tokens={tokens}
-            strategyName={strategyName}
-            onComplete={onComplete}
-          />
+          <RebalanceSuccess tokens={tokens} strategyName={strategyName} onComplete={onComplete} />
         ) : (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -149,9 +151,13 @@ export const RebalanceFlow = ({
                   <Sliders className="w-4 h-4" />
                   Adjust Weights
                 </h3>
-                <span className={`text-xs px-2 py-1 rounded ${
-                  isValidDistribution ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
-                }`}>
+                <span
+                  className={`text-xs px-2 py-1 rounded ${
+                    isValidDistribution
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-red-500/20 text-red-400'
+                  }`}
+                >
                   Total: {totalWeight.toFixed(1)}%
                 </span>
               </div>
@@ -160,14 +166,14 @@ export const RebalanceFlow = ({
                 {tokens.map((token, index) => (
                   <div key={token.symbol} className="flex items-center gap-3">
                     <span className="w-12 font-mono text-sm">{token.symbol}</span>
-                    
+
                     <button
                       onClick={() => adjustWeight(index, -5)}
                       className="p-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
                     >
                       <Minus className="w-4 h-4" />
                     </button>
-                    
+
                     <div className="flex-1 relative">
                       <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                         <motion.div
@@ -178,14 +184,14 @@ export const RebalanceFlow = ({
                         />
                       </div>
                     </div>
-                    
+
                     <button
                       onClick={() => adjustWeight(index, 5)}
                       className="p-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
-                    
+
                     <input
                       type="number"
                       value={token.weight}
@@ -211,8 +217,8 @@ export const RebalanceFlow = ({
                       key={s}
                       onClick={() => setSlippage(s)}
                       className={`px-2 py-1 text-xs rounded transition-colors ${
-                        slippage === s 
-                          ? 'bg-orange-500/30 text-orange-400' 
+                        slippage === s
+                          ? 'bg-orange-500/30 text-orange-400'
                           : 'bg-white/10 text-white/50 hover:bg-white/20'
                       }`}
                     >
@@ -273,14 +279,15 @@ export const RebalanceFlow = ({
                         <div key={token.symbol} className="flex items-center justify-between">
                           <span>{token.symbol}</span>
                           <span className={diff > 0 ? 'text-emerald-400' : 'text-red-400'}>
-                            {diff > 0 ? '+' : ''}{diff.toFixed(1)}%
+                            {diff > 0 ? '+' : ''}
+                            {diff.toFixed(1)}%
                           </span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-                
+
                 <button
                   onClick={handleRebalance}
                   className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl font-bold text-black flex items-center justify-center gap-2 shadow-lg"
@@ -288,7 +295,7 @@ export const RebalanceFlow = ({
                   <Zap className="w-5 h-5" />
                   Execute Rebalance
                 </button>
-                
+
                 <button
                   onClick={() => setStatus('ADJUST')}
                   className="w-full py-3 bg-white/10 rounded-xl font-medium text-sm hover:bg-white/20 transition-colors"

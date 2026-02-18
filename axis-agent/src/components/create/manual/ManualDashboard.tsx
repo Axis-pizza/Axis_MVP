@@ -26,11 +26,12 @@ export const ManualDashboard = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col h-[100dvh] bg-black text-white overflow-hidden font-sans">
-      {dashboard.step === 'builder' && (
-        isMobile
-          ? <MobileBuilder dashboard={dashboard} preferences={preferences} onBack={onBack} />
-          : <DesktopBuilder dashboard={dashboard} preferences={preferences} onBack={onBack} />
-      )}
+      {dashboard.step === 'builder' &&
+        (isMobile ? (
+          <MobileBuilder dashboard={dashboard} preferences={preferences} onBack={onBack} />
+        ) : (
+          <DesktopBuilder dashboard={dashboard} preferences={preferences} onBack={onBack} />
+        ))}
 
       <IdentityStep
         visible={dashboard.step === 'identity'}

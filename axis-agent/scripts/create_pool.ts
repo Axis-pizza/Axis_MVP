@@ -1,23 +1,29 @@
-import { Connection, Keypair, PublicKey, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
-import * as DLMMModule from "@meteora-ag/dlmm";
-import BN from "bn.js";
-import * as fs from "fs";
-import * as os from "os";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  sendAndConfirmTransaction,
+  Transaction,
+} from '@solana/web3.js';
+import * as DLMMModule from '@meteora-ag/dlmm';
+import BN from 'bn.js';
+import * as fs from 'fs';
+import * as os from 'os';
 
 // DLMM クラスを取得
 const DLMM = (DLMMModule as any).default.default;
 const ActivationType = (DLMMModule as any).default.ActivationType;
 
 // --- 設定 ---
-const RPC_URL = "https://api.devnet.solana.com";
+const RPC_URL = 'https://api.devnet.solana.com';
 
-const USDC_DEV_MINT = new PublicKey("Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr");
-const SOL_MINT = new PublicKey("So11111111111111111111111111111111111111112");
+const USDC_DEV_MINT = new PublicKey('Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr');
+const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
 
 const BIN_STEP = 100;
 
 async function main() {
-  const connection = new Connection(RPC_URL, "confirmed");
+  const connection = new Connection(RPC_URL, 'confirmed');
 
   const home = os.homedir();
   const keypairPath = `${home}/.config/solana/id.json`;
@@ -28,10 +34,10 @@ async function main() {
   }
 
   const keypair = Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(fs.readFileSync(keypairPath, "utf-8")))
+    new Uint8Array(JSON.parse(fs.readFileSync(keypairPath, 'utf-8')))
   );
 
-  console.log("🚀 Initializing Pool with Wallet:", keypair.publicKey.toBase58());
+  console.log('🚀 Initializing Pool with Wallet:', keypair.publicKey.toBase58());
 
   try {
     const tokenXStr = SOL_MINT.toBase58();
@@ -57,7 +63,7 @@ async function main() {
       ActivationType.Slot,
       false,
       {
-        cluster: "devnet",
+        cluster: 'devnet',
       }
     );
 
@@ -66,12 +72,12 @@ async function main() {
 
     for (const tx of txs) {
       const txHash = await sendAndConfirmTransaction(connection, tx, [keypair]);
-      console.log("✅ Tx sent:", txHash);
+      console.log('✅ Tx sent:', txHash);
     }
 
-    console.log("🎉 Pool Created!");
+    console.log('🎉 Pool Created!');
   } catch (e) {
-    console.error("Error:", e);
+    console.error('Error:', e);
   }
 }
 

@@ -30,7 +30,6 @@ export interface ManualDashboardProps {
   initialTokens?: { symbol: string; weight: number }[];
 }
 
-
 export type TabType = 'all' | 'your_tokens' | 'trending' | 'meme' | 'stock' | 'prediction';
 
 import type { ManualDashboardHook } from '../../../hooks/useManualDashboard';

@@ -1,22 +1,22 @@
 // axis-agent/src/components/common/OGBadge.tsx
 import { Crown } from 'lucide-react';
 
-export const OGBadge = ({ size = "sm" }: { size?: "sm" | "md" | "lg" }) => {
+export const OGBadge = ({ size = 'sm' }: { size?: 'sm' | 'md' | 'lg' }) => {
   // サイズごとのスタイル定義
   const sizeClasses = {
-    sm: "px-1.5 py-0.5 text-[10px] gap-1",
-    md: "px-2 py-1 text-xs gap-1.5",
-    lg: "px-3 py-1.5 text-sm gap-2"
+    sm: 'px-1.5 py-0.5 text-[10px] gap-1',
+    md: 'px-2 py-1 text-xs gap-1.5',
+    lg: 'px-3 py-1.5 text-sm gap-2',
   };
 
   const iconSizes = {
-    sm: "w-3 h-3",
-    md: "w-3.5 h-3.5",
-    lg: "w-4 h-4"
+    sm: 'w-3 h-3',
+    md: 'w-3.5 h-3.5',
+    lg: 'w-4 h-4',
   };
 
   return (
-    <div 
+    <div
       className={`
         inline-flex items-center rounded-full font-bold 
         bg-gradient-to-r from-yellow-600/20 to-amber-500/20 
@@ -26,7 +26,6 @@ export const OGBadge = ({ size = "sm" }: { size?: "sm" | "md" | "lg" }) => {
         ${sizeClasses[size]}
       `}
     >
-      
       <span>VIP</span>
     </div>
   );

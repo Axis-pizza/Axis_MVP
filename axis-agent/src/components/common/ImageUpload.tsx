@@ -38,7 +38,7 @@ export const ImageUpload = ({
       img.onload = () => {
         const MAX_SIZE = 1024;
         let { width, height } = img;
-        
+
         if (width > height && width > MAX_SIZE) {
           height = (height * MAX_SIZE) / width;
           width = MAX_SIZE;
@@ -49,9 +49,9 @@ export const ImageUpload = ({
 
         canvas.width = width;
         canvas.height = height;
-        
+
         ctx?.drawImage(img, 0, 0, width, height);
-        
+
         canvas.toBlob(
           (blob) => {
             if (blob) {
@@ -70,61 +70,70 @@ export const ImageUpload = ({
     });
   };
 
-  const handleFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setError('Image too large. Maximum 10MB.');
-      return;
-    }
-
-    setError(null);
-    
-    const previewUrl = URL.createObjectURL(file);
-    setPreview(previewUrl);
-
-    try {
-      setUploading(true);
-      
-      const compressed = await compressImage(file);
-      
-      if (compressed.size > 2 * 1024 * 1024) {
-        setError('Compressed image still too large. Try a smaller image.');
-        setUploading(false);
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith('image/')) {
+        setError('Please select an image file');
         return;
       }
 
-      const result = await api.uploadImage(compressed, walletAddress, type);
-      
-      if (result.success && result.url) {
-        onUploadComplete(result.url);
-      } else {
-        throw new Error(result.error || 'Upload failed');
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Image too large. Maximum 10MB.');
+        return;
       }
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Upload failed';
-      setError(message);
-      setPreview(null);
-    } finally {
-      setUploading(false);
-    }
-  }, [walletAddress, type, onUploadComplete]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
+      setError(null);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
+      const previewUrl = URL.createObjectURL(file);
+      setPreview(previewUrl);
+
+      try {
+        setUploading(true);
+
+        const compressed = await compressImage(file);
+
+        if (compressed.size > 2 * 1024 * 1024) {
+          setError('Compressed image still too large. Try a smaller image.');
+          setUploading(false);
+          return;
+        }
+
+        const result = await api.uploadImage(compressed, walletAddress, type);
+
+        if (result.success && result.url) {
+          onUploadComplete(result.url);
+        } else {
+          throw new Error(result.error || 'Upload failed');
+        }
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : 'Upload failed';
+        setError(message);
+        setPreview(null);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [walletAddress, type, onUploadComplete]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    },
+    [handleFile]
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) handleFile(file);
+    },
+    [handleFile]
+  );
 
   const clearImage = () => {
     setPreview(null);
@@ -152,11 +161,7 @@ export const ImageUpload = ({
             exit={{ opacity: 0, scale: 0.95 }}
             className="relative rounded-2xl overflow-hidden border border-white/10"
           >
-            <img
-              src={preview}
-              alt="Preview"
-              className="w-full h-48 object-cover"
-            />
+            <img src={preview} alt="Preview" className="w-full h-48 object-cover" />
             {uploading && (
               <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
@@ -178,7 +183,10 @@ export const ImageUpload = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             htmlFor={`image-upload-${type}`}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             className={`flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
@@ -195,9 +203,7 @@ export const ImageUpload = ({
             <p className="text-sm text-white/50">
               {dragOver ? 'Drop image here' : 'Click or drag to upload'}
             </p>
-            <p className="text-xs text-white/30 mt-1">
-              PNG, JPG, WebP • Max 2MB
-            </p>
+            <p className="text-xs text-white/30 mt-1">PNG, JPG, WebP • Max 2MB</p>
           </motion.label>
         )}
       </AnimatePresence>
