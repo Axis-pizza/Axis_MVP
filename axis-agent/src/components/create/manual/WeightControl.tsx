@@ -1,6 +1,6 @@
 /**
  * WeightControl - 全部盛りの比重調整コンポーネント
- * 
+ *
  * 機能:
  * - スライダー（ドラッグで調整）
  * - 数値表示（タップで直接入力）
@@ -22,11 +22,11 @@ interface WeightControlProps {
 const QUICK_VALUES = [10, 25, 50];
 const STEP_AMOUNT = 5;
 
-export const WeightControl = ({ 
-  value, 
-  onChange, 
+export const WeightControl = ({
+  value,
+  onChange,
   totalWeight,
-  disabled = false 
+  disabled = false,
 }: WeightControlProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(value.toString());
@@ -102,10 +102,10 @@ export const WeightControl = ({
               className={`h-full rounded-full ${barColor}`}
               initial={false}
               animate={{ width: `${Math.min(100, value)}%` }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             />
           </div>
-          
+
           {/* Native Range Input (invisible but functional) */}
           <input
             type="range"
@@ -117,19 +117,19 @@ export const WeightControl = ({
             disabled={disabled}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
           />
-          
+
           {/* Custom Thumb */}
           <motion.div
             className="absolute top-1/2 -translate-y-1/2 pointer-events-none"
             initial={false}
             animate={{ left: `calc(${Math.min(100, value)}% - 10px)` }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
-            <div className={`w-5 h-5 rounded-full border-2 shadow-lg ${
-              isOverLimit 
-                ? 'bg-red-500 border-red-400' 
-                : 'bg-orange-500 border-orange-400'
-            }`} />
+            <div
+              className={`w-5 h-5 rounded-full border-2 shadow-lg ${
+                isOverLimit ? 'bg-red-500 border-red-400' : 'bg-orange-500 border-orange-400'
+              }`}
+            />
           </motion.div>
         </div>
 
@@ -145,9 +145,7 @@ export const WeightControl = ({
               onBlur={handleInputBlur}
               onKeyDown={handleKeyDown}
               className={`w-full h-10 bg-black/50 border-2 rounded-xl text-center text-lg font-bold outline-none ${
-                isOverLimit 
-                  ? 'border-red-500 text-red-400' 
-                  : 'border-orange-500 text-white'
+                isOverLimit ? 'border-red-500 text-red-400' : 'border-orange-500 text-white'
               }`}
               maxLength={3}
               autoFocus
@@ -157,8 +155,8 @@ export const WeightControl = ({
               onClick={handleInputFocus}
               disabled={disabled}
               className={`w-full h-10 rounded-xl font-mono font-bold text-lg transition-all ${textColor} ${
-                disabled 
-                  ? 'bg-white/5 cursor-not-allowed' 
+                disabled
+                  ? 'bg-white/5 cursor-not-allowed'
                   : 'bg-white/10 hover:bg-white/15 active:scale-95'
               }`}
             >
@@ -207,7 +205,7 @@ export const WeightControl = ({
             <Minus size={12} />
             <span>{STEP_AMOUNT}</span>
           </button>
-          
+
           <button
             onClick={handleIncrement}
             disabled={disabled || value >= 100}

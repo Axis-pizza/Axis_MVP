@@ -8,16 +8,16 @@ import React from 'react';
 import { CreateLanding } from './CreateLanding';
 import { ManualDashboard, type ManualData } from './manual/ManualDashboard';
 import { DeploymentBlueprint } from './DeploymentBlueprint';
-import { StrategyDashboard } from './StrategyDashboard';
-import { RebalanceFlow } from './RebalanceFlow';
 import { ProfileEditModal } from '../common/ProfileEditModal';
 
 // --- Services ---
 import { getUserStrategies, type OnChainStrategy } from '../../services/kagemusha';
 import { api } from '../../services/api';
 
-
-class SimpleErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
+class SimpleErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: any }
+> {
   constructor(props: any) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -27,8 +27,7 @@ class SimpleErrorBoundary extends React.Component<{ children: React.ReactNode },
     return { hasError: true, error };
   }
 
-  componentDidCatch() {
-  }
+  componentDidCatch() {}
 
   render() {
     if (this.state.hasError) {
@@ -66,7 +65,8 @@ export const KagemushaFlow = ({ onStepChange }: KagemushaFlowProps) => {
 
   // Dashboard用のState (既存維持)
   const [userStrategies, setUserStrategies] = useState<OnChainStrategy[]>([]);
-  const [selectedDashboardStrategy, setSelectedDashboardStrategy] = useState<OnChainStrategy | null>(null);
+  const [selectedDashboardStrategy, setSelectedDashboardStrategy] =
+    useState<OnChainStrategy | null>(null);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
   useEffect(() => {
@@ -160,7 +160,7 @@ export const KagemushaFlow = ({ onStepChange }: KagemushaFlowProps) => {
 
   return (
     <SimpleErrorBoundary>
-    <div className="min-h-screen bg-[#030303] w-full relative overflow-hidden">
+      <div className="min-h-screen bg-[#030303] w-full relative overflow-hidden">
         {/* Registration Gate Modal */}
         <ProfileEditModal
           isOpen={showRegistration}
@@ -174,98 +174,51 @@ export const KagemushaFlow = ({ onStepChange }: KagemushaFlowProps) => {
 
         {/* 1. LANDING */}
         {step === 'LANDING' && (
-            <CreateLanding onCreate={handleStartCreate} isLoading={checkingRegistration} />
+          <CreateLanding onCreate={handleStartCreate} isLoading={checkingRegistration} />
         )}
 
         {/* 2. BUILDER (ManualDashboard + Identity) */}
         {step === 'BUILDER' && (
-            <ManualDashboard
-               onDeploySuccess={handleBuilderComplete}
-               onBack={handleBuilderBack}
-               initialConfig={draftStrategy?.config}
-               initialTokens={draftStrategy?.tokens}
-            />
+          <ManualDashboard
+            onDeploySuccess={handleBuilderComplete}
+            onBack={handleBuilderBack}
+            initialConfig={draftStrategy?.config}
+            initialTokens={draftStrategy?.tokens}
+          />
         )}
 
         {/* 3. BLUEPRINT */}
         {step === 'BLUEPRINT' && (
-            <div className="pt-20 px-4 pb-32 max-w-6xl mx-auto">
-                {draftStrategy && draftStrategy.config ? (
-                    <DeploymentBlueprint
-                        strategyName={draftStrategy.config.name || 'Untitled'}
-                        strategyType="BALANCED"
-                        tokens={draftStrategy.tokens || []}
-                        description={draftStrategy.config.description || ''}
-                        info={{ symbol: draftStrategy.config.ticker || 'ETF' }}
-                        initialTvl={1.0}
-                        onBack={handleBlueprintBack}
-                        onComplete={handleDeploymentComplete}
-                    />
-                ) : (
-                    <div className="flex flex-col items-center justify-center min-h-[50vh] text-red-500 gap-4">
-                        <h2 className="text-2xl font-bold">Data Loading Error</h2>
-                        <p>Strategy data is invalid or missing.</p>
-                        <pre className="bg-black/50 p-4 rounded text-xs text-left">
-                            {JSON.stringify(draftStrategy, null, 2)}
-                        </pre>
-                        <button
-                            onClick={handleBlueprintBack}
-                            className="px-6 py-2 bg-white/10 rounded-lg text-white"
-                        >
-                            Back to Builder
-                        </button>
-                    </div>
-                )}
-            </div>
+          <div className="pt-20 px-4 pb-32 max-w-6xl mx-auto">
+            {draftStrategy && draftStrategy.config ? (
+              <DeploymentBlueprint
+                strategyName={draftStrategy.config.name || 'Untitled'}
+                strategyType="BALANCED"
+                tokens={draftStrategy.tokens || []}
+                description={draftStrategy.config.description || ''}
+                info={{ symbol: draftStrategy.config.ticker || 'ETF' }}
+                initialTvl={1.0}
+                onBack={handleBlueprintBack}
+                onComplete={handleDeploymentComplete}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center min-h-[50vh] text-red-500 gap-4">
+                <h2 className="text-2xl font-bold">Data Loading Error</h2>
+                <p>Strategy data is invalid or missing.</p>
+                <pre className="bg-black/50 p-4 rounded text-xs text-left">
+                  {JSON.stringify(draftStrategy, null, 2)}
+                </pre>
+                <button
+                  onClick={handleBlueprintBack}
+                  className="px-6 py-2 bg-white/10 rounded-lg text-white"
+                >
+                  Back to Builder
+                </button>
+              </div>
+            )}
+          </div>
         )}
-
-        {/* 4. DASHBOARD */}
-        {step === 'DASHBOARD' && (
-           <div className="pt-20 px-4 pb-32 max-w-6xl mx-auto">
-             <StrategyDashboard
-               strategies={userStrategies.map(s => ({
-                 id: s.address,
-                 name: s.name,
-                 type: s.strategyType,
-                 tokens: s.tokens || [],
-                 tvl: s.tvl,
-                 pnl: s.pnl || 0,
-                 pnlPercent: s.pnlPercent || 0,
-                 isActive: s.isActive,
-                 lastRebalance: s.lastRebalance ? new Date(s.lastRebalance * 1000) : null,
-               }))}
-               onSelectStrategy={(s) => {
-                   const os = userStrategies.find(us => us.address === s.id);
-                   if(os) setSelectedDashboardStrategy(os);
-               }}
-               onDeposit={(_s) => {
-               }}
-               onRebalance={(s) => {
-                 const os = userStrategies.find(us => us.address === s.id);
-                 if(os) {
-                   setSelectedDashboardStrategy(os);
-                   setStep('REBALANCE');
-                 }
-               }}
-               onCreateNew={handleCreateNew}
-               isLoading={isDashboardLoading}
-             />
-           </div>
-        )}
-
-        {/* 5. REBALANCE (Optional) */}
-        {step === 'REBALANCE' && selectedDashboardStrategy && (
-           <div className="pt-20 px-4 pb-32 max-w-6xl mx-auto">
-             <RebalanceFlow
-               strategyName={selectedDashboardStrategy.name}
-               strategyType={selectedDashboardStrategy.strategyType}
-               currentTokens={selectedDashboardStrategy.tokens || []}
-               onBack={() => setStep('DASHBOARD')}
-               onComplete={() => { loadUserStrategies(); setStep('DASHBOARD'); }}
-             />
-           </div>
-        )}
-    </div>
+      </div>
     </SimpleErrorBoundary>
   );
 };

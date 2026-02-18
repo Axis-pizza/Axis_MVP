@@ -1,12 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  User,
-  Menu,
-  X,
-  BookOpen,
-  FileText,
-  Github,
-} from 'lucide-react';
+import { User, Menu, X, BookOpen, FileText, Github } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SwipeDiscoverView } from './SwipeDiscoverView';
@@ -44,7 +37,7 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
   }, [viewMode]);
 
   const toggleView = () => {
-    setViewMode(prev => prev === 'swipe' ? 'list' : 'swipe');
+    setViewMode((prev) => (prev === 'swipe' ? 'list' : 'swipe'));
   };
 
   const navigate = useNavigate();
@@ -59,17 +52,15 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
 
   return (
     <div className="relative min-h-screen bg-[#080503]">
-      
       {/* Header */}
       <div className="flex items-center justify-between w-full px-4 py-3 z-50 absolute top-0 md:top-16 left-0 right-0 pointer-events-none">
         {/* pointer-events-none prevents blocking swipe gestures; buttons use pointer-events-auto */}
-        
+
         {/* Left side: placeholder for logo (currently empty) */}
         <div />
 
         {/* Right side: button group */}
         <div className="flex items-center gap-3 pointer-events-auto">
-
           {/* Menu button (Docs, etc.) */}
           <div className="relative">
             <button
@@ -84,11 +75,8 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
               {isMenuOpen && (
                 <>
                   {/* Invisible overlay to close menu on background click */}
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={() => setIsMenuOpen(false)} 
-                  />
-                  
+                  <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
+
                   {/* Menu body */}
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: -10 }}
@@ -143,7 +131,6 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
             {/* Notification badge */}
             <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#B8863F] rounded-full border-2 border-[#080503]" />
           </button>
-
         </div>
       </div>
 
@@ -156,19 +143,12 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
             onOverlayChange={onOverlayChange}
           />
         ) : (
-          <ListDiscoverView 
-            onToggleView={toggleView} 
-            onStrategySelect={onStrategySelect} 
-          />
+          <ListDiscoverView onToggleView={toggleView} onStrategySelect={onStrategySelect} />
         )}
       </div>
 
       {/* Profile drawer */}
-      <ProfileDrawer 
-        isOpen={isDrawerOpen} 
-        onClose={() => setIsDrawerOpen(false)} 
-      />
-
+      <ProfileDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
     </div>
   );
 };

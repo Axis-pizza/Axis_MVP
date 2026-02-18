@@ -55,23 +55,23 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
 
     const response = await fetch(`${COINGECKO_API}/coins/markets?${params}`);
     if (!response.ok) throw new Error(`CoinGecko returned ${response.status}`);
-    
+
     const markets: CoinGeckoToken[] = await response.json();
     rawCache = markets;
 
     tokenCache = markets
-      .filter(m => m.symbol) 
-      .map(m => ({
+      .filter((m) => m.symbol)
+      .map((m) => ({
         symbol: m.symbol.toUpperCase(),
         name: m.name,
         // Prefer platforms.solana address, fall back to CoinGecko ID
-        address: m.platforms?.solana || m.id, 
+        address: m.platforms?.solana || m.id,
         logoURI: m.image,
         price: m.current_price,
         priceFormatted: formatPrice(m.current_price),
         change24h: m.price_change_percentage_24h,
       }));
-    
+
     cacheTime = Date.now();
     return tokenCache;
   } catch (error) {
@@ -83,35 +83,34 @@ export async function fetchSolanaTokens(perPage: number = 250): Promise<TokenInf
  * 2. Get specific market data for Mint Addresses (For Portfolio/Strategy Tracking)
  * Uses /simple/token_price which supports fetching by contract address
  */
-export async function getMarketData(mints: string[]): Promise<Record<string, { price: number; change24h: number }>> {
+export async function getMarketData(
+  mints: string[]
+): Promise<Record<string, { price: number; change24h: number }>> {
   if (!mints || mints.length === 0) return {};
 
   // Strict validation: exclude undefined and non-Base58 strings
   // Prevents invalid strings like "USDC" or "undefined" from being sent to the API
-  const validMints = mints.filter(m => 
-    m && 
-    typeof m === 'string' && 
-    m.length >= 32 && 
-    SOLANA_ADDRESS_REGEX.test(m)
+  const validMints = mints.filter(
+    (m) => m && typeof m === 'string' && m.length >= 32 && SOLANA_ADDRESS_REGEX.test(m)
   );
 
   if (validMints.length === 0) return {};
 
   const now = Date.now();
-  
+
   // Check cache
-  const uncachedMints = validMints.filter(mint => {
+  const uncachedMints = validMints.filter((mint) => {
     const cached = priceCache[mint];
-    return !cached || (now - cached.timestamp > PRICE_CACHE_TTL);
+    return !cached || now - cached.timestamp > PRICE_CACHE_TTL;
   });
 
   if (uncachedMints.length === 0) {
     const result: Record<string, { price: number; change24h: number }> = {};
-    validMints.forEach(mint => {
+    validMints.forEach((mint) => {
       if (priceCache[mint]) {
-        result[mint] = { 
-          price: priceCache[mint].price, 
-          change24h: priceCache[mint].change24h 
+        result[mint] = {
+          price: priceCache[mint].price,
+          change24h: priceCache[mint].change24h,
         };
       }
     });
@@ -125,7 +124,7 @@ export async function getMarketData(mints: string[]): Promise<Record<string, { p
       const ids = chunk.join(',');
       // Build URL
       const url = `${COINGECKO_API}/simple/token_price/solana?contract_addresses=${ids}&vs_currencies=usd&include_24hr_change=true`;
-      
+
       const res = await fetch(url);
       if (!res.ok) {
         return null;
@@ -139,23 +138,23 @@ export async function getMarketData(mints: string[]): Promise<Record<string, { p
   const results = await Promise.all(fetchPromises);
 
   // Update cache
-  results.forEach(data => {
+  results.forEach((data) => {
     if (!data) return;
     Object.entries(data).forEach(([mint, info]: [string, any]) => {
       const price = info.usd;
       const change = info.usd_24h_change;
-      
+
       priceCache[mint] = {
         price,
         change24h: change,
-        timestamp: now
+        timestamp: now,
       };
     });
   });
 
   // Build result
   const finalResult: Record<string, { price: number; change24h: number }> = {};
-  validMints.forEach(mint => {
+  validMints.forEach((mint) => {
     const cached = priceCache[mint];
     if (cached) {
       finalResult[mint] = { price: cached.price, change24h: cached.change24h };
@@ -187,23 +186,20 @@ function formatPrice(price: number): string {
 export async function searchTokens(query: string, limit: number = 20): Promise<TokenInfo[]> {
   const tokens = await fetchSolanaTokens();
   const q = query.toLowerCase();
-  
+
   return tokens
-    .filter(t => 
-      t.symbol.toLowerCase().includes(q) || 
-      t.name.toLowerCase().includes(q)
-    )
+    .filter((t) => t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q))
     .slice(0, limit);
 }
 
 export async function getTokenById(id: string): Promise<TokenInfo | null> {
   const tokens = await fetchSolanaTokens();
-  return tokens.find(t => t.address === id) ?? null;
+  return tokens.find((t) => t.address === id) ?? null;
 }
 
 export async function getTokenBySymbol(symbol: string): Promise<TokenInfo | null> {
   const tokens = await fetchSolanaTokens();
-  return tokens.find(t => t.symbol.toUpperCase() === symbol.toUpperCase()) ?? null;
+  return tokens.find((t) => t.symbol.toUpperCase() === symbol.toUpperCase()) ?? null;
 }
 
 export function clearTokenCache(): void {
@@ -244,5 +240,5 @@ export const CoinGeckoService = {
   getMarketData,
   fetchSolanaTokens,
   fetchMarketCapMap,
-  searchTokens
+  searchTokens,
 };

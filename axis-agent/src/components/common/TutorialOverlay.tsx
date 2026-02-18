@@ -74,14 +74,14 @@ export const TutorialOverlay = ({ onComplete, onConnectWallet }: TutorialOverlay
   const goNext = useCallback(() => {
     if (current < SLIDES.length - 1) {
       setDirection(1);
-      setCurrent(prev => prev + 1);
+      setCurrent((prev) => prev + 1);
     }
   }, [current]);
 
   const goPrev = useCallback(() => {
     if (current > 0) {
       setDirection(-1);
-      setCurrent(prev => prev - 1);
+      setCurrent((prev) => prev - 1);
     }
   }, [current]);
 
@@ -102,14 +102,13 @@ export const TutorialOverlay = ({ onComplete, onConnectWallet }: TutorialOverlay
 
   const handleConnect = () => {
     onConnectWallet(); // Connect
-    // We don't close immediately to let them see the connection UI, 
+    // We don't close immediately to let them see the connection UI,
     // or you could call onComplete() here too depending on UX preference.
-    onComplete(); 
+    onComplete();
   };
 
   return createPortal(
     <div className="fixed inset-0 z-[1000000] bg-[#080503] text-[#F2E0C8] overflow-hidden font-sans perspective-[1000px]">
-      
       {/* 1. Improved Background: Darker overlay to help text pop */}
       <div className="absolute inset-0 bg-black/40 z-0 pointer-events-none" />
 
@@ -131,7 +130,9 @@ export const TutorialOverlay = ({ onComplete, onConnectWallet }: TutorialOverlay
         onClick={onComplete}
         className="absolute top-8 right-8 z-50 group flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all"
       >
-        <span className="text-xs font-medium tracking-wider text-white/60 group-hover:text-white uppercase">Skip Intro</span>
+        <span className="text-xs font-medium tracking-wider text-white/60 group-hover:text-white uppercase">
+          Skip Intro
+        </span>
         <X className="w-3 h-3 text-white/40 group-hover:text-white" />
       </button>
 
@@ -156,27 +157,28 @@ export const TutorialOverlay = ({ onComplete, onConnectWallet }: TutorialOverlay
             The text sits inside this dark glass lens.
           */}
           <div className="relative w-full max-w-[380px] aspect-square rounded-full flex flex-col items-center justify-center text-center p-12 shadow-2xl">
-            
             {/* Glass Background of the Orb */}
             <div className="absolute inset-0 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.5)]" />
-            
+
             {/* Inner Ring Decoration */}
             <div className="absolute inset-4 rounded-full border border-white/5 pointer-events-none" />
 
             {/* Content Container (Relative to sit above glass) */}
             <div className="relative z-10 flex flex-col items-center">
-              
               {/* Animated Icon */}
-              <motion.div 
+              <motion.div
                 initial={{ scale: 0.8, opacity: 0, y: 10 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
                 className="mb-6 relative"
               >
-                <div className="absolute inset-0 bg-white/20 blur-xl rounded-full" style={{ color: slide.accentColor }} />
-                <Icon 
-                  className="w-10 h-10 relative drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" 
-                  style={{ color: slide.accentColor }} 
+                <div
+                  className="absolute inset-0 bg-white/20 blur-xl rounded-full"
+                  style={{ color: slide.accentColor }}
+                />
+                <Icon
+                  className="w-10 h-10 relative drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]"
+                  style={{ color: slide.accentColor }}
                   strokeWidth={2}
                 />
               </motion.div>
@@ -193,11 +195,11 @@ export const TutorialOverlay = ({ onComplete, onConnectWallet }: TutorialOverlay
                 >
                   {slide.badge}
                 </span>
-                
+
                 <h2 className="text-3xl font-serif text-white mb-4 tracking-tight leading-none">
                   {slide.title}
                 </h2>
-                
+
                 <p className="text-zinc-400 text-sm leading-relaxed font-light mx-auto max-w-[260px]">
                   {slide.subtitle}
                 </p>
@@ -251,9 +253,9 @@ export const TutorialOverlay = ({ onComplete, onConnectWallet }: TutorialOverlay
                   ? 'w-3 h-3 bg-transparent border-white scale-110'
                   : 'w-1.5 h-1.5 bg-white/20 border-transparent group-hover:bg-white/40'
               }`}
-              style={{ 
+              style={{
                 borderColor: i === current ? slide.accentColor : undefined,
-                backgroundColor: i === current ? slide.accentColor : undefined 
+                backgroundColor: i === current ? slide.accentColor : undefined,
               }}
             />
           </button>
@@ -263,14 +265,14 @@ export const TutorialOverlay = ({ onComplete, onConnectWallet }: TutorialOverlay
       {/* Navigation Hints (Arrows) */}
       {!isLast && (
         <>
-          <button 
-            onClick={goPrev} 
+          <button
+            onClick={goPrev}
             disabled={current === 0}
             className={`absolute left-4 top-1/2 -translate-y-1/2 p-4 text-white/20 hover:text-white/60 transition-colors ${current === 0 ? 'opacity-0' : 'opacity-100'}`}
           >
             <ChevronLeft className="w-8 h-8" />
           </button>
-          <button 
+          <button
             onClick={goNext}
             className="absolute right-4 top-1/2 -translate-y-1/2 p-4 text-white/20 hover:text-white/60 transition-colors"
           >

@@ -19,7 +19,7 @@ interface FloatingNavProps {
 export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) => {
   const [isBugDrawerOpen, setIsBugDrawerOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-  const [isDesktop, setIsDesktop] = useState(false); 
+  const [isDesktop, setIsDesktop] = useState(false);
 
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isHoveringRef = useRef(false);
@@ -48,11 +48,11 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
   useEffect(() => {
     if (isDesktop) return;
     const events = ['scroll', 'touchstart', 'click', 'keydown', 'mousemove'];
-    events.forEach(event => window.addEventListener(event, handleActivity));
+    events.forEach((event) => window.addEventListener(event, handleActivity));
     handleActivity();
     return () => {
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-      events.forEach(event => window.removeEventListener(event, handleActivity));
+      events.forEach((event) => window.removeEventListener(event, handleActivity));
     };
   }, [handleActivity, isDesktop]);
 
@@ -73,23 +73,26 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
     <>
       <motion.div
         initial={{ y: 0 }}
-        animate={{ 
-          y: isDesktop ? 0 : (isVisible ? 0 : 120),
-          opacity: isDesktop ? 1 : (isVisible ? 1 : 0.5) 
-        }} 
-        transition={{ 
-          type: "spring", damping: 20, stiffness: 300, mass: 0.8 
+        animate={{
+          y: isDesktop ? 0 : isVisible ? 0 : 120,
+          opacity: isDesktop ? 1 : isVisible ? 1 : 0.5,
+        }}
+        transition={{
+          type: 'spring',
+          damping: 20,
+          stiffness: 300,
+          mass: 0.8,
         }}
         // ▼▼▼ 修正: stickyをやめてfixedに戻し、背景色を追加 ▼▼▼
         className="fixed z-50 flex justify-center pointer-events-none px-4
         bottom-8 left-0 right-0
         md:top-0 md:bottom-auto md:px-0 md:w-full
         md:bg-[#0A0A0A]/90 md:backdrop-blur-xl md:border-b md:border-amber-900/20"
-    >
-        <div 
+      >
+        <div
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          onTouchStart={handleMouseEnter} 
+          onTouchStart={handleMouseEnter}
           // ▼▼▼ 修正: PCでは幅最大(w-full)にし、背景は親に任せるため透明に ▼▼▼
           className={`
             pointer-events-auto relative flex items-center justify-between gap-6 
@@ -102,12 +105,8 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
             md:w-full md:max-w-7xl md:mx-auto md:rounded-none md:border-none md:bg-transparent md:shadow-none md:py-4 md:px-8
           `}
         >
-          
           {/* ▼▼▼ 修正: ロゴの中身を復活させました ▼▼▼ */}
-          <div className="hidden md:flex items-center gap-2 font-bold text-xl text-white tracking-tight">
-             
-            
-          </div>
+          <div className="hidden md:flex items-center gap-2 font-bold text-xl text-white tracking-tight"></div>
 
           <div className="flex items-center gap-4 md:gap-8">
             <div className="flex items-center gap-2 md:gap-8">
@@ -123,19 +122,23 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
                       <motion.div
                         layoutId="nav-active-bg"
                         className="absolute inset-0 bg-gradient-to-br from-amber-500 to-amber-700 rounded-full shadow-[0_0_20px_rgba(184,134,63,0.4)]"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                        transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
                       />
                     )}
                     <div className="relative z-10 flex items-center gap-2">
                       <item.icon
                         className={`w-6 h-6 transition-colors duration-300 ${
-                          isActive ? 'text-black fill-black/10' : 'text-amber-700/50 group-hover:text-amber-400'
+                          isActive
+                            ? 'text-black fill-black/10'
+                            : 'text-amber-700/50 group-hover:text-amber-400'
                         }`}
                         strokeWidth={isActive ? 2.5 : 2}
                       />
-                      <span className={`hidden md:block text-sm font-medium ${
-                         isActive ? 'text-black' : 'text-amber-700/60 group-hover:text-amber-400'
-                      }`}>
+                      <span
+                        className={`hidden md:block text-sm font-medium ${
+                          isActive ? 'text-black' : 'text-amber-700/60 group-hover:text-amber-400'
+                        }`}
+                      >
                         {item.label}
                       </span>
                     </div>
@@ -148,18 +151,13 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
               onClick={() => setIsBugDrawerOpen(true)}
               className="relative w-10 h-10 flex items-center justify-center rounded-full bg-amber-900/10 hover:bg-amber-900/20 border border-amber-800/15 hover:border-amber-600/30 transition-all group"
             >
-               <MessageSquareText
-                 className="w-4 h-4 text-amber-600/70 group-hover:text-amber-400 group-hover:scale-110 transition-all duration-500"
-               />
+              <MessageSquareText className="w-4 h-4 text-amber-600/70 group-hover:text-amber-400 group-hover:scale-110 transition-all duration-500" />
             </button>
           </div>
         </div>
       </motion.div>
 
-      <BugDrawer 
-        isOpen={isBugDrawerOpen} 
-        onClose={() => setIsBugDrawerOpen(false)} 
-      />
+      <BugDrawer isOpen={isBugDrawerOpen} onClose={() => setIsBugDrawerOpen(false)} />
     </>
   );
 });

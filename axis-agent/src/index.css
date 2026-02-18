@@ -1,37 +1,37 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @import './mobile-styles.css';
 
 @theme {
   /* * Times New Roman serif font */
-  --font-sans: "Times New Roman", Times, serif;
+  --font-sans: 'Times New Roman', Times, serif;
 
   /* ===== Metallic Gold Scale — Red-biased, high contrast ===== */
-  --color-orange-400: #D4A261; /* gold-300: warm satin gold */
-  --color-orange-500: #B8863F; /* gold-500: primary metallic accent */
-  --color-orange-600: #8B5E28; /* gold-700: deep bronze */
+  --color-orange-400: #d4a261; /* gold-300: warm satin gold */
+  --color-orange-500: #b8863f; /* gold-500: primary metallic accent */
+  --color-orange-600: #8b5e28; /* gold-700: deep bronze */
 
-  --color-amber-400: #E8C890; /* gold-100: bright metallic highlight */
-  --color-amber-500: #D4A261; /* gold-300 */
+  --color-amber-400: #e8c890; /* gold-100: bright metallic highlight */
+  --color-amber-500: #d4a261; /* gold-300 */
 
   /* ===== Core Backgrounds — ultra-deep warm black ===== */
-  --color-zinc-900: #140E08; /* bg-secondary */
-  --color-black: #080503;    /* bg-primary — near-void black */
+  --color-zinc-900: #140e08; /* bg-secondary */
+  --color-black: #080503; /* bg-primary — near-void black */
 
   /* ===== Brand Tokens ===== */
-  --color-brand-primary: #B8863F;
-  --color-brand-secondary: #D4A261;
+  --color-brand-primary: #b8863f;
+  --color-brand-secondary: #d4a261;
   --color-bg-dark: #080503;
-  --color-bg-secondary: #140E08;
+  --color-bg-secondary: #140e08;
   --color-bg-tertiary: #221509;
-  --color-gold-900: #6B4420;
-  --color-gold-700: #8B5E28;
-  --color-gold-500: #B8863F;
-  --color-gold-300: #D4A261;
-  --color-gold-100: #E8C890;
-  --color-text-primary: #F2E0C8;
-  --color-text-secondary: #B89860;
-  --color-text-muted: #7A5A30;
+  --color-gold-900: #6b4420;
+  --color-gold-700: #8b5e28;
+  --color-gold-500: #b8863f;
+  --color-gold-300: #d4a261;
+  --color-gold-100: #e8c890;
+  --color-text-primary: #f2e0c8;
+  --color-text-secondary: #b89860;
+  --color-text-muted: #7a5a30;
 }
 
 /* Global reset */
@@ -45,8 +45,8 @@ html {
 
 body {
   background-color: #080503;
-  color: #F2E0C8;
-  font-family: "Times New Roman", Times, serif;
+  color: #f2e0c8;
+  font-family: 'Times New Roman', Times, serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: 0.02em;
@@ -88,11 +88,11 @@ body {
 .gradient-text {
   background: linear-gradient(
     135deg,
-    #E8C890 0%,
-    #D4A261 25%,
-    #B8863F 50%,
-    #8B5E28 75%,
-    #6B4420 100%
+    #e8c890 0%,
+    #d4a261 25%,
+    #b8863f 50%,
+    #8b5e28 75%,
+    #6b4420 100%
   );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -107,14 +107,30 @@ body {
 }
 
 /* Topping colors — muted institutional palette */
-.topping-pepperoni { background: #9F1239; box-shadow: inset 0 2px 4px rgba(0,0,0,0.4); }
-.topping-cheese { background: #B8863F; }
-.topping-basil { background: #15803D; }
+.topping-pepperoni {
+  background: #9f1239;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+.topping-cheese {
+  background: #b8863f;
+}
+.topping-basil {
+  background: #15803d;
+}
 
 /* Pulse glow — warm metallic gold glow */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 15px rgba(184, 134, 63, 0.08), 0 0 40px rgba(184, 134, 63, 0.03); }
-  50% { box-shadow: 0 0 20px rgba(184, 134, 63, 0.2), 0 0 60px rgba(184, 134, 63, 0.08); }
+  0%,
+  100% {
+    box-shadow:
+      0 0 15px rgba(184, 134, 63, 0.08),
+      0 0 40px rgba(184, 134, 63, 0.03);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(184, 134, 63, 0.2),
+      0 0 60px rgba(184, 134, 63, 0.08);
+  }
 }
 .pulse-glow {
   animation: pulse-glow 3s ease-in-out infinite;
@@ -122,20 +138,34 @@ body {
 
 /* Metallic shine — for CTA buttons and high-value elements */
 @keyframes metallic-shine {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
 }
 
 /* Matrix rain — gold particles */
 @keyframes matrix-rain {
-  0% { transform: translateY(-100%); opacity: 0; }
-  10% { opacity: 0.5; }
-  90% { opacity: 0.5; }
-  100% { transform: translateY(100vh); opacity: 0; }
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.5;
+  }
+  90% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
 }
 .matrix-char {
   animation: matrix-rain 5s linear infinite;
-  color: #B8863F;
+  color: #b8863f;
   text-shadow: 0 0 6px rgba(184, 134, 63, 0.3);
 }
 

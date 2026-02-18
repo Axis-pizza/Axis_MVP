@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, Wallet, TrendingUp, Shield, 
-  Loader2, CheckCircle2, AlertCircle, ExternalLink, ArrowRight, 
-  Sparkles, Lock
+import {
+  ArrowLeft,
+  Wallet,
+  TrendingUp,
+  Shield,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  ArrowRight,
+  Sparkles,
+  Lock,
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
-import {
-  PublicKey,
-  Transaction,
-} from '@solana/web3.js';
+import { PublicKey, Transaction } from '@solana/web3.js';
 import { PizzaChart } from '../common/PizzaChart';
 import { api } from '../../services/api';
 import { Buffer } from 'buffer';
@@ -50,7 +55,7 @@ export const DepositFlow = ({
 }: DepositFlowProps) => {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
-  
+
   const [amount, setAmount] = useState<string>(initialAmount ? initialAmount.toString() : '');
   const [balance, setBalance] = useState<number>(0);
   const [status, setStatus] = useState<DepositStatus>('INPUT');
@@ -63,8 +68,7 @@ export const DepositFlow = ({
       try {
         const bal = await getUsdcBalance(connection, publicKey);
         setBalance(bal);
-      } catch {
-      }
+      } catch {}
     };
     fetchBalance();
   }, [publicKey, connection]);
@@ -81,23 +85,29 @@ export const DepositFlow = ({
       // --- 1. USDC SPL Transfer ---
       let strategyPubkey;
       try {
-         strategyPubkey = new PublicKey(strategyAddress);
+        strategyPubkey = new PublicKey(strategyAddress);
       } catch {
-         // strategyAddress が無効な場合は publicKey (自分のウォレット) にフォールバック
-         strategyPubkey = publicKey;
+        // strategyAddress が無効な場合は publicKey (自分のウォレット) にフォールバック
+        strategyPubkey = publicKey;
       }
 
       const transaction = new Transaction();
 
       // Ensure destination ATA exists
-      const { ata: fromAta, instruction: createFromIx } = await getOrCreateUsdcAta(connection, publicKey, publicKey);
-      const { ata: toAta, instruction: createToIx } = await getOrCreateUsdcAta(connection, publicKey, strategyPubkey);
+      const { ata: fromAta, instruction: createFromIx } = await getOrCreateUsdcAta(
+        connection,
+        publicKey,
+        publicKey
+      );
+      const { ata: toAta, instruction: createToIx } = await getOrCreateUsdcAta(
+        connection,
+        publicKey,
+        strategyPubkey
+      );
       if (createFromIx) transaction.add(createFromIx);
       if (createToIx) transaction.add(createToIx);
 
-      transaction.add(
-        createUsdcTransferIx(fromAta, toAta, publicKey, parsedAmount)
-      );
+      transaction.add(createUsdcTransferIx(fromAta, toAta, publicKey, parsedAmount));
 
       setStatus('PROCESSING');
       const latestBlockhash = await connection.getLatestBlockhash();
@@ -112,14 +122,17 @@ export const DepositFlow = ({
         maxRetries: 3,
       });
 
-      await connection.confirmTransaction({
-        signature,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      }, 'confirmed');
+      await connection.confirmTransaction(
+        {
+          signature,
+          blockhash: latestBlockhash.blockhash,
+          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        },
+        'confirmed'
+      );
 
       setTxSignature(signature);
-      
+
       // --- 2. API Saving ---
       setStatus('SAVING');
 
@@ -132,19 +145,19 @@ export const DepositFlow = ({
         type: strategyType,
 
         // ★修正: ここで mint と logoURI をバックエンドへ送る
-        tokens: tokens.map(t => ({
+        tokens: tokens.map((t) => ({
           symbol: String(t.symbol),
           weight: Math.floor(Number(t.weight)),
-          mint: t.mint || "So11111111111111111111111111111111111111112",
-          logoURI: t.logoURI
+          mint: t.mint || 'So11111111111111111111111111111111111111112',
+          logoURI: t.logoURI,
         })),
 
         // composition も同様に
-        composition: tokens.map(t => ({
+        composition: tokens.map((t) => ({
           symbol: String(t.symbol),
           weight: Math.floor(Number(t.weight)),
-          mint: t.mint || "So11111111111111111111111111111111111111112",
-          logoURI: t.logoURI
+          mint: t.mint || 'So11111111111111111111111111111111111111112',
+          logoURI: t.logoURI,
         })),
 
         ownerPubkey: publicKey.toBase58(),
@@ -152,14 +165,13 @@ export const DepositFlow = ({
         address: publicKey.toBase58(),
         tvl: Number(parsedAmount),
         initialInvestment: Number(parsedAmount),
-        image: "",
-        signedTransaction: base64Tx
+        image: '',
+        signedTransaction: base64Tx,
       };
 
       try {
         await api.deploy(signature, payload);
-      } catch {
-      }
+      } catch {}
 
       // ticker を確実に保存するため createStrategy も呼ぶ
       if (strategyTicker) {
@@ -170,7 +182,7 @@ export const DepositFlow = ({
             ticker: strategyTicker,
             description: `${strategyType} Strategy created by ${publicKey.toBase58().slice(0, 6)}...`,
             type: strategyType,
-            tokens: tokens.map(t => ({
+            tokens: tokens.map((t) => ({
               symbol: String(t.symbol),
               weight: Math.floor(Number(t.weight)),
               mint: t.mint || '',
@@ -178,12 +190,10 @@ export const DepositFlow = ({
             })),
             address: strategyAddress || publicKey.toBase58(),
           });
-        } catch {
-        }
+        } catch {}
       }
 
       setStatus('SUCCESS');
-
     } catch (e: any) {
       console.error('Deposit Error:', e);
       const msg = e?.logs?.join('\n') || e?.message || 'Deposit failed';
@@ -199,35 +209,44 @@ export const DepositFlow = ({
 
   const getTypeColor = () => {
     switch (strategyType) {
-      case 'AGGRESSIVE': return '#F97316';
-      case 'BALANCED': return '#3B82F6';
-      case 'CONSERVATIVE': return '#10B981';
-      default: return '#B8863F';
+      case 'AGGRESSIVE':
+        return '#F97316';
+      case 'BALANCED':
+        return '#3B82F6';
+      case 'CONSERVATIVE':
+        return '#10B981';
+      default:
+        return '#B8863F';
     }
   };
   const themeColor = getTypeColor();
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      <div 
+      <div
         className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full blur-[120px] opacity-20 pointer-events-none"
         style={{ backgroundColor: themeColor }}
       />
 
       <div className="relative z-10 px-4 py-6 pb-32 max-w-lg mx-auto">
         <div className="flex items-center justify-between mb-8">
-          <button onClick={onBack} className="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors backdrop-blur-md border border-white/5">
+          <button
+            onClick={onBack}
+            className="p-3 rounded-full bg-white/5 hover:bg-white/10 transition-colors backdrop-blur-md border border-white/5"
+          >
             <ArrowLeft className="w-5 h-5 text-[#E7E5E4]" />
           </button>
           <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/5 backdrop-blur-md">
-            <span className="text-xs font-bold tracking-wider text-[#E7E5E4]">{strategyType} MODE</span>
+            <span className="text-xs font-bold tracking-wider text-[#E7E5E4]">
+              {strategyType} MODE
+            </span>
           </div>
           <div className="w-11" />
         </div>
 
         <AnimatePresence mode="wait">
           {status === 'SUCCESS' ? (
-            <DepositSuccess 
+            <DepositSuccess
               amount={parsedAmount}
               txSignature={txSignature}
               strategyName={strategyName}
@@ -242,21 +261,29 @@ export const DepositFlow = ({
               className="space-y-8"
             >
               <div className="text-center relative">
-                <motion.div 
+                <motion.div
                   className="relative inline-block mb-6"
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
                 >
                   <div className="relative z-10 p-2 bg-[#080503] rounded-full border border-white/10 shadow-2xl">
                     <PizzaChart slices={tokens} size={140} showLabels={false} />
                   </div>
-                  <div className="absolute inset-0 rounded-full blur-xl opacity-40 animate-pulse" style={{ backgroundColor: themeColor }} />
+                  <div
+                    className="absolute inset-0 rounded-full blur-xl opacity-40 animate-pulse"
+                    style={{ backgroundColor: themeColor }}
+                  />
                 </motion.div>
 
-                <h1 className="text-3xl font-serif font-bold text-[#E7E5E4] mb-2">{strategyName}</h1>
+                <h1 className="text-3xl font-serif font-bold text-[#E7E5E4] mb-2">
+                  {strategyName}
+                </h1>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {tokens.map(t => (
-                    <span key={t.symbol} className="px-2 py-1 rounded bg-white/5 border border-white/5 text-[10px] text-[#A8A29E] font-mono">
+                  {tokens.map((t) => (
+                    <span
+                      key={t.symbol}
+                      className="px-2 py-1 rounded bg-white/5 border border-white/5 text-[10px] text-[#A8A29E] font-mono"
+                    >
                       {t.symbol} {t.weight}%
                     </span>
                   ))}
@@ -270,7 +297,7 @@ export const DepositFlow = ({
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="text-[#E7E5E4] font-mono">{balance.toFixed(2)} USDC</span>
-                    <button 
+                    <button
                       onClick={() => setAmount(balance.toFixed(2))}
                       className="text-[#B8863F] hover:text-[#D4A261] font-bold transition-colors"
                     >
@@ -307,7 +334,11 @@ export const DepositFlow = ({
                 </div>
 
                 {errorMessage && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2"
+                  >
                     <AlertCircle className="w-4 h-4 text-red-400" />
                     <span className="text-xs text-red-400">{errorMessage}</span>
                   </motion.div>
@@ -325,7 +356,7 @@ export const DepositFlow = ({
                   )}
                   {(status === 'CONFIRMING' || status === 'PROCESSING' || status === 'SAVING') && (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" /> 
+                      <Loader2 className="w-5 h-5 animate-spin" />
                       {status === 'CONFIRMING' ? 'Sign in Wallet...' : 'Processing...'}
                     </>
                   )}
@@ -345,7 +376,7 @@ const DepositSuccess = ({
   txSignature,
   strategyName,
   onComplete,
-  themeColor
+  themeColor,
 }: {
   amount: number;
   txSignature: string | null;
@@ -364,7 +395,7 @@ const DepositSuccess = ({
         <div className="w-24 h-24 bg-[#140E08] border-2 border-green-500 rounded-full flex items-center justify-center relative z-10 shadow-2xl">
           <Sparkles className="w-10 h-10 text-green-500" />
         </div>
-        <motion.div 
+        <motion.div
           className="absolute -top-2 -right-2 bg-green-500 text-[#080503] text-xs font-bold px-2 py-1 rounded-full border-4 border-[#030303]"
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -376,12 +407,15 @@ const DepositSuccess = ({
 
       <h1 className="text-4xl font-serif font-bold text-[#E7E5E4] mb-2">Strategy Live</h1>
       <p className="text-[#A8A29E] mb-8 max-w-xs mx-auto text-sm leading-relaxed">
-        Your liquidity has been seeded. <br/>
+        Your liquidity has been seeded. <br />
         <span className="text-white font-bold">{strategyName}</span> is now active on-chain.
       </p>
 
       <div className="w-full bg-[#E7E5E4] text-[#080503] rounded-lg p-6 mb-8 relative overflow-hidden font-mono text-xs">
-        <div className="absolute left-0 top-0 bottom-0 w-2" style={{ backgroundColor: themeColor }} />
+        <div
+          className="absolute left-0 top-0 bottom-0 w-2"
+          style={{ backgroundColor: themeColor }}
+        />
         <div className="flex justify-between mb-2">
           <span className="opacity-60">INITIAL DEPOSIT</span>
           <span className="font-bold">{amount} USDC</span>

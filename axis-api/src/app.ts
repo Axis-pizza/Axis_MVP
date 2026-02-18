@@ -35,6 +35,17 @@ app.onError((err, c) => {
   return c.json({ success: false, error: 'Internal Server Error' }, 500);
 });
 
+app.get('/test-snapshot', async (c) => {
+  console.log('--- 🛠️ Manual Snapshot Triggered 🛠️ ---');
+  try {
+   
+    await runPriceSnapshot(c.env.axis_db);
+    return c.json({ success: true, message: "Snapshot process finished. Check your terminal logs." });
+  } catch (e: any) {
+    console.error('Snapshot Error:', e);
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
 
 
 app.get('/init-db', async (c) => {
@@ -65,6 +76,7 @@ app.route('/upload', uploadRoutes);
 app.route('/share', shareRoutes);
 app.route('/api/jupiter', jupiterRouter);
 app.route('/api/dflow', dflowRoutes);
+
 app.post('/report', async (c) => {
   try {
    
@@ -87,11 +99,9 @@ app.post('/report', async (c) => {
   }
 });
 
-
-
 async function sendBugReportEmail(
   env: Bindings, 
-  data: { user_tg: string; message: string; image?: string } // imageを追加
+  data: { user_tg: string; message: string; image?: string }
 ) {
   const ADMIN_EMAIL = "yusukekikuta.05@gmail.com";
   
@@ -134,22 +144,19 @@ async function sendBugReportEmail(
       `
     });
 
-    // ★★★ ここが重要: 画像があれば添付する ★★★
     if (data.image) {
-      // フロントから来るデータ形式: "data:image/png;base64,iVBORw0KGgoAAA..."
-      // ここからヘッダーとデータを分離する必要があります
       const matches = data.image.match(/^data:(.+);base64,(.+)$/);
       
       if (matches && matches.length === 3) {
-        const contentType = matches[1]; // 例: "image/png"
-        const base64Data = matches[2];  // 例: "iVBORw0..." (純粋なデータ)
+        const contentType = matches[1];
+        const base64Data = matches[2];
         const extension = contentType.split('/')[1] || 'png';
 
         msg.addAttachment({
           filename: `screenshot.${extension}`,
           contentType: contentType,
           data: base64Data,
-          transferEncoding: 'base64' // 明示的に指定
+          transferEncoding: 'base64'
         });
       }
     }
@@ -171,13 +178,9 @@ async function sendBugReportEmail(
   }
 }
 
-
-// --- Holding XP 配布ロジック ---
 async function distributeHoldingXP(env: Bindings) {
   try {
     const db = env.axis_db;
-    
-    // 1. 全戦略を取得 (total_deposited があるもの)
     const { results: strategies } = await db.prepare(
       "SELECT id, owner_pubkey, total_deposited FROM strategies"
     ).all();
@@ -186,32 +189,22 @@ async function distributeHoldingXP(env: Bindings) {
       return;
     }
 
-    // ユーザーごとの集計用マップ
     const userHoldings: Record<string, number> = {};
 
-    // 2. ユーザーごとの保有額(TVL)を集計
     for (const strat of strategies) {
       const owner = strat.owner_pubkey as string;
-      // Devnet特例: total_deposited が 0 なら $1,000 (テスト用) とみなす
-      // ※ 本番では || 1000 を削除してください
       let tvl = (strat.total_deposited as number) || 1000; 
-      
       userHoldings[owner] = (userHoldings[owner] || 0) + tvl;
     }
 
-    // 3. XP計算 & 配布
-    const CAP_USD = 5000;     // Season 0 Cap
-    const XP_RATE = 1;        // 1 XP per $1
+    const CAP_USD = 5000;
+    const XP_RATE = 1;
 
     for (const [pubkey, totalUsd] of Object.entries(userHoldings)) {
-      // キャップ適用
       const cappedUsd = Math.min(totalUsd, CAP_USD);
-      
-      // 獲得XP計算
       const earnedXp = cappedUsd * XP_RATE;
 
       if (earnedXp > 0) {
-        // A. 本人に付与
         await db.prepare(
           `INSERT INTO xp_ledger (user_pubkey, amount, action_type, description) 
            VALUES (?, ?, 'HOLDING_REWARD', ?)`
@@ -221,7 +214,6 @@ async function distributeHoldingXP(env: Bindings) {
           "UPDATE users SET total_xp = total_xp + ? WHERE pubkey = ?"
         ).bind(earnedXp, pubkey).run();
         
-        // B. 紹介者ボーナス (10%)
         const user = await db.prepare("SELECT referrer_id FROM users WHERE pubkey = ?").bind(pubkey).first();
         if (user && user.referrer_id) {
           const bonus = Math.floor(earnedXp * 0.1);
@@ -234,35 +226,24 @@ async function distributeHoldingXP(env: Bindings) {
             await db.prepare(
               "UPDATE users SET total_xp = total_xp + ? WHERE pubkey = ?"
             ).bind(bonus, user.referrer_id).run();
-            
           }
         }
       }
     }
-
   } catch (e) {
     console.error("❌ Cron Job Failed (XP):", e);
   }
 }
 
 export default {
-
   fetch: app.fetch,
-
-  // Cron Job (定期実行) のハンドラー
-  // */5 * * * * → 価格スナップショット (5分ごと)
-  // 0 * * * *   → XP配布 (毎時)
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
     const tasks: Promise<void>[] = [];
-
-    // 価格スナップショット: 5分おき (*/5) または毎時 (0) どちらでも実行
     tasks.push(
       runPriceSnapshot(env.axis_db).catch(e =>
         console.error('[Cron] Price snapshot failed:', e)
       )
     );
-
-    // XP配布: 毎時0分のみ
     if (event.cron === '0 * * * *') {
       tasks.push(
         distributeHoldingXP(env).catch(e =>
@@ -270,7 +251,6 @@ export default {
         )
       );
     }
-
     ctx.waitUntil(Promise.all(tasks));
   }
 };

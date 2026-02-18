@@ -1,7 +1,13 @@
 import { useState, useEffect, useMemo, memo } from 'react';
 import {
-  Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight,
-  TrendingUp, Star, LayoutGrid
+  Eye,
+  EyeOff,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
+  TrendingUp,
+  Star,
+  LayoutGrid,
 } from 'lucide-react';
 import { useWallet, useConnection } from '../../hooks/useWallet';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
@@ -12,7 +18,7 @@ import { OGBadge } from '../common/OGBadge';
 
 // --- Types & Styles ---
 const FIXED_BG_STYLE = {
-  background: 'radial-gradient(circle at 70% 20%, #221509, #0B0704 60%)'
+  background: 'radial-gradient(circle at 70% 20%, #221509, #0B0704 60%)',
 };
 
 interface Strategy {
@@ -39,7 +45,8 @@ interface UserProfile {
 
 // --- Helper Functions ---
 const formatCurrency = (val: number, currency: 'USD' | 'USDC') => {
-  if (currency === 'USDC') return `${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
+  if (currency === 'USDC')
+    return `${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`;
   return `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
@@ -55,12 +62,14 @@ interface ProfileViewProps {
 export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
-  
+
   // --- UI State ---
   const [activeTab, setActiveTab] = useState<'portfolio' | 'leaderboard'>('portfolio');
-  const [portfolioSubTab, setPortfolioSubTab] = useState<'created' | 'invested' | 'watchlist'>('created');
+  const [portfolioSubTab, setPortfolioSubTab] = useState<'created' | 'invested' | 'watchlist'>(
+    'created'
+  );
   const [leaderboardTab] = useState<'points'>('points'); // pointsに固定
-  
+
   const [currencyMode, setCurrencyMode] = useState<'USD' | 'USDC'>('USD');
   const [isHidden, setIsHidden] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState<number>(0);
@@ -87,7 +96,9 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
     fetchBalance();
 
     const interval = setInterval(fetchBalance, 60000);
-    const handleVisibility = () => { if (!document.hidden) fetchBalance(); };
+    const handleVisibility = () => {
+      if (!document.hidden) fetchBalance();
+    };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       clearInterval(interval);
@@ -106,29 +117,32 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
           api.getUser(publicKey.toBase58()),
           api.getUserStrategies(publicKey.toBase58()),
           api.getUserWatchlist(publicKey.toBase58()),
-          api.getInvestedStrategies(publicKey.toBase58())
+          api.getInvestedStrategies(publicKey.toBase58()),
         ]);
 
         if (userRes.success && userRes.user) {
           const u = userRes.user;
           setUserProfile({
             username: u.username || 'Anonymous',
-            referralCode: u.referralCode || `AXIS-${publicKey.toBase58().slice(0,4).toUpperCase()}`,
+            referralCode:
+              u.referralCode || `AXIS-${publicKey.toBase58().slice(0, 4).toUpperCase()}`,
             totalPoints: u.total_xp || 0,
             totalVolume: u.total_invested || 0,
             rankTier: u.rank_tier || 'Novice',
             pnlPercent: u.pnl_percent || 0,
             referralCount: u.referralCount || 0,
-            is_vip: u.is_vip || false
+            is_vip: u.is_vip || false,
           });
         }
 
         if (stratsRes.success && stratsRes.strategies) {
           const seen = new Map();
-          const unique = stratsRes.strategies.filter((s: any) => {
-             const key = s.id;
-             return seen.has(key) ? false : seen.set(key, true);
-          }).sort((a: any, b: any) => b.createdAt - a.createdAt);
+          const unique = stratsRes.strategies
+            .filter((s: any) => {
+              const key = s.id;
+              return seen.has(key) ? false : seen.set(key, true);
+            })
+            .sort((a: any, b: any) => b.createdAt - a.createdAt);
           setMyStrategies(unique);
         }
 
@@ -139,7 +153,6 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
         if (investedRes.success && investedRes.strategies) {
           setInvestedStrategies(investedRes.strategies);
         }
-        
       } catch {
       } finally {
         setIsLoading(false);
@@ -156,32 +169,30 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
       try {
         const res = await api.getLeaderboard('points');
         if (res.success && res.leaderboard) {
-          setLeaderboardData(res.leaderboard.map((u: any, i: number) => ({
-            ...u,
-            rank: i + 1,
-            isMe: u.pubkey === publicKey?.toBase58()
-          })));
+          setLeaderboardData(
+            res.leaderboard.map((u: any, i: number) => ({
+              ...u,
+              rank: i + 1,
+              isMe: u.pubkey === publicKey?.toBase58(),
+            }))
+          );
         }
-      } catch {
-      }
+      } catch {}
     };
     loadLeaderboard();
   }, [activeTab, publicKey]);
 
   // --- Logic & Display Values ---
   // USDC ≈ $1, so USD value = USDC value
-  const investedAmountUSD = useMemo(() =>
-    myStrategies.reduce((sum, s) => sum + (s.tvl || 0), 0),
+  const investedAmountUSD = useMemo(
+    () => myStrategies.reduce((sum, s) => sum + (s.tvl || 0), 0),
     [myStrategies]
   );
-  const totalNetWorthUSD = useMemo(() =>
-    usdcBalance + investedAmountUSD,
+  const totalNetWorthUSD = useMemo(
+    () => usdcBalance + investedAmountUSD,
     [usdcBalance, investedAmountUSD]
   );
-  const displayValue = useMemo(() =>
-    totalNetWorthUSD,
-    [totalNetWorthUSD]
-  );
+  const displayValue = useMemo(() => totalNetWorthUSD, [totalNetWorthUSD]);
   const pnlVal = userProfile?.pnlPercent || 0;
   const isPos = pnlVal >= 0;
 
@@ -196,7 +207,15 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
           Access your portfolio, track referrals, and climb the leaderboard.
         </p>
         <div className="w-full max-w-xs">
-           <WalletMultiButton style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #6B4420, #B8863F, #E8C890)', borderRadius: '12px', fontWeight: 'bold' }} />
+          <WalletMultiButton
+            style={{
+              width: '100%',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, #6B4420, #B8863F, #E8C890)',
+              borderRadius: '12px',
+              fontWeight: 'bold',
+            }}
+          />
         </div>
       </div>
     );
@@ -206,119 +225,204 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
     <div className="max-w-md mx-auto h-full flex flex-col pt-4 md:pt-28 px-4 pb-32 safe-area-top relative">
       {/* Net Worth Card */}
       <div className="mb-8 relative group perspective-1000">
-        <div className="relative overflow-hidden rounded-[24px] border border-[rgba(184,134,63,0.15)] bg-[#080503] shadow-2xl" style={{ aspectRatio: '1.58/1' }}>
-            <div className="absolute inset-0 z-0" style={FIXED_BG_STYLE} />
-            <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
-            <div className="relative z-10 h-full p-6 flex flex-col justify-between bg-black/10 backdrop-blur-[1px]">
+        <div
+          className="relative overflow-hidden rounded-[24px] border border-[rgba(184,134,63,0.15)] bg-[#080503] shadow-2xl"
+          style={{ aspectRatio: '1.58/1' }}
+        >
+          <div className="absolute inset-0 z-0" style={FIXED_BG_STYLE} />
+          <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" />
+          <div className="relative z-10 h-full p-6 flex flex-col justify-between bg-black/10 backdrop-blur-[1px]">
             <div className="flex justify-between items-start">
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-[rgba(184,134,63,0.08)] w-fit">
-                            <Wallet className="w-3 h-3 text-[#B8863F]" />
-                            <span className="font-bold text-white text-sm font-serif">{formatAddress(publicKey.toBase58())}</span>
-                        </div>
-                        {userProfile?.is_vip && <div className="ml-1"><OGBadge size="sm" /></div>}
-                    </div>
-                    <div className="flex gap-2">
-                         <button onClick={() => setCurrencyMode(m => m === 'USD' ? 'USDC' : 'USD')} className="text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white/70 border border-[rgba(184,134,63,0.15)]">{currencyMode}</button>
-                         <button onClick={() => setIsHidden(!isHidden)} className="text-white/50">{isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
-                    </div>
-                 </div>
-                 <div className="py-2">
-                    <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest mb-1">Total Net Worth</p>
-                    <h2 className="text-4xl sm:text-5xl font-bold text-white tracking-tight font-serif">
-                        {isHidden ? '••••••' : formatCurrency(displayValue, currencyMode)}
-                    </h2>
-                    {pnlVal !== 0 && (
-                      <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-2 border border-[rgba(184,134,63,0.15)] ${isPos ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                          {isPos ? <ArrowUpRight className="w-3 h-3"/> : <ArrowDownRight className="w-3 h-3"/>}
-                          <span className="font-mono">{isHidden ? '••••' : `${isPos ? '+' : ''}${pnlVal.toFixed(2)}%`}</span>
-                      </div>
-                    )}
-                 </div>
-                 <div className="flex justify-between items-end">
-                    <div>
-                        <p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Points</p>
-                        <p className="text-sm text-[#B8863F] font-bold font-mono">{userProfile?.totalPoints.toLocaleString() || 0}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Rank</p>
-                      <p className="text-sm text-white font-bold">{userProfile?.rankTier || 'Novice'}</p>
-                    </div>
-                 </div>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-[rgba(184,134,63,0.08)] w-fit">
+                  <Wallet className="w-3 h-3 text-[#B8863F]" />
+                  <span className="font-bold text-white text-sm font-serif">
+                    {formatAddress(publicKey.toBase58())}
+                  </span>
+                </div>
+                {userProfile?.is_vip && (
+                  <div className="ml-1">
+                    <OGBadge size="sm" />
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrencyMode((m) => (m === 'USD' ? 'USDC' : 'USD'))}
+                  className="text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white/70 border border-[rgba(184,134,63,0.15)]"
+                >
+                  {currencyMode}
+                </button>
+                <button onClick={() => setIsHidden(!isHidden)} className="text-white/50">
+                  {isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
+            <div className="py-2">
+              <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest mb-1">
+                Total Net Worth
+              </p>
+              <h2 className="text-4xl sm:text-5xl font-bold text-white tracking-tight font-serif">
+                {isHidden ? '••••••' : formatCurrency(displayValue, currencyMode)}
+              </h2>
+              {pnlVal !== 0 && (
+                <div
+                  className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-2 border border-[rgba(184,134,63,0.15)] ${isPos ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}
+                >
+                  {isPos ? (
+                    <ArrowUpRight className="w-3 h-3" />
+                  ) : (
+                    <ArrowDownRight className="w-3 h-3" />
+                  )}
+                  <span className="font-mono">
+                    {isHidden ? '••••' : `${isPos ? '+' : ''}${pnlVal.toFixed(2)}%`}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Points</p>
+                <p className="text-sm text-[#B8863F] font-bold font-mono">
+                  {userProfile?.totalPoints.toLocaleString() || 0}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-white/40 uppercase font-bold mb-0.5">Rank</p>
+                <p className="text-sm text-white font-bold">{userProfile?.rankTier || 'Novice'}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-[rgba(184,134,63,0.15)] mb-6 sticky top-0 md:top-20 bg-[#080503] z-20 pt-2">
-         {['portfolio', 'leaderboard'].map(t => (
-             <button
-                key={t}
-                onClick={() => setActiveTab(t as any)}
-                className={`flex-1 pb-3 font-bold text-sm capitalize transition-colors ${activeTab === t ? 'text-white border-b-2 border-[#B8863F]' : 'text-white/40 hover:text-white/60'}`}
-             >
-                {t}
-             </button>
-         ))}
+        {['portfolio', 'leaderboard'].map((t) => (
+          <button
+            key={t}
+            onClick={() => setActiveTab(t as any)}
+            className={`flex-1 pb-3 font-bold text-sm capitalize transition-colors ${activeTab === t ? 'text-white border-b-2 border-[#B8863F]' : 'text-white/40 hover:text-white/60'}`}
+          >
+            {t}
+          </button>
+        ))}
       </div>
 
       {/* Tab Content */}
       {activeTab === 'portfolio' && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <FilterChip label={`Created (${myStrategies.length})`} active={portfolioSubTab === 'created'} onClick={() => setPortfolioSubTab('created')} />
-            <FilterChip label={`Invested (${investedStrategies.length})`} active={portfolioSubTab === 'invested'} onClick={() => setPortfolioSubTab('invested')} />
-            <FilterChip label={`Watchlist (${watchlist.length})`} active={portfolioSubTab === 'watchlist'} onClick={() => setPortfolioSubTab('watchlist')} icon={<Star className="w-3 h-3" />} />
+            <FilterChip
+              label={`Created (${myStrategies.length})`}
+              active={portfolioSubTab === 'created'}
+              onClick={() => setPortfolioSubTab('created')}
+            />
+            <FilterChip
+              label={`Invested (${investedStrategies.length})`}
+              active={portfolioSubTab === 'invested'}
+              onClick={() => setPortfolioSubTab('invested')}
+            />
+            <FilterChip
+              label={`Watchlist (${watchlist.length})`}
+              active={portfolioSubTab === 'watchlist'}
+              onClick={() => setPortfolioSubTab('watchlist')}
+              icon={<Star className="w-3 h-3" />}
+            />
           </div>
           <div className="space-y-3 pb-20">
-            {portfolioSubTab === 'created' && (
-               myStrategies.length > 0 ? myStrategies.map(s => <StrategyCard key={s.id} strategy={s} onSelect={onStrategySelect} />)
-               : <EmptyState icon={LayoutGrid} title="No strategies yet" sub="Create your first index fund." />
-            )}
-            {portfolioSubTab === 'invested' && (
-              investedStrategies.length > 0 ? investedStrategies.map(s => <StrategyCard key={s.id} strategy={s} onSelect={onStrategySelect} />)
-              : <EmptyState icon={TrendingUp} title="No investments" sub="Explore strategies to grow wealth." />
-            )}
-            {portfolioSubTab === 'watchlist' && (
-               watchlist.length > 0 ? watchlist.map(s => <StrategyCard key={s.id} strategy={s} onSelect={onStrategySelect} />)
-               : <EmptyState icon={Star} title="Watchlist empty" sub="Star strategies to track them." />
-            )}
+            {portfolioSubTab === 'created' &&
+              (myStrategies.length > 0 ? (
+                myStrategies.map((s) => (
+                  <StrategyCard key={s.id} strategy={s} onSelect={onStrategySelect} />
+                ))
+              ) : (
+                <EmptyState
+                  icon={LayoutGrid}
+                  title="No strategies yet"
+                  sub="Create your first index fund."
+                />
+              ))}
+            {portfolioSubTab === 'invested' &&
+              (investedStrategies.length > 0 ? (
+                investedStrategies.map((s) => (
+                  <StrategyCard key={s.id} strategy={s} onSelect={onStrategySelect} />
+                ))
+              ) : (
+                <EmptyState
+                  icon={TrendingUp}
+                  title="No investments"
+                  sub="Explore strategies to grow wealth."
+                />
+              ))}
+            {portfolioSubTab === 'watchlist' &&
+              (watchlist.length > 0 ? (
+                watchlist.map((s) => (
+                  <StrategyCard key={s.id} strategy={s} onSelect={onStrategySelect} />
+                ))
+              ) : (
+                <EmptyState
+                  icon={Star}
+                  title="Watchlist empty"
+                  sub="Star strategies to track them."
+                />
+              ))}
           </div>
         </div>
       )}
 
       {activeTab === 'leaderboard' && (
         <div className="space-y-4 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="flex items-center px-4 pb-2 text-[10px] text-white/30 font-bold uppercase tracking-wider">
-                <div className="w-8 text-center">#</div>
-                <div className="flex-1 pl-2">User</div>
-                <div className="w-24 text-right">XP</div>
-            </div>
-            <div className="space-y-2">
-                {leaderboardData.length === 0 ? (
-                    <div className="py-20 text-center text-white/30 text-xs">
-                        {isLoading ? "Loading..." : "No data available."}
+          <div className="flex items-center px-4 pb-2 text-[10px] text-white/30 font-bold uppercase tracking-wider">
+            <div className="w-8 text-center">#</div>
+            <div className="flex-1 pl-2">User</div>
+            <div className="w-24 text-right">XP</div>
+          </div>
+          <div className="space-y-2">
+            {leaderboardData.length === 0 ? (
+              <div className="py-20 text-center text-white/30 text-xs">
+                {isLoading ? 'Loading...' : 'No data available.'}
+              </div>
+            ) : (
+              leaderboardData.map((user, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center p-3 rounded-xl border transition-colors ${user.isMe ? 'bg-[#B8863F]/10 border-[#B8863F]/30' : 'bg-[#140E08] border-[rgba(184,134,63,0.08)]'}`}
+                >
+                  <div
+                    className={`w-8 text-center font-mono font-bold text-lg ${user.rank <= 3 ? 'text-[#FFD700]' : 'text-[#7A5A30]'}`}
+                  >
+                    {user.rank}
+                  </div>
+                  <div className="flex-1 flex items-center gap-3 pl-2 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold text-white/50 border border-[rgba(184,134,63,0.08)] overflow-hidden">
+                      {user.avatar_url ? (
+                        <img
+                          src={api.getProxyUrl(user.avatar_url)}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        user.username.charAt(0)
+                      )}
                     </div>
-                ) : (
-                    leaderboardData.map((user, i) => (
-                        <div key={i} className={`flex items-center p-3 rounded-xl border transition-colors ${user.isMe ? 'bg-[#B8863F]/10 border-[#B8863F]/30' : 'bg-[#140E08] border-[rgba(184,134,63,0.08)]'}`}>
-                            <div className={`w-8 text-center font-mono font-bold text-lg ${user.rank <= 3 ? 'text-[#FFD700]' : 'text-[#7A5A30]'}`}>{user.rank}</div>
-                            <div className="flex-1 flex items-center gap-3 pl-2 min-w-0">
-                                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-bold text-white/50 border border-[rgba(184,134,63,0.08)] overflow-hidden">
-                                    {user.avatar_url ? <img src={api.getProxyUrl(user.avatar_url)} className="w-full h-full object-cover"/> : user.username.charAt(0)}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className={`font-bold text-sm truncate ${user.isMe ? 'text-[#B8863F]' : 'text-white'}`}>{user.username}</p>
-                                    <p className="text-[10px] text-white/30 font-mono">{formatAddress(user.pubkey)}</p>
-                                </div>
-                            </div>
-                            <div className="w-24 text-right font-mono font-bold text-white">
-                                {user.value.toLocaleString()}
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
+                    <div className="min-w-0">
+                      <p
+                        className={`font-bold text-sm truncate ${user.isMe ? 'text-[#B8863F]' : 'text-white'}`}
+                      >
+                        {user.username}
+                      </p>
+                      <p className="text-[10px] text-white/30 font-mono">
+                        {formatAddress(user.pubkey)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-24 text-right font-mono font-bold text-white">
+                    {user.value.toLocaleString()}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -328,7 +432,7 @@ export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
 // --- Sub Components ---
 
 const FilterChip = memo(({ label, active, onClick, icon }: any) => (
-  <button 
+  <button
     onClick={onClick}
     className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${active ? 'bg-gradient-to-r from-[#6B4420] via-[#B8863F] to-[#E8C890] text-[#140D07]' : 'bg-[#140E08] border border-[rgba(184,134,63,0.08)] text-white/50 hover:bg-white/5'}`}
   >
@@ -344,47 +448,58 @@ const EmptyState = memo(({ icon: Icon, title, sub }: any) => (
   </div>
 ));
 
-const StrategyCard = memo(({ strategy, onSelect }: { strategy: Strategy; onSelect?: (strategy: any) => void }) => {
-  const tvlUSD = strategy.tvl || 0; // USDC ≈ $1
-  const tokens = Array.isArray(strategy.tokens) ? strategy.tokens : [];
-  const displayTokens = tokens.slice(0, 5);
-  const extraCount = tokens.length - 5;
+const StrategyCard = memo(
+  ({ strategy, onSelect }: { strategy: Strategy; onSelect?: (strategy: any) => void }) => {
+    const tvlUSD = strategy.tvl || 0; // USDC ≈ $1
+    const tokens = Array.isArray(strategy.tokens) ? strategy.tokens : [];
+    const displayTokens = tokens.slice(0, 5);
+    const extraCount = tokens.length - 5;
 
-  return (
-    <button
-      onClick={() => onSelect?.(strategy)}
-      className="w-full text-left bg-[#140E08] p-4 rounded-xl border border-[rgba(184,134,63,0.08)] hover:border-[#B8863F]/30 transition-colors active:scale-[0.98]"
-    >
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <p className="text-white font-bold">{strategy.name}</p>
-          <p className="text-white/40 text-xs">{strategy.ticker || strategy.type || ''}</p>
+    return (
+      <button
+        onClick={() => onSelect?.(strategy)}
+        className="w-full text-left bg-[#140E08] p-4 rounded-xl border border-[rgba(184,134,63,0.08)] hover:border-[#B8863F]/30 transition-colors active:scale-[0.98]"
+      >
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <p className="text-white font-bold">{strategy.name}</p>
+            <p className="text-white/40 text-xs">{strategy.ticker || strategy.type || ''}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-white font-mono text-sm">
+              {tvlUSD > 0 ? `$${tvlUSD.toFixed(2)}` : '-'}
+            </p>
+            <p className="text-white/40 text-[10px]">TVL</p>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-white font-mono text-sm">{tvlUSD > 0 ? `$${tvlUSD.toFixed(2)}` : '-'}</p>
-          <p className="text-white/40 text-[10px]">TVL</p>
+        <div className="flex items-center gap-0 mb-3">
+          {displayTokens.map((t: any, i: number) => (
+            <div
+              key={i}
+              className="w-6 h-6 rounded-full overflow-hidden border-2 border-[#140E08] bg-white/10 -ml-1.5 first:ml-0"
+            >
+              <TokenImage
+                src={t.logoURI}
+                alt={t.symbol || ''}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ))}
+          {extraCount > 0 && (
+            <div className="w-6 h-6 rounded-full bg-white/10 border-2 border-[#140E08] -ml-1.5 flex items-center justify-center">
+              <span className="text-[8px] text-white/60 font-bold">+{extraCount}</span>
+            </div>
+          )}
         </div>
-      </div>
-      <div className="flex items-center gap-0 mb-3">
-         {displayTokens.map((t: any, i: number) => (
-           <div key={i} className="w-6 h-6 rounded-full overflow-hidden border-2 border-[#140E08] bg-white/10 -ml-1.5 first:ml-0">
-             <TokenImage
-               src={t.logoURI}
-               alt={t.symbol || ''}
-               className="w-full h-full object-cover"
-             />
-           </div>
-         ))}
-         {extraCount > 0 && (
-           <div className="w-6 h-6 rounded-full bg-white/10 border-2 border-[#140E08] -ml-1.5 flex items-center justify-center">
-             <span className="text-[8px] text-white/60 font-bold">+{extraCount}</span>
-           </div>
-         )}
-      </div>
-      <div className="flex justify-between items-center pt-3 border-t border-[rgba(184,134,63,0.08)]">
-        <span className="text-[10px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 font-bold">ACTIVE</span>
-        <span className="text-[10px] text-white/30">{new Date(strategy.createdAt * 1000).toLocaleDateString()}</span>
-      </div>
-    </button>
-  );
-});
+        <div className="flex justify-between items-center pt-3 border-t border-[rgba(184,134,63,0.08)]">
+          <span className="text-[10px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 font-bold">
+            ACTIVE
+          </span>
+          <span className="text-[10px] text-white/30">
+            {new Date(strategy.createdAt * 1000).toLocaleDateString()}
+          </span>
+        </div>
+      </button>
+    );
+  }
+);

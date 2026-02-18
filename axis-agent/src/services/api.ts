@@ -4,8 +4,8 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://axis-api.yusukekikuta-05.workers.dev';
 
-const API_URL = API_BASE.replace(/\/$/, '').endsWith('/api') 
-  ? API_BASE.replace(/\/$/, '') 
+const API_URL = API_BASE.replace(/\/$/, '').endsWith('/api')
+  ? API_BASE.replace(/\/$/, '')
   : `${API_BASE.replace(/\/$/, '')}/api`;
 
 // In-memory cache
@@ -23,13 +23,10 @@ const _invalidate = (prefix: string) => {
   }
 };
 
-
-
 export const api = {
-
   get: async (endpoint: string) => {
     const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-    
+
     console.log(`Requesting: ${url}`);
 
     const response = await fetch(url, {
@@ -81,10 +78,8 @@ export const api = {
         username: userData.username || userData.name,
         avatar_url: userData.pfpUrl || userData.avatar_url,
         total_xp: userData.total_xp ?? userData.xp ?? 0,
-        rank_tier: userData.rank_tier || 'Novice'
+        rank_tier: userData.rank_tier || 'Novice',
       };
-
-      
 
       const result = { success: true, user, is_registered: data.is_registered ?? true };
       _setCache(cacheKey, result);
@@ -96,7 +91,7 @@ export const api = {
 
   connectTwitter(wallet: string) {
     const url = this.getTwitterAuthUrl(wallet);
-    
+
     // 簡易的なモバイル判定
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
@@ -119,13 +114,20 @@ export const api = {
     return `${API_BASE}/auth/twitter?wallet=${wallet}`;
   },
 
-  async updateProfile(data: { wallet_address: string; name?: string; username?: string; bio?: string; avatar_url?: string; pfpUrl?: string }) {
+  async updateProfile(data: {
+    wallet_address: string;
+    name?: string;
+    username?: string;
+    bio?: string;
+    avatar_url?: string;
+    pfpUrl?: string;
+  }) {
     try {
       const payload = {
         wallet_address: data.wallet_address,
         name: data.username || data.name,
         bio: data.bio,
-        avatar_url: data.pfpUrl || data.avatar_url
+        avatar_url: data.pfpUrl || data.avatar_url,
       };
 
       const res = await fetch(`${API_BASE}/user`, {
@@ -151,7 +153,7 @@ export const api = {
     const formData = new FormData();
     formData.append('image', file);
     formData.append('wallet_address', walletAddress);
-    formData.append('type', 'profile'); 
+    formData.append('type', 'profile');
 
     try {
       const res = await fetch(`${API_BASE}/upload/image`, {
@@ -172,17 +174,17 @@ export const api = {
 
     try {
       // axis-api の /api/dflow/markets を叩く
-      const res = await fetch(`${API_BASE}/dflow/markets`); 
+      const res = await fetch(`${API_BASE}/dflow/markets`);
       if (!res.ok) return [];
-      
+
       const data = await res.json();
       // レスポンスの構造に合わせて調整 (data.markets なのか data そのままなのか確認が必要ですが、一旦そのまま保存)
-      const result = Array.isArray(data) ? data : (data.markets || []);
-      
+      const result = Array.isArray(data) ? data : data.markets || [];
+
       _setCache(cacheKey, result);
       return result;
     } catch (e) {
-      console.error("Failed to fetch prediction markets:", e);
+      console.error('Failed to fetch prediction markets:', e);
       return [];
     }
   },
@@ -210,8 +212,14 @@ export const api = {
     }
   },
 
-
-  async register(data: { email: string; wallet_address: string; invite_code_used: string; avatar_url?: string; name?: string; bio?: string }) {
+  async register(data: {
+    email: string;
+    wallet_address: string;
+    invite_code_used: string;
+    avatar_url?: string;
+    name?: string;
+    bio?: string;
+  }) {
     try {
       const res = await fetch(`${API_BASE}/register`, {
         method: 'POST',
@@ -224,17 +232,15 @@ export const api = {
     }
   },
 
-
   getProxyUrl(url: string | undefined | null) {
     if (!url) return '';
     if (url.startsWith('http')) return url;
     if (url.startsWith('blob:')) return url;
     if (url.startsWith('data:')) return url;
-    
+
     return `${API_BASE}/upload/image/${url}`;
   },
 
-  
   async analyze(directive: string, tags: string[] = [], customInput?: string) {
     const res = await fetch(`${API_BASE}/analyze`, {
       method: 'POST',
@@ -248,7 +254,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/strategies/${id}/watchlist`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userPubkey })
+      body: JSON.stringify({ userPubkey }),
     });
 
     const data = await res.json();
@@ -295,12 +301,12 @@ export const api = {
           wallet_address: wallet,
           pnl_percent: pnl,
           total_invested_usd: invested,
-          strategy_id: strategyId
+          strategy_id: strategyId,
         }),
       });
     } catch {}
   },
-  
+
   // Fetch invested strategies list
   async getInvestedStrategies(pubkey: string) {
     try {
@@ -347,8 +353,8 @@ export const api = {
     description?: string;
     type: string;
     tokens: { symbol: string; mint: string; weight: number; logoURI?: string }[];
-    address: string; 
-    config?: any; 
+    address: string;
+    config?: any;
   }) => {
     try {
       const res = await fetch(`${API_BASE}/strategies`, {
@@ -356,7 +362,7 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      
+
       if (!res.ok) {
         const err = await res.text();
         return { success: false, error: err };
@@ -382,7 +388,9 @@ export const api = {
   },
 
   async searchTokens(query: string, limit = 20) {
-    const res = await fetch(`${API_BASE}/tokens/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+    const res = await fetch(
+      `${API_BASE}/tokens/search?q=${encodeURIComponent(query)}&limit=${limit}`
+    );
     return res.json();
   },
 
@@ -440,10 +448,16 @@ export const api = {
       try {
         data = JSON.parse(text);
       } catch {
-        return { success: false, error: `Server returned invalid response (${res.status}): ${text.slice(0, 200)}` };
+        return {
+          success: false,
+          error: `Server returned invalid response (${res.status}): ${text.slice(0, 200)}`,
+        };
       }
       if (!res.ok) {
-        return { success: false, error: data.error || data.message || `Server error (${res.status})` };
+        return {
+          success: false,
+          error: data.error || data.message || `Server error (${res.status})`,
+        };
       }
       return data;
     } catch (e) {
@@ -476,7 +490,7 @@ export const api = {
   async getUserWatchlist(pubkey: string) {
     try {
       const res = await fetch(`${API_BASE}/users/${pubkey}/watchlist`);
-      
+
       if (!res.ok) {
         return { success: false, strategies: [] };
       }
@@ -518,6 +532,4 @@ export const api = {
     });
     return res.json();
   },
-
-  
 };

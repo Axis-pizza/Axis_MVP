@@ -14,13 +14,13 @@ interface RedeemModalProps {
   onSuccess: () => void;
 }
 
-export const RedeemModal = ({ 
-  isOpen, 
-  onClose, 
-  strategyAddress, 
+export const RedeemModal = ({
+  isOpen,
+  onClose,
+  strategyAddress,
   strategyName,
   maxShares = 100, // Default mock value if not provided
-  onSuccess 
+  onSuccess,
 }: RedeemModalProps) => {
   const { connection } = useConnection();
   const wallet = useWallet();
@@ -30,18 +30,13 @@ export const RedeemModal = ({
 
   const handleRedeem = async () => {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return;
-    
+
     setIsLoading(true);
     setError(null);
 
     try {
-      await withdraw(
-        connection,
-        wallet,
-        new PublicKey(strategyAddress),
-        Number(amount)
-      );
-      
+      await withdraw(connection, wallet, new PublicKey(strategyAddress), Number(amount));
+
       onSuccess();
       onClose();
     } catch (e: unknown) {
@@ -74,10 +69,7 @@ export const RedeemModal = ({
           >
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold">Redeem Shares</h3>
-              <button 
-                onClick={onClose}
-                className="p-2 bg-white/5 rounded-full hover:bg-white/10"
-              >
+              <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10">
                 <X className="w-4 h-4" />
               </button>
             </div>

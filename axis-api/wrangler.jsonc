@@ -40,11 +40,12 @@
 		}
 	],
 	"r2_buckets": [
-		{
-			"binding": "IMAGES",
-			"bucket_name": "axis-images"
-		}
-	],
+    {
+      "binding": "IMAGES",
+      "bucket_name": "axis-images",
+      "preview_bucket_name": "axis-images-preview"
+    }
+],
 	"triggers": {
 		"crons": [
 			"*/5 * * * *",

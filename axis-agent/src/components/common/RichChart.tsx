@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from 'react';
 import {
   createChart,
   ColorType,
   CrosshairMode,
   type IChartApi,
   type UTCTimestamp,
-} from "lightweight-charts";
+} from 'lightweight-charts';
 
 interface RichChartProps {
   data: any[];
@@ -15,7 +15,7 @@ interface RichChartProps {
     lineColor?: string;
     areaTopColor?: string;
     areaBottomColor?: string;
-  }
+  };
 }
 
 function emaSmooth(values: number[], alpha = 0.25) {
@@ -34,17 +34,17 @@ function normalizeLineData(raw: any[]) {
     .map((d) => {
       const time = d?.time as UTCTimestamp | number | undefined;
       const value =
-        typeof d?.value === "number"
+        typeof d?.value === 'number'
           ? d.value
-          : typeof d?.close === "number"
-          ? d.close
-          : typeof d?.price === "number"
-          ? d.price
-          : typeof d?.y === "number"
-          ? d.y
-          : undefined;
+          : typeof d?.close === 'number'
+            ? d.close
+            : typeof d?.price === 'number'
+              ? d.price
+              : typeof d?.y === 'number'
+                ? d.y
+                : undefined;
 
-      if (time == null || typeof value !== "number" || Number.isNaN(value)) {
+      if (time == null || typeof value !== 'number' || Number.isNaN(value)) {
         return null;
       }
 
@@ -53,9 +53,7 @@ function normalizeLineData(raw: any[]) {
     .filter(Boolean) as { time: UTCTimestamp; value: number }[];
 
   normalized.sort((a, b) => (a.time as number) - (b.time as number));
-  const deduped = normalized.filter(
-    (v, i, arr) => i === 0 || v.time !== arr[i - 1].time
-  );
+  const deduped = normalized.filter((v, i, arr) => i === 0 || v.time !== arr[i - 1].time);
 
   return deduped;
 }
@@ -78,34 +76,35 @@ export const RichChart = ({ data, isPositive, height = 300, colors }: RichChartP
 
     const chart: IChartApi = createChart(chartContainerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#78716C",
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: '#78716C',
         fontFamily: "'Times New Roman', Times, serif",
       },
       grid: {
         vertLines: { visible: false },
-        horzLines: { color: "rgba(255, 255, 255, 0.06)" },
+        horzLines: { color: 'rgba(255, 255, 255, 0.06)' },
       },
       width: chartContainerRef.current.clientWidth,
       height: height,
       timeScale: {
-        borderColor: "rgba(255, 255, 255, 0.12)",
+        borderColor: 'rgba(255, 255, 255, 0.12)',
         timeVisible: true,
       },
       localization: {
-        locale: "en-US",
-        dateFormat: "yyyy/MM/dd",
+        locale: 'en-US',
+        dateFormat: 'yyyy/MM/dd',
       },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: "rgba(255, 255, 255, 0.12)" },
+      rightPriceScale: { borderColor: 'rgba(255, 255, 255, 0.12)' },
     });
 
-    const mainColor = colors?.lineColor || (isPositive ? "#10B981" : "#EF4444");
-    const topColor = colors?.areaTopColor || (isPositive ? "rgba(16, 185, 129, 0.38)" : "rgba(239, 68, 68, 0.38)");
-    const bottomColor = colors?.areaBottomColor || "rgba(0,0,0,0)";
+    const mainColor = colors?.lineColor || (isPositive ? '#10B981' : '#EF4444');
+    const topColor =
+      colors?.areaTopColor || (isPositive ? 'rgba(16, 185, 129, 0.38)' : 'rgba(239, 68, 68, 0.38)');
+    const bottomColor = colors?.areaBottomColor || 'rgba(0,0,0,0)';
 
     const areaUnder = chart.addAreaSeries({
-      lineColor: "rgba(0,0,0,0)", 
+      lineColor: 'rgba(0,0,0,0)',
       topColor: topColor,
       bottomColor: bottomColor,
       lineWidth: 1,
@@ -113,8 +112,8 @@ export const RichChart = ({ data, isPositive, height = 300, colors }: RichChartP
 
     const areaMain = chart.addAreaSeries({
       lineColor: mainColor,
-      topColor: isPositive ? "rgba(16, 185, 129, 0.22)" : "rgba(239, 68, 68, 0.22)",
-      bottomColor: "rgba(0,0,0,0)",
+      topColor: isPositive ? 'rgba(16, 185, 129, 0.22)' : 'rgba(239, 68, 68, 0.22)',
+      bottomColor: 'rgba(0,0,0,0)',
       lineWidth: 2,
     });
 

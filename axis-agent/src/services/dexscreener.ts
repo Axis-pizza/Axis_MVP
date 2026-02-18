@@ -5,48 +5,52 @@
  */
 
 interface DexTokenData {
-    priceUsd: string;
-    priceChange: {
-      h24: number;
-      h6: number;
-      h1: number;
-      m5: number;
-    };
-    baseToken: {
-      address: string;
-      symbol: string;
-    };
-  }
-  
-  const DEX_API_BASE = "https://api.dexscreener.com/latest/dex/tokens";
+  priceUsd: string;
+  priceChange: {
+    h24: number;
+    h6: number;
+    h1: number;
+    m5: number;
+  };
+  baseToken: {
+    address: string;
+    symbol: string;
+  };
+}
 
-  const cache: Record<string, { price: number; change24h: number; timestamp: number }> = {};
-  const CACHE_TTL = 30 * 1000;
+const DEX_API_BASE = 'https://api.dexscreener.com/latest/dex/tokens';
 
-  export const DexScreenerService = {
-    getMarketData: async (mints: string[]): Promise<Record<string, { price: number; change24h: number }>> => {
-      const validMints = mints
-        .filter(m => m && typeof m === 'string' && m.length > 30)
-        .map(m => m.trim());
+const cache: Record<string, { price: number; change24h: number; timestamp: number }> = {};
+const CACHE_TTL = 30 * 1000;
 
-      if (validMints.length === 0) return {};
+export const DexScreenerService = {
+  getMarketData: async (
+    mints: string[]
+  ): Promise<Record<string, { price: number; change24h: number }>> => {
+    const validMints = mints
+      .filter((m) => m && typeof m === 'string' && m.length > 30)
+      .map((m) => m.trim());
 
-      const now = Date.now();
-      const uncachedMints = validMints.filter(mint => {
-        const cached = cache[mint];
-        return !cached || (now - cached.timestamp > CACHE_TTL);
-      });
+    if (validMints.length === 0) return {};
 
-      const finalResult: Record<string, { price: number; change24h: number }> = {};
+    const now = Date.now();
+    const uncachedMints = validMints.filter((mint) => {
+      const cached = cache[mint];
+      return !cached || now - cached.timestamp > CACHE_TTL;
+    });
 
-      validMints.forEach(mint => {
-        if (cache[mint]) finalResult[mint] = { price: cache[mint].price, change24h: cache[mint].change24h };
-      });
+    const finalResult: Record<string, { price: number; change24h: number }> = {};
 
-      if (uncachedMints.length === 0) return finalResult;
+    validMints.forEach((mint) => {
+      if (cache[mint])
+        finalResult[mint] = { price: cache[mint].price, change24h: cache[mint].change24h };
+    });
 
-      const chunks = chunkArray(uncachedMints, 30);
-      const responses = await Promise.all(chunks.map(async (chunk) => {
+    if (uncachedMints.length === 0) return finalResult;
+
+    const chunks = chunkArray(uncachedMints, 30);
+    const responses = await Promise.all(
+      chunks.map(async (chunk) => {
         try {
           const res = await fetch(`${DEX_API_BASE}/${chunk.join(',')}`);
           if (!res.ok) return null;
@@ -54,29 +58,30 @@ interface DexTokenData {
         } catch {
           return null;
         }
-      }));
+      })
+    );
 
-      responses.forEach(data => {
-        if (!data || !Array.isArray(data.pairs)) return;
+    responses.forEach((data) => {
+      if (!data || !Array.isArray(data.pairs)) return;
 
-        data.pairs.forEach((pair: any) => {
-          const mint = pair.baseToken.address;
-          const price = parseFloat(pair.priceUsd) || 0;
-          const change = pair.priceChange?.h24 || 0;
+      data.pairs.forEach((pair: any) => {
+        const mint = pair.baseToken.address;
+        const price = parseFloat(pair.priceUsd) || 0;
+        const change = pair.priceChange?.h24 || 0;
 
-          cache[mint] = { price, change24h: change, timestamp: now };
-          finalResult[mint] = { price, change24h: change };
-        });
+        cache[mint] = { price, change24h: change, timestamp: now };
+        finalResult[mint] = { price, change24h: change };
       });
+    });
 
-      return finalResult;
-    }
-  };
-  
-  function chunkArray(array: string[], size: number) {
-    const result = [];
-    for (let i = 0; i < array.length; i += size) {
-      result.push(array.slice(i, i + size));
-    }
-    return result;
+    return finalResult;
+  },
+};
+
+function chunkArray(array: string[], size: number) {
+  const result = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
   }
+  return result;
+}

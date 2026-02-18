@@ -26,15 +26,23 @@ export const Toast = ({ message, type }: ToastProps) => {
     <AnimatePresence>
       <motion.div
         initial={{ x: -100, opacity: 0 }}
-        animate={{ 
-          x: [0, -shakeIntensity, shakeIntensity, -shakeIntensity, shakeIntensity, -shakeIntensity, 0],
+        animate={{
+          x: [
+            0,
+            -shakeIntensity,
+            shakeIntensity,
+            -shakeIntensity,
+            shakeIntensity,
+            -shakeIntensity,
+            0,
+          ],
           rotate: [0, -rotateIntensity, rotateIntensity, -rotateIntensity, rotateIntensity, 0],
           opacity: 1,
         }}
-        transition={{ 
+        transition={{
           x: { duration: 0.4, times: [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1] },
           rotate: { duration: 0.4, times: [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1] },
-          opacity: { duration: 0.2 }
+          opacity: { duration: 0.2 },
         }}
         exit={{ x: -100, opacity: 0 }}
         className={`fixed top-4 left-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl border ${bgColors[type]} shadow-2xl backdrop-blur-md min-w-[300px]`}
