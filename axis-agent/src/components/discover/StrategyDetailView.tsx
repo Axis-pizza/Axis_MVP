@@ -7,6 +7,7 @@ import {
   useMotionValue,
   useTransform as useMotionTransform,
   useAnimation,
+  animate,
 } from 'framer-motion';
 import {
   ArrowLeft,
@@ -58,18 +59,18 @@ const XIcon = ({ className }: { className?: string }) => (
 );
 
 // --- Components (UI Parts) ---
-
-// 1. Swipe To Confirm
 const SwipeToConfirm = ({
   onConfirm,
   isLoading,
   isSuccess,
   label,
+  amount, // ★追加: 金額を監視するためにプロップを追加
 }: {
   onConfirm: () => void;
   isLoading: boolean;
   isSuccess?: boolean;
   label: string;
+  amount?: string; // ★追加
 }) => {
   const constraintsRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
@@ -79,12 +80,15 @@ const SwipeToConfirm = ({
   const PADDING = 4;
   const maxDrag = Math.max(0, containerWidth - HANDLE_SIZE - PADDING * 2);
 
-  const textOpacity = useMotionTransform(x, [0, maxDrag * 0.5], [1, 0]);
-  const progressWidth = useMotionTransform(
-    x,
-    [0, maxDrag],
-    [HANDLE_SIZE + PADDING * 2, containerWidth]
-  );
+  const textOpacity = useTransform(x, [0, maxDrag * 0.5], [1, 0]);
+  const progressWidth = useTransform(x, [0, maxDrag], [HANDLE_SIZE + PADDING * 2, containerWidth]);
+
+  // ★追加: 金額が変更されたらスライダーを左に戻す (Issue ②の解決)
+  useEffect(() => {
+    if (!isLoading && !isSuccess) {
+      animate(x, 0, { type: 'spring', stiffness: 300, damping: 30 });
+    }
+  }, [amount, isLoading, isSuccess, x]);
 
   useEffect(() => {
     if (!constraintsRef.current) return;
@@ -98,17 +102,20 @@ const SwipeToConfirm = ({
   useEffect(() => {
     if (isLoading || isSuccess) {
       x.set(maxDrag);
-    } else {
-      x.set(0);
+    } else if (x.get() === maxDrag && !isLoading && !isSuccess) {
+      // 処理が完了せずエラー等で戻ってきた場合
+      animate(x, 0, { type: 'spring', stiffness: 300, damping: 30 });
     }
   }, [isLoading, isSuccess, maxDrag, x]);
 
   const handleDragEnd = () => {
     if (x.get() > maxDrag * 0.6) {
-      x.set(maxDrag);
+      // 右端までアニメーションさせる
+      animate(x, maxDrag, { type: 'spring', stiffness: 500, damping: 40 });
       if (!isLoading && !isSuccess) onConfirm();
     } else {
-      x.set(0);
+      // ★変更: 指を離した時に滑らかに戻るように修正 (Issue ①の解決)
+      animate(x, 0, { type: 'spring', stiffness: 400, damping: 30 });
     }
   };
 
