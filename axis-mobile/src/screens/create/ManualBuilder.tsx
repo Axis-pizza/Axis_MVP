@@ -176,11 +176,11 @@ export function ManualBuilder({ onComplete }: Props) {
               <Text className="text-xs ml-2 flex-1" style={{ color: colors.text }}>{token.symbol}</Text>
 
               <View className="flex-row items-center gap-2">
-                <Pressable onPress={() => updateWeight(token.address, token.weight - 5)}>
+                <Pressable onPress={() => updateWeight(token.address, token.weight - 1)}>
                   <Minus size={14} color={colors.textMuted} />
                 </Pressable>
                 <Text className="text-xs w-8 text-center" style={{ color: colors.text }}>{token.weight}%</Text>
-                <Pressable onPress={() => updateWeight(token.address, token.weight + 5)}>
+                <Pressable onPress={() => updateWeight(token.address, token.weight + 1)}>
                   <Plus size={14} color={colors.textMuted} />
                 </Pressable>
                 <Pressable onPress={() => removeToken(token.address)} className="ml-1">
