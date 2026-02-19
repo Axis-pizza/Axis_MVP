@@ -49,10 +49,10 @@ export function IdentityStep({ tokens, onComplete, onBack }: Props) {
               <Text className="mr-1" style={{ color: colors.textMuted }}>$</Text>
               <TextInput
                 value={ticker}
-                onChangeText={(v) => setTicker(v.toUpperCase().slice(0, 5))}
+                onChange={(e) => setTicker(e.target.value)}
                 placeholder="TICKER"
                 placeholderTextColor={colors.textMuted}
-                className="flex-1 text-lg font-bold"
+                className="uppercase flex-1 text-lg font-bold"
                 style={{ color: colors.text }}
                 autoCapitalize="characters"
                 maxLength={5}

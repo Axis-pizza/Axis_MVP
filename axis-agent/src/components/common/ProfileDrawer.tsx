@@ -10,10 +10,12 @@ import {
   Sparkles,
   Edit,
   User,
-  Droplets,
   Wallet,
   QrCode,
   Share2,
+  ExternalLink,
+  AlertTriangle,
+  Coins // ★追加: Coinsアイコン
 } from 'lucide-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWallet } from '../../hooks/useWallet';
@@ -21,6 +23,7 @@ import { api } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { ProfileEditModal } from './ProfileEditModal';
 
+// --- Invite Modal Component ---
 const InviteModal = ({
   isOpen,
   onClose,
@@ -102,6 +105,8 @@ const InviteModal = ({
   );
 };
 
+
+// --- Profile Drawer Component ---
 export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
   const { showToast } = useToast();
   const [userData, setUserData] = useState<any>(null);
@@ -112,7 +117,10 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isWalletModalPending, setIsWalletModalPending] = useState(false);
   const { setVisible, visible: walletModalVisible } = useWalletModal();
-  const { publicKey, disconnect, ready, connected } = useWallet();
+  const { publicKey, disconnect, connected } = useWallet();
+  
+  // ★ 追加: Faucetフォールバック用のState
+  const [showFaucetFallback, setShowFaucetFallback] = useState(false);
 
   const resetUserData = useCallback(() => {
     setUserData(null);
@@ -123,7 +131,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
       resetUserData();
       return;
     }
-
     try {
       const res = await api.getUser(publicKey.toBase58());
       if (res.success || res.user) {
@@ -132,21 +139,17 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
         setUserData(user);
       }
     } catch {
-    } finally {
+      // エラー処理は適宜
     }
   }, [publicKey, resetUserData]);
 
   useEffect(() => {
     if (!publicKey || !connected) {
       resetUserData();
-    }
-  }, [publicKey, connected, resetUserData]);
-
-  useEffect(() => {
-    if (publicKey && connected) {
+    } else {
       fetchUser();
     }
-  }, [publicKey, connected, fetchUser]);
+  }, [publicKey, connected, fetchUser, resetUserData]);
 
   useEffect(() => {
     if (isOpen && publicKey && connected) {
@@ -160,14 +163,33 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     }
   }, [walletModalVisible, isWalletModalPending]);
 
+  // ★ 追加: ウォレット接続・切断ハンドラ
+  const handleConnect = () => {
+    setVisible(true);
+    setIsWalletModalPending(true);
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      setIsDisconnecting(true);
+      await disconnect();
+      resetUserData();
+      onClose();
+      showToast('Wallet disconnected', 'info');
+    } catch (error) {
+      console.error('Disconnect error:', error);
+      showToast('Failed to disconnect wallet', 'error');
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
   const handleCheckIn = async () => {
     if (!publicKey) return;
     setLoading(true);
     try {
       const res = await api.dailyCheckIn(publicKey.toBase58());
-
       if (res.success) {
-        // Update XP from response if available
         const newXp = res.user?.total_xp ?? res.user?.xp ?? res.total_xp ?? res.xp;
         if (newXp !== undefined) {
           setUserData((prev: any) => ({
@@ -176,8 +198,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
             ...(res.user || {}),
           }));
         }
-
-        // Also fetch fresh data from server
         await fetchUser();
         showToast('✅ +10 XP Claimed!', 'success');
       } else {
@@ -189,52 +209,32 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     setLoading(false);
   };
 
+  // ★ 修正: Faucetハンドラ (エラー時にフォールバック表示)
   const handleFaucet = async () => {
     if (!publicKey) {
-      showToast('Please connect your wallet first', 'error');
+      showToast("Please connect your wallet first", "error");
       return;
     }
     setFaucetLoading(true);
+    setShowFaucetFallback(false);
+
     try {
       const walletAddress = publicKey.toBase58();
       console.log('[Faucet] Requesting for wallet:', walletAddress);
       const result = await api.requestFaucet(walletAddress);
-      console.log('[Faucet] Response:', result);
+      
       if (result.success) {
-        showToast(result.message || '1,000 USDC received!', 'success');
+        showToast(result.message || "1,000 USDC received!", "success");
       } else {
-        const errMsg = result.error || result.message || 'Faucet request failed';
-        console.error('[Faucet] Error:', errMsg);
-        showToast(errMsg, 'error');
+        console.error('[Faucet] Error:', result.error || result.message);
+        setShowFaucetFallback(true); // ★ エラー時に表示
       }
     } catch (e) {
       console.error('[Faucet] Exception:', e);
-      showToast('Network error. Please try again.', 'error');
+      setShowFaucetFallback(true); // ★ 例外時にも表示
     } finally {
       setFaucetLoading(false);
     }
-  };
-
-  const handleDisconnect = async () => {
-    setIsDisconnecting(true);
-    try {
-      resetUserData();
-      await disconnect();
-      onClose();
-      showToast('Disconnected successfully', 'success');
-    } catch {
-      showToast('Disconnect failed', 'error');
-    } finally {
-      setIsDisconnecting(false);
-    }
-  };
-
-  const handleConnect = () => {
-    setIsWalletModalPending(true);
-    onClose();
-    setTimeout(() => {
-      setVisible(true);
-    }, 150);
   };
 
   const showConnectView = !connected || !publicKey;
@@ -274,7 +274,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 pt-2 custom-scrollbar">
-                {showConnectView && (
+                {showConnectView ? (
                   <div className="flex flex-col items-center justify-center h-full text-center py-10">
                     <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6">
                       <Wallet className="w-10 h-10 text-[#F2E0C8]/30" />
@@ -289,8 +289,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       Connect Wallet
                     </button>
                   </div>
-                )}
-                {!showConnectView && publicKey && (
+                ) : (
                   <>
                     <div className="flex flex-col items-center mb-8">
                       <div
@@ -317,7 +316,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
                       <h3 className="mt-4 text-xl font-bold text-[#F2E0C8]">
                         {userData?.username ||
-                          `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`}
+                          `${publicKey?.toBase58().slice(0, 4)}...${publicKey?.toBase58().slice(-4)}`}
                       </h3>
                       {userData?.bio ? (
                         <p className="text-sm text-[#7A5A30] text-center mt-1 max-w-[200px] leading-relaxed">
@@ -356,6 +355,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     </div>
 
                     <div className="space-y-3">
+                      {/* Daily Check-in Button */}
                       <button
                         onClick={handleCheckIn}
                         disabled={loading}
@@ -370,18 +370,59 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                         <span className="rounded bg-black/20 px-1.5 py-0.5 text-xs">+10 XP</span>
                       </button>
 
-                      <button
-                        onClick={handleFaucet}
-                        disabled={faucetLoading}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(184,134,63,0.15)] bg-[#140E08] py-3.5 font-bold text-[#B89860] transition-all active:scale-95 hover:bg-[#221509] disabled:opacity-50"
-                      >
-                        {faucetLoading ? (
-                          <Sparkles className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Droplets className="h-5 w-5" />
+                      {/* Faucet Block */}
+                      <div className="flex flex-col gap-3">
+                        <button
+                          onClick={handleFaucet}
+                          disabled={faucetLoading}
+                          className={`w-full bg-[#1C1C1E] border border-[rgba(184,134,63,0.3)] text-[#B8863F] py-3 rounded-2xl font-bold flex flex-col items-center justify-center transition-all ${
+                            faucetLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#B8863F]/10 active:scale-95'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Coins className="w-5 h-5" />
+                            <span>{faucetLoading ? 'Processing...' : 'Get Demo Tokens'}</span>
+                          </div>
+                          <span className="text-[10px] text-[#B8863F]/70 font-normal mt-0.5">
+                            Requires Devnet SOL for gas
+                          </span>
+                        </button>
+
+                        {/* ★ Faucetフォールバック案内 */}
+                        {showFaucetFallback && (
+                          <div className="w-full bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
+                            <div className="flex items-start gap-2 text-red-400">
+                              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                              <p className="text-[11px] font-medium leading-relaxed">
+                                Automatic distribution failed due to network congestion or insufficient pool balance.<br />Please claim test SOL from the official faucets below.
+                              </p>
+                            </div>
+                            
+                            <div className="flex flex-col gap-2">
+                              <a 
+                                href="https://faucet.quicknode.com/solana/devnet" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-between px-3 py-2 bg-black/40 hover:bg-black/60 rounded-lg border border-white/5 text-xs text-white/80 transition-colors"
+                              >
+                                <span className="font-bold text-[#B8863F]">QuickNode Faucet</span>
+                                <ExternalLink className="w-3.5 h-3.5 text-white/40" />
+                              </a>
+                              <a 
+                                href="https://faucet.solana.com/" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-between px-3 py-2 bg-black/40 hover:bg-black/60 rounded-lg border border-white/5 text-xs text-white/80 transition-colors"
+                              >
+                                <span>Solana Faucet</span>
+                                <ExternalLink className="w-3.5 h-3.5 text-white/40" />
+                              </a>
+                            </div>
+                          </div>
                         )}
-                        Get 1,000 USDC
-                      </button>
+                      </div>
+
+                      {/* Invite Button */}
                       <button
                         onClick={() => setIsInviteOpen(true)}
                         className="group flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(184,134,63,0.15)] bg-[#140E08] py-3.5 font-bold text-[#F2E0C8] transition-all active:scale-95 hover:bg-[#221509]"
@@ -394,6 +435,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                 )}
               </div>
 
+              {/* Disconnect Footer */}
               {!showConnectView && publicKey && (
                 <div className="mt-auto shrink-0 p-6 pt-0">
                   <button
@@ -415,6 +457,7 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
         )}
       </AnimatePresence>
 
+      {/* Modals */}
       {publicKey && (
         <ProfileEditModal
           isOpen={isEditOpen}
