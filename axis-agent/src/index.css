@@ -54,14 +54,14 @@ body {
 
 /* Scrollbar — thin, gold-accented */
 ::-webkit-scrollbar {
-  width: 3px;
-  height: 3px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(184, 134, 63, 0.2);
+  background: rgba(184, 134, 63, 0.4);
   border-radius: 4px;
 }
 
