@@ -20,7 +20,7 @@ interface WeightControlProps {
 }
 
 const QUICK_VALUES = [10, 25, 50];
-const STEP_AMOUNT = 5;
+const STEP_AMOUNT = 1;
 
 export const WeightControl = ({
   value,
