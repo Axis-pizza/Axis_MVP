@@ -27,8 +27,12 @@ export function DeploymentBlueprint({ config, tokens, onComplete, onBack }: Prop
 
     setDeploying(true);
     try {
-      // TODO: Implement actual deployment with wallet signing
+      const finalTicker = config.ticker.toUpperCase();
+      
+      console.log(`Deploying strategy with TICKER: ${finalTicker}`);
+
       showToast('Deployment not yet implemented on mobile', 'info');
+      
       setTimeout(() => {
         setDeploying(false);
         onComplete();
@@ -44,7 +48,9 @@ export function DeploymentBlueprint({ config, tokens, onComplete, onBack }: Prop
       {/* Strategy card preview */}
       <View className="mt-4 p-5 rounded-2xl items-center" style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
         <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: `${colors.accent}15` }}>
-          <Text className="text-2xl font-bold" style={{ color: colors.accent }}>${config.ticker}</Text>
+          <Text className="text-2xl font-bold" style={{ color: colors.accent }}>
+            ${config.ticker.toUpperCase()}
+          </Text>
         </View>
         <Text className="text-xl font-bold text-center" style={{ color: colors.text, fontFamily: serifFont }}>
           {config.name}
@@ -117,7 +123,7 @@ export function DeploymentBlueprint({ config, tokens, onComplete, onBack }: Prop
           <View className="mx-6 p-6 rounded-2xl w-[90%]" style={{ backgroundColor: colors.surface }}>
             <Text className="text-lg font-bold text-center mb-4" style={{ color: colors.text }}>Confirm Deployment</Text>
             <Text className="text-sm text-center mb-6" style={{ color: colors.textSecondary }}>
-              Deploy ${config.ticker} with {depositAmount} SOL initial deposit?
+              Deploy ${config.ticker.toUpperCase()} with {depositAmount} SOL initial deposit?
             </Text>
             <View className="flex-row gap-3">
               <Pressable
