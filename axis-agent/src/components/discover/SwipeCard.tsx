@@ -1,8 +1,9 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion, useMotionValue, useTransform, animate, type PanInfo } from 'framer-motion';
 import { TrendingUp, TrendingDown, Clock, Copy, ExternalLink, Wallet } from 'lucide-react';
 
-// --- Types (変更なし) ---
+// --- Types ---
 interface Token {
   symbol: string;
   weight: number;
@@ -160,13 +161,6 @@ const typeColors: Record<string, string> = {
     'text-emerald-200 border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.2)]',
 };
 
-// ポートフォリオ配分チャート用カラーパレット
-const CHART_COLORS = [
-  '#F59E0B', '#3B82F6', '#10B981', '#8B5CF6',
-  '#F97316', '#06B6D4', '#EF4444', '#84CC16',
-  '#EC4899', '#14B8A6', '#A78BFA', '#FCD34D',
-];
-
 // ── SwipeCardBody ──
 export const SwipeCardBody = ({
   strategy,
@@ -177,7 +171,8 @@ export const SwipeCardBody = ({
 }) => {
   const c = compact;
   const maxLogos = c ? 6 : 8;
-  const overflow = Math.max(0, strategy.tokens.length - maxLogos);
+  const sortedTokens = [...strategy.tokens].sort((a, b) => b.weight - a.weight);
+  const overflow = Math.max(0, sortedTokens.length - maxLogos);
 
   return (
     <div
@@ -289,73 +284,75 @@ export const SwipeCardBody = ({
         </div>
       </div>
 
-      {/* --- Composition: 重なりロゴ + 配分チップ --- */}
-      <div className={`flex-1 overflow-hidden flex flex-col relative z-10 ${c ? 'px-3 py-1.5' : 'px-6 py-3'}`}>
+      {/* --- Composition: プログレス・ピル（2カラム・グリッド） --- */}
+      <div className={`flex-1 overflow-hidden flex flex-col relative z-20 ${c ? 'px-3 py-1.5' : 'px-6 py-3'}`}>
+        
         {/* セクションヘッダー */}
         <div className={`flex items-center justify-between ${c ? 'mb-2' : 'mb-3'}`}>
           <span className={`font-bold text-white/40 uppercase tracking-widest flex items-center gap-1 ${c ? 'text-[8px]' : 'text-[11px]'}`}>
-            <div className="w-1 h-1 rounded-full bg-amber-400/50" /> Assets
+            <div className="w-1 h-1 rounded-full bg-white/50" /> Assets
           </span>
           <span className={`px-1.5 py-px rounded-full bg-white/10 text-white/60 border border-white/5 ${c ? 'text-[8px]' : 'text-[10px] px-2 py-0.5'}`}>
             {strategy.tokens.length}
           </span>
         </div>
 
-        {/* 重なりロゴ */}
-        <div className={`flex items-center ${c ? 'mb-2' : 'mb-3'}`}>
-          {strategy.tokens.slice(0, maxLogos).map((token, i) => (
-            <div
-              key={i}
-              className={`rounded-full bg-black/80 overflow-hidden flex-none border-2 shadow-lg ${c ? 'w-7 h-7' : 'w-10 h-10'}`}
-              style={{
-                marginLeft: i > 0 ? (c ? '-8px' : '-10px') : '0',
-                zIndex: maxLogos - i,
-                borderColor: CHART_COLORS[i % CHART_COLORS.length],
-              }}
-            >
-              <TokenIcon
-                symbol={token.symbol}
-                src={token.logoURI}
-                address={token.address}
-                className="w-full h-full object-cover rounded-full"
-              />
-            </div>
-          ))}
-          {overflow > 0 && (
-            <div
-              className={`rounded-full bg-white/5 border-2 border-white/15 flex items-center justify-center flex-none ${c ? 'w-7 h-7' : 'w-10 h-10'}`}
-              style={{ marginLeft: c ? '-8px' : '-10px', zIndex: 0 }}
-            >
-              <span className={`text-white/50 font-bold ${c ? 'text-[7px]' : 'text-[9px]'}`}>
-                +{overflow}
-              </span>
-            </div>
-          )}
+        {/* 2カラム・グリッドで構成銘柄をすべて表示 */}
+        <div className={`grid grid-cols-2 ${c ? 'gap-1.5' : 'gap-2'} mt-1 overflow-y-auto pr-1 pb-1 scrollbar-hide`}>
+          {(() => {
+            // 最も比重の大きい数値を基準（100%）にしてゲージの長さを相対計算する
+            const maxWeight = Math.max(...sortedTokens.map(t => t.weight));
+
+            return sortedTokens.slice(0, maxLogos).map((token, i) => {
+              // ゲージの長さ（最大銘柄のゲージが幅いっぱいになる）
+              const relativeFill = (token.weight / maxWeight) * 100;
+
+              return (
+                <div 
+                  key={i} 
+                  className={`relative overflow-hidden bg-[#0a0a0a] border border-white/5 flex items-center ${c ? 'rounded-lg p-1' : 'rounded-xl p-1.5'}`}
+                >
+                  {/* 背景ゲージ（白の半透明でモダンに） */}
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${relativeFill}%` }}
+                    transition={{ duration: 0.6, ease: "easeOut", delay: i * 0.05 }}
+                    className="absolute left-0 top-0 bottom-0 bg-white/10"
+                  />
+
+                  {/* コンテンツ（前面に配置） */}
+                  <div className="relative z-10 flex items-center justify-between w-full px-1">
+                    <div className="flex items-center gap-1.5">
+                      <TokenIcon 
+                        symbol={token.symbol} 
+                        src={token.logoURI} 
+                        address={token.address} 
+                        className={`rounded-full bg-black/50 ${c ? 'w-4 h-4' : 'w-5 h-5'}`} 
+                      />
+                      <span className={`font-bold text-white/90 tracking-wide ${c ? 'text-[8px]' : 'text-[10px]'}`}>
+                        {token.symbol}
+                      </span>
+                    </div>
+                    
+                    {/* パーセンテージ */}
+                    <span className={`font-mono text-white/60 ${c ? 'text-[8px]' : 'text-[10px]'}`}>
+                      {token.weight}%
+                    </span>
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
 
-        {/* 配分チップ */}
-        <div className="flex flex-wrap gap-1 overflow-hidden">
-          {strategy.tokens.slice(0, maxLogos).map((token, i) => (
-            <div
-              key={i}
-              className={`flex items-center gap-1 rounded-full bg-white/5 border border-white/5 ${c ? 'px-1.5 py-0.5' : 'px-2 py-0.5'}`}
-            >
-              <span
-                className={`rounded-full flex-none ${c ? 'w-1 h-1' : 'w-1.5 h-1.5'}`}
-                style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
-              />
-              <span className={`font-bold text-white/70 ${c ? 'text-[7px]' : 'text-[9px]'}`}>
-                {token.symbol}
-              </span>
-              <span
-                className={`font-bold ${c ? 'text-[7px]' : 'text-[9px]'}`}
-                style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}
-              >
-                {token.weight}%
-              </span>
-            </div>
-          ))}
-        </div>
+        {/* 万が一、maxLogos（6〜8）を超えた場合のみ表示 */}
+        {overflow > 0 && (
+          <div className="mt-2 text-center">
+            <span className={`text-white/30 font-medium tracking-widest ${c ? 'text-[7px]' : 'text-[9px]'}`}>
+              + {overflow} MORE ASSETS
+            </span>
+          </div>
+        )}
       </div>
 
       {/* --- Footer --- */}
