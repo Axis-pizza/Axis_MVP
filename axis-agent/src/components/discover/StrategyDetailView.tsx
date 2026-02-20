@@ -525,16 +525,6 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
 
     setInvestStatus('SIGNING');
     try {
-      // SOL残高チェック（ガス代 + ATA作成に最低 0.005 SOL 必要）
-      const solBalance = await connection.getBalance(wallet.publicKey);
-      if (solBalance < 5_000_000) {
-        // 0.005 SOL
-        showToast('Not enough SOL for gas fees. Use the faucet first.', 'error');
-        setInvestStatus('ERROR');
-        setTimeout(() => setInvestStatus('IDLE'), 2000);
-        return;
-      }
-
       const amount = parseFloat(amountStr);
       const transaction = new Transaction();
 
@@ -586,11 +576,25 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
 
       const latestBlockhash = await connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = latestBlockhash.blockhash;
+      // serialize() には feePayer が必須のため、一時的にユーザーを設定
       transaction.feePayer = wallet.publicKey;
 
       if (!wallet.signTransaction) throw new Error('Wallet not supported');
 
-      const signedTx = await wallet.signTransaction(transaction);
+      // サーバーを fee payer として署名してもらい、部分署名済み tx を取得
+      // サーバーは受け取った tx の instructions を流用し、自身を fee payer に差し替えて partialSign
+      let txToSign = transaction;
+      try {
+        const serialized = transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+        const { transaction: feePayerSignedBase64 } = await api.signAsFeePayer(
+          Buffer.from(serialized).toString('base64')
+        );
+        txToSign = Transaction.from(Buffer.from(feePayerSignedBase64, 'base64'));
+      } catch {
+        // fee payer エンドポイント未実装時はユーザー自身が fee payer のままフォールバック
+      }
+
+      const signedTx = await wallet.signTransaction(txToSign);
 
       // シミュレーション事前チェック（署名済み tx で実行）
       const simResult = await connection.simulateTransaction(signedTx);

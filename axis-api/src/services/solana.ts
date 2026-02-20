@@ -3,8 +3,6 @@ import {
   Keypair,
   PublicKey,
   Transaction,
-  SystemProgram,
-  LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
 import {
   getOrCreateAssociatedTokenAccount,
@@ -16,7 +14,6 @@ import { USDC_MINT } from "../config/constants";
 export async function claimFaucet(privateKey: string, walletAddress: string, rpcUrl: string) {
   if (!walletAddress) throw new Error("Wallet address required");
 
-  // Decode private key
   const secret = bs58.decode(privateKey);
   const adminKeypair = Keypair.fromSecretKey(secret);
 
@@ -39,24 +36,15 @@ export async function claimFaucet(privateKey: string, walletAddress: string, rpc
 
   const amount = 1000 * 1_000_000; // 1000 USDC
 
-  const SOL_AMOUNT = 0.05 * LAMPORTS_PER_SOL; // 0.05 SOL for gas fees
-
-  const tx = new Transaction()
-    .add(
-      SystemProgram.transfer({
-        fromPubkey: adminKeypair.publicKey,
-        toPubkey: userPublicKey,
-        lamports: SOL_AMOUNT,
-      })
+  // SOL転送は廃止 — サーバー自身が fee payer としてガス代を負担する
+  const tx = new Transaction().add(
+    createTransferInstruction(
+      adminTokenAccount.address,
+      userTokenAccount.address,
+      adminKeypair.publicKey,
+      amount
     )
-    .add(
-      createTransferInstruction(
-        adminTokenAccount.address,
-        userTokenAccount.address,
-        adminKeypair.publicKey,
-        amount
-      )
-    );
+  );
 
   const latest = await connection.getLatestBlockhash("processed");
   tx.recentBlockhash = latest.blockhash;
@@ -68,11 +56,35 @@ export async function claimFaucet(privateKey: string, walletAddress: string, rpc
     maxRetries: 3,
   });
 
-  return { 
-      signature: sig,
-      latestBlockhash: latest,
-      connection
+  return {
+    signature: sig,
+    latestBlockhash: latest,
+    connection,
   };
+}
+
+// フロントエンドが作成したトランザクションにサーバーを fee payer として部分署名して返す
+export async function signAsFeePayer(
+  privateKey: string,
+  transactionBase64: string
+): Promise<string> {
+  const secret = bs58.decode(privateKey);
+  const feePayerKeypair = Keypair.fromSecretKey(secret);
+
+  // クライアントの tx から blockhash と instructions を取り出す
+  const clientTx = Transaction.from(Buffer.from(transactionBase64, 'base64'));
+
+  // fee payer をサーバーに差し替えて新しい tx を構築
+  const serverTx = new Transaction({
+    feePayer: feePayerKeypair.publicKey,
+    recentBlockhash: clientTx.recentBlockhash,
+  });
+  serverTx.add(...clientTx.instructions);
+
+  // fee payer として部分署名（ユーザー署名はフロントで後から追加）
+  serverTx.partialSign(feePayerKeypair);
+
+  return serverTx.serialize({ requireAllSignatures: false }).toString('base64');
 }
 
 export async function confirmTransaction(connection: Connection, signature: string, latestBlockhash: any) {
