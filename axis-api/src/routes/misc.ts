@@ -90,11 +90,31 @@ app.post("/claim", async (c) => {
           ).bind(Math.floor(Date.now() / 1000), wallet_address).run();
       }
 
-      return c.json({ success: true, signature, message: "💰 Sent 1,000 USDC + 0.05 SOL (Devnet)" });
+      return c.json({ success: true, signature, message: "💰 Sent 1,000 USDC (Devnet)" });
 
     } catch (e: any) {
         console.error("Faucet Error:", e);
         return c.json({ error: "Transfer failed: " + e.message }, 500);
+    }
+});
+
+// --- Fee Payer Signing ---
+// フロントエンドから受け取ったトランザクションにサーバーを fee payer として部分署名して返す
+// ユーザーは SOL 不要でトランザクションを実行できる
+app.post('/fee-payer/sign', async (c) => {
+    try {
+        const { transaction: txBase64 } = await c.req.json();
+        if (!txBase64) return c.json({ error: 'transaction required' }, 400);
+
+        const signedTxBase64 = await SolanaService.signAsFeePayer(
+            c.env.SERVER_PRIVATE_KEY,
+            txBase64
+        );
+
+        return c.json({ transaction: signedTxBase64 });
+    } catch (e: any) {
+        console.error('Fee payer sign error:', e);
+        return c.json({ error: e.message || 'Signing failed' }, 500);
     }
 });
 

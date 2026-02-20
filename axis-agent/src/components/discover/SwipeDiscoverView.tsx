@@ -4,6 +4,7 @@ import {
   motion,
   useMotionValue,
   useTransform as useMotionTransform,
+  animate,
 } from 'framer-motion';
 import {
   RefreshCw,
@@ -22,10 +23,17 @@ import { SwipeCard } from './SwipeCard';
 import { api } from '../../services/api';
 import { useWallet, useConnection } from '../../hooks/useWallet';
 import { PublicKey, Transaction } from '@solana/web3.js';
+import {
+  getAssociatedTokenAddress,
+  createTransferInstruction,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token';
 import { getUsdcBalance, getOrCreateUsdcAta, createUsdcTransferIx } from '../../services/usdc';
 import { JupiterService } from '../../services/jupiter';
 import { DexScreenerService } from '../../services/dexscreener';
 import { useToast } from '../../context/ToastContext';
+
+const MASTER_MINT_ADDRESS = new PublicKey('2JiisncKr8DhvA68MpszFDjGAVu2oFtqJJC837LLiKdT');
 
 type TransactionStatus = 'IDLE' | 'SIGNING' | 'CONFIRMING' | 'PROCESSING' | 'SUCCESS' | 'ERROR';
 
@@ -206,11 +214,13 @@ const SwipeToConfirm = memo(
     isLoading,
     isSuccess,
     label,
+    amount,
   }: {
     onConfirm: () => void;
     isLoading: boolean;
     isSuccess?: boolean;
     label: string;
+    amount?: string;
   }) => {
     const constraintsRef = useRef<HTMLDivElement>(null);
     const x = useMotionValue(0);
@@ -227,6 +237,13 @@ const SwipeToConfirm = memo(
       [HANDLE_SIZE + PADDING * 2, containerWidth]
     );
 
+    // 金額が変更されたらスライダーをリセット
+    useEffect(() => {
+      if (!isLoading && !isSuccess) {
+        animate(x, 0, { type: 'spring', stiffness: 300, damping: 30 });
+      }
+    }, [amount, isLoading, isSuccess, x]);
+
     useEffect(() => {
       if (!constraintsRef.current) return;
       const el = constraintsRef.current;
@@ -239,17 +256,17 @@ const SwipeToConfirm = memo(
     useEffect(() => {
       if (isLoading || isSuccess) {
         x.set(maxDrag);
-      } else {
-        x.set(0);
+      } else if (x.get() === maxDrag && !isLoading && !isSuccess) {
+        animate(x, 0, { type: 'spring', stiffness: 300, damping: 30 });
       }
     }, [isLoading, isSuccess, maxDrag, x]);
 
     const handleDragEnd = () => {
       if (x.get() > maxDrag * 0.6) {
-        x.set(maxDrag);
+        animate(x, maxDrag, { type: 'spring', stiffness: 500, damping: 40 });
         if (!isLoading && !isSuccess) onConfirm();
       } else {
-        x.set(0);
+        animate(x, 0, { type: 'spring', stiffness: 400, damping: 30 });
       }
     };
 
@@ -259,7 +276,7 @@ const SwipeToConfirm = memo(
         className={`relative h-16 w-full rounded-full overflow-hidden border select-none transition-all duration-300 ${
           isSuccess
             ? 'bg-emerald-500/20 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
-            : 'bg-[#140E08] border-[rgba(184,134,63,0.15)] shadow-inner'
+            : 'bg-[#1C1C1E] border-[rgba(255,255,255,0.1)]'
         }`}
       >
         <motion.div
@@ -274,7 +291,7 @@ const SwipeToConfirm = memo(
           style={{ opacity: textOpacity }}
         >
           <span className="font-bold text-xs tracking-[0.2em] text-white/50 animate-pulse">
-            {isLoading ? 'PROCESSING...' : `SLIDE TO ${label}`}
+            {isLoading ? 'PROCESSING...' : label}
           </span>
         </motion.div>
 
@@ -306,47 +323,58 @@ const SwipeToConfirm = memo(
   }
 );
 
-// --- InvestSheet (Reused from StrategyDetailView) ---
+// --- InvestSheet (Full Screen — matches StrategyDetailView Trade modal) ---
 interface InvestSheetProps {
   isOpen: boolean;
   onClose: () => void;
   strategy: any;
-  onConfirm: (amount: string) => Promise<void>;
+  onConfirm: (amount: string, mode: 'BUY' | 'SELL') => Promise<void>;
   status: TransactionStatus;
+  userEtfBalance: number;
 }
 
-const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestSheetProps) => {
+const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status, userEtfBalance }: InvestSheetProps) => {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const { showToast } = useToast();
 
+  const [mode, setMode] = useState<'BUY' | 'SELL'>('BUY');
   const [amount, setAmount] = useState('0');
-  const [balance, setBalance] = useState(0);
-
-  const MOCK_RATE = 100;
-  const estimatedOutput =
-    parseFloat(amount) > 0 ? (parseFloat(amount) * MOCK_RATE).toFixed(2) : '0.00';
+  const [usdcBalance, setUsdcBalance] = useState(0);
+  const MOCK_PRICE_PER_TOKEN = 1.0;
 
   useEffect(() => {
     if (!publicKey || !isOpen) return;
     const fetchBalance = async () => {
       try {
         const bal = await getUsdcBalance(connection, publicKey);
-        setBalance(bal);
+        setUsdcBalance(bal);
       } catch {}
     };
     fetchBalance();
   }, [isOpen, publicKey, connection]);
 
   useEffect(() => {
-    if (isOpen) setAmount('0');
+    if (isOpen) {
+      setAmount('0');
+      setMode('BUY');
+    }
   }, [isOpen]);
+
+  const estimatedOutput = useMemo(() => {
+    const val = parseFloat(amount);
+    if (isNaN(val) || val <= 0) return '0.00';
+    return (val * MOCK_PRICE_PER_TOKEN).toFixed(4);
+  }, [amount]);
+
+  const currentBalance = mode === 'BUY' ? usdcBalance : userEtfBalance;
+  const ticker = strategy.ticker || 'ETF';
 
   const handleNum = (num: string) => {
     if (status !== 'IDLE' && status !== 'ERROR') return;
     if (amount === '0' && num !== '.') setAmount(num);
     else if (amount.includes('.') && num === '.') return;
-    else if (amount.length < 8) setAmount((prev) => prev + num);
+    else if (amount.length < 9) setAmount((prev) => prev + num);
   };
 
   const handleBackspace = () => {
@@ -360,186 +388,134 @@ const InvestSheet = ({ isOpen, onClose, strategy, onConfirm, status }: InvestShe
       showToast('Enter valid amount', 'error');
       return;
     }
-    onConfirm(amount);
+    if (val > currentBalance) {
+      showToast('Insufficient balance', 'error');
+      return;
+    }
+    onConfirm(amount, mode);
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/90 z-[300]"
-            onClick={
-              status === 'IDLE' || status === 'ERROR' || status === 'SUCCESS' ? onClose : undefined
-            }
-          />
-          <motion.div
-            key="sheet"
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 bg-[#080503] rounded-t-[32px] z-[310] overflow-hidden flex flex-col safe-area-bottom border-t border-[rgba(184,134,63,0.15)] shadow-2xl"
-            style={{ maxHeight: '92vh' }}
-          >
-            <div
-              className="w-full flex justify-center pt-4 pb-2"
-              onClick={status === 'IDLE' ? onClose : undefined}
+        <motion.div
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="fixed inset-0 z-[99999] bg-[#0C0C0C] flex flex-col"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 pt-12 pb-4 shrink-0">
+            <button
+              onClick={onClose}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1C1C1E] text-white hover:bg-white/10 transition-colors"
             >
-              <div className="w-12 h-1.5 bg-white/10 rounded-full" />
+              <X className="w-5 h-5" />
+            </button>
+            {/* Mode Toggle Pills */}
+            <div className="flex bg-[#1C1C1E] p-1 rounded-full border border-white/5">
+              <button
+                onClick={() => setMode('BUY')}
+                className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  mode === 'BUY' ? 'bg-[#B8863F] text-black' : 'text-[#78716C]'
+                }`}
+              >
+                Buy
+              </button>
+              <button
+                onClick={() => setMode('SELL')}
+                className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  mode === 'SELL' ? 'bg-[#B8863F] text-black' : 'text-[#78716C]'
+                }`}
+              >
+                Sell
+              </button>
+            </div>
+            <div className="w-10 h-10" />
+          </div>
+
+          {/* Main Content (Center) */}
+          <div className="flex-1 flex flex-col justify-center items-center relative w-full px-6">
+            {/* Amount Display */}
+            <div className="flex flex-col items-center gap-2 mb-8">
+              <div className="flex items-baseline justify-center gap-1">
+                <span
+                  className={`font-sans font-medium text-6xl tracking-tight ${amount === '0' ? 'text-[#57534E]' : 'text-white'}`}
+                >
+                  {amount}
+                </span>
+              </div>
+              <span className="text-[#78716C] font-bold text-lg">
+                {mode === 'BUY' ? 'USDC' : ticker}
+              </span>
             </div>
 
-            <div className="px-6 pt-2 pb-8 flex flex-col h-full">
-              <div className="flex justify-between items-center mb-6">
-                <button
-                  onClick={onClose}
-                  disabled={
-                    status === 'SIGNING' || status === 'CONFIRMING' || status === 'PROCESSING'
-                  }
-                  className="p-2 -ml-2 rounded-full text-[#78716C] hover:text-white hover:bg-white/5 transition-colors disabled:opacity-30"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-                <span className="text-sm font-bold text-[#78716C] uppercase tracking-wider">
-                  Buy {strategy.ticker || 'ETF'}
+            {/* Available Balance Pill */}
+            <div className="flex items-center gap-2 bg-[#1C1C1E] py-2 px-4 rounded-full border border-white/5 mb-8">
+              <Wallet className="w-3.5 h-3.5 text-[#78716C]" />
+              <span className="text-[#A8A29E] text-xs font-mono">
+                Available: {currentBalance.toFixed(4)} {mode === 'BUY' ? 'USDC' : ticker}
+              </span>
+              <button
+                onClick={() => setAmount((currentBalance * (mode === 'BUY' ? 0.95 : 1)).toFixed(4))}
+                className="text-[#B8863F] text-xs font-bold uppercase hover:text-white transition-colors"
+              >
+                Max
+              </button>
+            </div>
+
+            {/* Estimated Output */}
+            {amount !== '0' && (
+              <div className="absolute bottom-4 flex items-center gap-2 text-sm text-[#78716C]">
+                <ArrowDown className="w-4 h-4" />
+                <span>
+                  Receive approx. {estimatedOutput} {mode === 'BUY' ? ticker : 'USDC'}
                 </span>
-                <div className="w-8" />
               </div>
+            )}
+          </div>
 
-              <div className="flex-1 flex flex-col justify-center items-center mb-8 relative">
-                {status !== 'IDLE' && status !== 'ERROR' ? (
-                  /* Step Indicator during transaction */
-                  <div className="flex flex-col items-center gap-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {(['SIGNING', 'CONFIRMING', 'PROCESSING', 'SUCCESS'] as const).map(
-                        (step, i) => {
-                          const steps = ['SIGNING', 'CONFIRMING', 'PROCESSING', 'SUCCESS'];
-                          const currentIdx = steps.indexOf(status);
-                          const isActive = i <= currentIdx;
-                          const isCurrent = i === currentIdx;
-                          return (
-                            <div key={step} className="flex items-center gap-3">
-                              <div
-                                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                                  isActive
-                                    ? step === 'SUCCESS'
-                                      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
-                                      : 'bg-[#B8863F] shadow-[0_0_8px_rgba(184,134,63,0.6)]'
-                                    : 'bg-white/10'
-                                } ${isCurrent && status !== 'SUCCESS' ? 'animate-pulse' : ''}`}
-                              />
-                              {i < 3 && (
-                                <div
-                                  className={`w-8 h-0.5 transition-all duration-300 ${i < currentIdx ? 'bg-[#B8863F]' : 'bg-white/10'}`}
-                                />
-                              )}
-                            </div>
-                          );
-                        }
-                      )}
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-bold text-white mb-1">
-                        {status === 'SIGNING' && 'Waiting for wallet signature...'}
-                        {status === 'CONFIRMING' && 'Confirming on Solana...'}
-                        {status === 'PROCESSING' && 'Processing token transfer...'}
-                        {status === 'SUCCESS' && 'Complete!'}
-                      </p>
-                      <p className="text-xs text-[#78716C]">
-                        {status === 'SIGNING' && 'Approve the transaction in your wallet'}
-                        {status === 'CONFIRMING' && 'This may take a few seconds'}
-                        {status === 'PROCESSING' && 'Webhook is distributing your tokens'}
-                        {status === 'SUCCESS' &&
-                          `You received ${estimatedOutput} ${strategy.ticker || 'ETF'}`}
-                      </p>
-                    </div>
-                    {status === 'SUCCESS' && (
-                      <div className="text-4xl">
-                        <Check className="w-12 h-12 text-emerald-400" />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* Normal input display */
-                  <>
-                    <div className="flex flex-col items-center z-10">
-                      <div className="flex items-baseline justify-center gap-2 mb-1">
-                        <span
-                          className={`font-serif font-bold text-white tracking-tighter transition-all duration-200 ${amount === '0' ? 'text-white/30' : 'text-white'} text-6xl`}
-                        >
-                          {amount}
-                        </span>
-                        <span className="text-xl font-bold text-[#B8863F]">USDC</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-[#78716C] font-mono bg-white/5 py-1.5 px-3 rounded-full border border-[rgba(184,134,63,0.08)]">
-                        <Wallet className="w-3 h-3" />
-                        <span>{balance.toFixed(4)} Available</span>
-                        <button
-                          onClick={() => setAmount((balance * 0.95).toFixed(4))}
-                          className="text-[#B8863F] font-bold hover:text-[#D4A261] transition-colors"
-                          disabled={status !== 'IDLE' && status !== 'ERROR'}
-                        >
-                          MAX
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="my-6 text-white/20 animate-bounce">
-                      <ArrowDown className="w-6 h-6" />
-                    </div>
-
-                    <div className="flex flex-col items-center">
-                      <div className="text-sm font-bold text-[#78716C] uppercase mb-1">
-                        You Receive (Est.)
-                      </div>
-                      <div className="flex items-center gap-2 text-3xl font-bold text-white">
-                        <span>{estimatedOutput}</span>
-                        <span className="text-emerald-400">{strategy.ticker || 'TOKEN'}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {(status === 'IDLE' || status === 'ERROR') && (
-                <div className="grid grid-cols-3 gap-3 mb-8 max-w-[280px] mx-auto w-full">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0].map((key) => (
-                    <button
-                      key={key}
-                      onClick={() => handleNum(key.toString())}
-                      className="h-14 text-2xl font-medium text-white/90 hover:bg-white/5 active:bg-white/10 rounded-2xl transition-all flex items-center justify-center disabled:opacity-30"
-                      disabled={status !== 'IDLE' && status !== 'ERROR'}
-                    >
-                      {key}
-                    </button>
-                  ))}
+          {/* Keypad & Action (Bottom) */}
+          <div className="shrink-0 w-full px-6 pb-[calc(env(safe-area-inset-bottom)+24px)] bg-[#0C0C0C]">
+            {(status === 'IDLE' || status === 'ERROR') && (
+              <div className="grid grid-cols-3 gap-y-4 gap-x-6 mb-8 max-w-[320px] mx-auto">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0].map((key) => (
                   <button
-                    onClick={handleBackspace}
-                    className="h-14 text-[#78716C] hover:text-white hover:bg-white/5 active:bg-white/10 rounded-2xl transition-all flex items-center justify-center disabled:opacity-30"
-                    disabled={status !== 'IDLE' && status !== 'ERROR'}
+                    key={key}
+                    onClick={() => handleNum(key.toString())}
+                    className="h-14 text-2xl font-medium text-white hover:bg-white/5 active:bg-white/10 rounded-full transition-all flex items-center justify-center select-none"
                   >
-                    <ArrowLeft className="w-6 h-6" />
+                    {key}
                   </button>
-                </div>
-              )}
+                ))}
+                <button
+                  onClick={handleBackspace}
+                  className="h-14 flex items-center justify-center text-white hover:bg-white/5 rounded-full active:scale-95 transition-all"
+                >
+                  <ArrowLeft className="w-6 h-6" />
+                </button>
+              </div>
+            )}
 
-              <div className="max-w-[320px] mx-auto w-full">
+            <div className="max-w-[340px] mx-auto w-full">
+              {status === 'SIGNING' || status === 'CONFIRMING' || status === 'PROCESSING' ? (
+                <div className="w-full h-16 bg-[#1C1C1E] rounded-full flex items-center justify-center gap-3 border border-white/5">
+                  <Loader2 className="w-5 h-5 text-[#B8863F] animate-spin" />
+                  <span className="text-white font-bold tracking-wide text-sm">PROCESSING...</span>
+                </div>
+              ) : (
                 <SwipeToConfirm
                   onConfirm={handleExecute}
-                  isLoading={
-                    status === 'SIGNING' || status === 'CONFIRMING' || status === 'PROCESSING'
-                  }
+                  isLoading={false}
                   isSuccess={status === 'SUCCESS'}
-                  label={`BUY ${strategy.ticker || 'ETF'}`}
+                  label={`SLIDE TO ${mode}`}
+                  amount={amount}
                 />
-              </div>
+              )}
             </div>
-          </motion.div>
-        </>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
@@ -702,9 +678,25 @@ export const SwipeDiscoverView = ({
   const [isInvestOpen, setIsInvestOpen] = useState(false);
   const [investStatus, setInvestStatus] = useState<TransactionStatus>('IDLE');
   const [investTarget, setInvestTarget] = useState<any | null>(null);
+  const [userEtfBalance, setUserEtfBalance] = useState(0);
 
   const dataFetched = useRef(false);
   const appliedFocusRef = useRef<string | null>(null);
+
+  // ETF balance fetch
+  useEffect(() => {
+    if (!wallet.publicKey) return;
+    const fetchEtfBalance = async () => {
+      try {
+        const userAta = await getAssociatedTokenAddress(MASTER_MINT_ADDRESS, wallet.publicKey!);
+        const account = await connection.getTokenAccountBalance(userAta);
+        setUserEtfBalance(account.value.uiAmount || 0);
+      } catch {
+        setUserEtfBalance(0);
+      }
+    };
+    fetchEtfBalance();
+  }, [wallet.publicKey, connection, investStatus, isInvestOpen]);
 
   useEffect(() => {
     onOverlayChange?.(matchedStrategy !== null);
@@ -949,7 +941,7 @@ export const SwipeDiscoverView = ({
     setIsInvestOpen(true);
   };
 
-  const handleDeposit = async (amountStr: string) => {
+  const handleDeposit = async (amountStr: string, mode: 'BUY' | 'SELL' = 'BUY') => {
     if (!wallet.publicKey || !investTarget) {
       showToast('Connect Wallet', 'error');
       return;
@@ -975,30 +967,65 @@ export const SwipeDiscoverView = ({
       const targetPubkey = new PublicKey(targetAddressStr.trim());
       const transaction = new Transaction();
 
-      // USDC SPL transfer
-      const { ata: fromAta, instruction: createFromIx } = await getOrCreateUsdcAta(
-        connection,
-        wallet.publicKey,
-        wallet.publicKey
-      );
-      const { ata: toAta, instruction: createToIx } = await getOrCreateUsdcAta(
-        connection,
-        wallet.publicKey,
-        targetPubkey
-      );
-      if (createFromIx) transaction.add(createFromIx);
-      if (createToIx) transaction.add(createToIx);
-      transaction.add(createUsdcTransferIx(fromAta, toAta, wallet.publicKey, parsedAmount));
+      if (mode === 'BUY') {
+        // USDC SPL transfer to vault
+        const { ata: fromAta, instruction: createFromIx } = await getOrCreateUsdcAta(
+          connection,
+          wallet.publicKey,
+          wallet.publicKey
+        );
+        const { ata: toAta, instruction: createToIx } = await getOrCreateUsdcAta(
+          connection,
+          wallet.publicKey,
+          targetPubkey
+        );
+        if (createFromIx) transaction.add(createFromIx);
+        if (createToIx) transaction.add(createToIx);
+        transaction.add(createUsdcTransferIx(fromAta, toAta, wallet.publicKey, parsedAmount));
+      } else {
+        // SELL: ETF token transfer back to vault
+        const mintAddress = investTarget.mintAddress
+          ? new PublicKey(investTarget.mintAddress)
+          : MASTER_MINT_ADDRESS;
+        const userAta = await getAssociatedTokenAddress(mintAddress, wallet.publicKey);
+        const vaultAta = await getAssociatedTokenAddress(mintAddress, targetPubkey);
+        const decimals = 9;
+        const tokenAmount = BigInt(Math.floor(parsedAmount * Math.pow(10, decimals)));
+        transaction.add(
+          createTransferInstruction(
+            userAta,
+            vaultAta,
+            wallet.publicKey,
+            tokenAmount,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+      }
 
       const latestBlockhash = await connection.getLatestBlockhash();
       transaction.recentBlockhash = latestBlockhash.blockhash;
+      // serialize() には feePayer が必須のため、一時的にユーザーを設定
       transaction.feePayer = wallet.publicKey;
 
       if (!wallet.signTransaction) {
         throw new Error('Wallet does not support signing');
       }
 
-      const signedTx = await wallet.signTransaction(transaction);
+      // サーバーを fee payer として署名してもらい、部分署名済み tx を取得
+      // サーバーは受け取った tx の instructions を流用し、自身を fee payer に差し替えて partialSign
+      let txToSign = transaction;
+      try {
+        const serialized = transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+        const { transaction: feePayerSignedBase64 } = await api.signAsFeePayer(
+          Buffer.from(serialized).toString('base64')
+        );
+        txToSign = Transaction.from(Buffer.from(feePayerSignedBase64, 'base64'));
+      } catch {
+        // fee payer エンドポイント未実装時はユーザー自身が fee payer のままフォールバック
+      }
+
+      const signedTx = await wallet.signTransaction(txToSign);
       setInvestStatus('CONFIRMING');
       const signature = await connection.sendRawTransaction(signedTx.serialize(), {
         skipPreflight: false,
@@ -1016,15 +1043,14 @@ export const SwipeDiscoverView = ({
       );
 
       setInvestStatus('PROCESSING');
-      showToast(`Payment confirmed! Processing token transfer...`, 'info');
 
       setTimeout(() => {
         setInvestStatus('SUCCESS');
-        const estimatedReceived = (parsedAmount * 100).toFixed(2);
-        showToast(
-          `Complete! You received ${estimatedReceived} ${investTarget.ticker || 'ETF'}`,
-          'success'
-        );
+        const msg =
+          mode === 'BUY'
+            ? `Received ${(parsedAmount * 100).toFixed(2)} ${investTarget.ticker || 'ETF'}`
+            : `Sold ${parsedAmount} ${investTarget.ticker || 'ETF'}`;
+        showToast(`Success! ${msg}`, 'success');
 
         setTimeout(() => {
           setIsInvestOpen(false);
@@ -1192,6 +1218,7 @@ export const SwipeDiscoverView = ({
           strategy={investTarget}
           onConfirm={handleDeposit}
           status={investStatus}
+          userEtfBalance={userEtfBalance}
         />
       )}
     </div>

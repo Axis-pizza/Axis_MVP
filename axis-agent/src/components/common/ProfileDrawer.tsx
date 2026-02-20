@@ -13,9 +13,7 @@ import {
   Wallet,
   QrCode,
   Share2,
-  ExternalLink,
-  AlertTriangle,
-  Coins // ★追加: Coinsアイコン
+  Coins,
 } from 'lucide-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWallet } from '../../hooks/useWallet';
@@ -118,9 +116,6 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isWalletModalPending, setIsWalletModalPending] = useState(false);
   const { setVisible, visible: walletModalVisible } = useWalletModal();
   const { publicKey, disconnect, connected } = useWallet();
-  
-  // ★ 追加: Faucetフォールバック用のState
-  const [showFaucetFallback, setShowFaucetFallback] = useState(false);
 
   const resetUserData = useCallback(() => {
     setUserData(null);
@@ -209,29 +204,22 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
     setLoading(false);
   };
 
-  // ★ 修正: Faucetハンドラ (エラー時にフォールバック表示)
   const handleFaucet = async () => {
     if (!publicKey) {
-      showToast("Please connect your wallet first", "error");
+      showToast('Please connect your wallet first', 'error');
       return;
     }
     setFaucetLoading(true);
-    setShowFaucetFallback(false);
 
     try {
-      const walletAddress = publicKey.toBase58();
-      console.log('[Faucet] Requesting for wallet:', walletAddress);
-      const result = await api.requestFaucet(walletAddress);
-      
+      const result = await api.requestFaucet(publicKey.toBase58());
       if (result.success) {
-        showToast(result.message || "1,000 USDC received!", "success");
+        showToast(result.message || '1,000 USDC received!', 'success');
       } else {
-        console.error('[Faucet] Error:', result.error || result.message);
-        setShowFaucetFallback(true); // ★ エラー時に表示
+        showToast(result.error || result.message || 'Faucet failed. Try again later.', 'error');
       }
     } catch (e) {
-      console.error('[Faucet] Exception:', e);
-      setShowFaucetFallback(true); // ★ 例外時にも表示
+      showToast('Faucet failed. Try again later.', 'error');
     } finally {
       setFaucetLoading(false);
     }
@@ -370,57 +358,17 @@ export const ProfileDrawer = ({ isOpen, onClose }: { isOpen: boolean; onClose: (
                         <span className="rounded bg-black/20 px-1.5 py-0.5 text-xs">+10 XP</span>
                       </button>
 
-                      {/* Faucet Block */}
-                      <div className="flex flex-col gap-3">
-                        <button
-                          onClick={handleFaucet}
-                          disabled={faucetLoading}
-                          className={`w-full bg-[#1C1C1E] border border-[rgba(184,134,63,0.3)] text-[#B8863F] py-3 rounded-2xl font-bold flex flex-col items-center justify-center transition-all ${
-                            faucetLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#B8863F]/10 active:scale-95'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Coins className="w-5 h-5" />
-                            <span>{faucetLoading ? 'Processing...' : 'Get Demo Tokens'}</span>
-                          </div>
-                          <span className="text-[10px] text-[#B8863F]/70 font-normal mt-0.5">
-                            Requires Devnet SOL for gas
-                          </span>
-                        </button>
-
-                        {/* ★ Faucetフォールバック案内 */}
-                        {showFaucetFallback && (
-                          <div className="w-full bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
-                            <div className="flex items-start gap-2 text-red-400">
-                              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              <p className="text-[11px] font-medium leading-relaxed">
-                                Automatic distribution failed due to network congestion or insufficient pool balance.<br />Please claim test SOL from the official faucets below.
-                              </p>
-                            </div>
-                            
-                            <div className="flex flex-col gap-2">
-                              <a 
-                                href="https://faucet.quicknode.com/solana/devnet" 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-between px-3 py-2 bg-black/40 hover:bg-black/60 rounded-lg border border-white/5 text-xs text-white/80 transition-colors"
-                              >
-                                <span className="font-bold text-[#B8863F]">QuickNode Faucet</span>
-                                <ExternalLink className="w-3.5 h-3.5 text-white/40" />
-                              </a>
-                              <a 
-                                href="https://faucet.solana.com/" 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-between px-3 py-2 bg-black/40 hover:bg-black/60 rounded-lg border border-white/5 text-xs text-white/80 transition-colors"
-                              >
-                                <span>Solana Faucet</span>
-                                <ExternalLink className="w-3.5 h-3.5 text-white/40" />
-                              </a>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      {/* Faucet Button */}
+                      <button
+                        onClick={handleFaucet}
+                        disabled={faucetLoading}
+                        className={`w-full bg-[#1C1C1E] border border-[rgba(184,134,63,0.3)] text-[#B8863F] py-3 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${
+                          faucetLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#B8863F]/10 active:scale-95'
+                        }`}
+                      >
+                        <Coins className="w-5 h-5" />
+                        <span>{faucetLoading ? 'Processing...' : 'Get Demo USDC'}</span>
+                      </button>
 
                       {/* Invite Button */}
                       <button

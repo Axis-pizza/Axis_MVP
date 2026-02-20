@@ -434,6 +434,19 @@ export const api = {
     }
   },
 
+  async signAsFeePayer(transactionBase64: string): Promise<{ transaction: string }> {
+    const res = await fetch(`${API_BASE}/fee-payer/sign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transaction: transactionBase64 }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Fee payer signing failed (${res.status})`);
+    }
+    return res.json();
+  },
+
   async requestFaucet(wallet: string) {
     try {
       console.log('[Faucet API] POST /claim', { wallet_address: wallet });
