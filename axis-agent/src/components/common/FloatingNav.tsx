@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Compass, Plus, User, MessageSquareText } from 'lucide-react';
+import { Compass, Plus, User, MessageSquareText, Layers, LayoutGrid } from 'lucide-react';
 import { BugDrawer } from './BugDrawer';
 
 export type ViewState = 'DISCOVER' | 'CREATE' | 'PROFILE';
@@ -14,9 +14,11 @@ const NAV_ITEMS = [
 interface FloatingNavProps {
   currentView: ViewState;
   onNavigate: (view: ViewState) => void;
+  discoverViewMode?: 'swipe' | 'list';
+  onDiscoverViewModeChange?: (mode: 'swipe' | 'list') => void;
 }
 
-export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) => {
+export const FloatingNav = memo(({ currentView, onNavigate, discoverViewMode, onDiscoverViewModeChange }: FloatingNavProps) => {
   const [isBugDrawerOpen, setIsBugDrawerOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -147,6 +149,43 @@ export const FloatingNav = memo(({ currentView, onNavigate }: FloatingNavProps) 
               })}
             </div>
             <div className="w-px h-8 bg-amber-900/20" />
+
+            {/* Discover view toggle — desktop only, visible when on DISCOVER */}
+            <AnimatePresence>
+              {currentView === 'DISCOVER' && discoverViewMode && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.15 }}
+                  className="hidden md:flex items-center bg-white/5 border border-amber-800/20 rounded-full p-1 gap-0.5"
+                >
+                  <button
+                    onClick={() => onDiscoverViewModeChange?.('swipe')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${
+                      discoverViewMode === 'swipe'
+                        ? 'bg-white/15 text-white'
+                        : 'text-amber-700/50 hover:text-amber-400'
+                    }`}
+                  >
+                    <Layers size={13} />
+                    Swipe
+                  </button>
+                  <button
+                    onClick={() => onDiscoverViewModeChange?.('list')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${
+                      discoverViewMode === 'list'
+                        ? 'bg-white/15 text-white'
+                        : 'text-amber-700/50 hover:text-amber-400'
+                    }`}
+                  >
+                    <LayoutGrid size={13} />
+                    List
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <button
               onClick={() => setIsBugDrawerOpen(true)}
               className="relative w-10 h-10 flex items-center justify-center rounded-full bg-amber-900/10 hover:bg-amber-900/20 border border-amber-800/15 hover:border-amber-600/30 transition-all group"

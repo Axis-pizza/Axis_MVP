@@ -17,6 +17,7 @@ import { getUsdcBalance } from './services/usdc';
 
 type View = 'DISCOVER' | 'CREATE' | 'PROFILE' | 'STRATEGY_DETAIL';
 const TUTORIAL_KEY = 'kagemusha-onboarding-v2';
+const DISCOVER_VIEW_KEY = 'axis-discover-view-mode';
 
 export default function Home() {
   const [view, setView] = useState<View>('CREATE');
@@ -25,6 +26,15 @@ export default function Home() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [isOverlayActive, setIsOverlayActive] = useState(false);
   const [hideNavInCreate, setHideNavInCreate] = useState(false);
+  const [discoverViewMode, setDiscoverViewMode] = useState<'swipe' | 'list'>(() => {
+    const saved = localStorage.getItem(DISCOVER_VIEW_KEY);
+    return saved === 'list' ? 'list' : 'swipe';
+  });
+
+  const handleDiscoverViewModeChange = (mode: 'swipe' | 'list') => {
+    setDiscoverViewMode(mode);
+    localStorage.setItem(DISCOVER_VIEW_KEY, mode);
+  };
 
   const { connected, publicKey } = useWallet();
   const { connection } = useConnection();
@@ -94,6 +104,8 @@ export default function Home() {
           <DiscoverView
             onStrategySelect={handleStrategySelect}
             onOverlayChange={setIsOverlayActive}
+            viewMode={discoverViewMode}
+            onViewModeChange={handleDiscoverViewModeChange}
           />
         </div>
       )}
@@ -130,7 +142,12 @@ export default function Home() {
 
       {/* Floating Navigation (Tutorial targets this) */}
       {view !== 'STRATEGY_DETAIL' && !hideNavInCreate && !isOverlayActive && (
-        <FloatingNav currentView={view as ViewState} onNavigate={handleNavigate} />
+        <FloatingNav
+          currentView={view as ViewState}
+          onNavigate={handleNavigate}
+          discoverViewMode={discoverViewMode}
+          onDiscoverViewModeChange={handleDiscoverViewModeChange}
+        />
       )}
 
       {/* Luxury Tutorial Overlay */}
