@@ -42,6 +42,7 @@ interface SwipeDiscoverViewProps {
   onToggleView: () => void;
   onStrategySelect: (strategy: any) => void;
   onOverlayChange?: (isActive: boolean) => void;
+  focusedStrategyId?: string | null;
 }
 
 // --- Components ---
@@ -680,6 +681,7 @@ export const SwipeDiscoverView = ({
   onToggleView,
   onStrategySelect,
   onOverlayChange,
+  focusedStrategyId,
 }: SwipeDiscoverViewProps) => {
   const wallet = useWallet();
   const { publicKey } = wallet;
@@ -702,6 +704,7 @@ export const SwipeDiscoverView = ({
   const [investTarget, setInvestTarget] = useState<any | null>(null);
 
   const dataFetched = useRef(false);
+  const appliedFocusRef = useRef<string | null>(null);
 
   useEffect(() => {
     onOverlayChange?.(matchedStrategy !== null);
@@ -899,6 +902,17 @@ export const SwipeDiscoverView = ({
       };
     });
   }, [strategies, tokenDataMap, userMap, tickerMap]);
+
+  // focusedStrategyId が指定されたら、enrichedStrategies 確定後に最前面へ移動
+  useEffect(() => {
+    if (!focusedStrategyId || focusedStrategyId === appliedFocusRef.current) return;
+    if (enrichedStrategies.length === 0) return;
+    const idx = enrichedStrategies.findIndex((s) => s.id === focusedStrategyId);
+    if (idx >= 0) {
+      setCurrentIndex(idx);
+      appliedFocusRef.current = focusedStrategyId;
+    }
+  }, [focusedStrategyId, enrichedStrategies]);
 
   const handleSwipe = useCallback(
     (direction: 'left' | 'right', strategy: any) => {
@@ -1144,6 +1158,7 @@ export const SwipeDiscoverView = ({
                     onSwipeLeft={() => handleSwipe('left', strategy)}
                     onSwipeRight={() => handleSwipe('right', strategy)}
                     onTap={() => onStrategySelect(strategy)}
+                    onSwipeDown={onToggleView}
                   />
                 );
               })}

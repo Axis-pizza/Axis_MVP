@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Menu, X, BookOpen, FileText, Github, Layers, LayoutGrid } from 'lucide-react';
+import { User, Menu, X, BookOpen, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SwipeDiscoverView } from './SwipeDiscoverView';
@@ -7,89 +7,60 @@ import { ListDiscoverView } from './ListDiscoverView';
 import { ProfileDrawer } from '../common/ProfileDrawer';
 import type { Strategy } from '../../types';
 
-// X (formerly Twitter) logo SVG component
 const XLogo = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
   </svg>
 );
 
-type ViewMode = 'swipe' | 'list';
-
-const STORAGE_KEY = 'axis-discover-view-mode';
+const GithubLogo = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
+  </svg>
+);
 
 interface DiscoverViewProps {
   onStrategySelect: (strategy: Strategy) => void;
   onOverlayChange?: (isActive: boolean) => void;
+  viewMode: 'swipe' | 'list';
+  onViewModeChange: (mode: 'swipe' | 'list') => void;
 }
 
-export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverViewProps) => {
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return (saved === 'list' ? 'list' : 'swipe') as ViewMode;
-  });
-
+export const DiscoverView = ({ onStrategySelect, onOverlayChange, viewMode, onViewModeChange }: DiscoverViewProps) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // Menu open/close state
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [focusedStrategyId, setFocusedStrategyId] = useState<string | null>(null);
 
+  // list へ戻った時に focus をリセット
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, viewMode);
+    if (viewMode === 'list') setFocusedStrategyId(null);
   }, [viewMode]);
 
   const toggleView = () => {
-    setViewMode((prev) => (prev === 'swipe' ? 'list' : 'swipe'));
+    onViewModeChange(viewMode === 'swipe' ? 'list' : 'swipe');
+  };
+
+  // List カードをタップ → Swipe の最前面カードとして表示
+  const handleOpenInSwipe = (strategyId: string) => {
+    setFocusedStrategyId(strategyId);
+    onViewModeChange('swipe');
   };
 
   const navigate = useNavigate();
 
-  // Menu link definitions
   const menuLinks = [
     { label: 'Docs', icon: BookOpen, url: 'https://muse-7.gitbook.io/axis/product-docs/' },
     { label: 'X', icon: XLogo, url: 'https://x.com/axis_pizza' },
-    { label: 'GitHub', icon: Github, url: 'https://github.com/Axis-pizza/Axis_MVP' },
+    { label: 'GitHub', icon: GithubLogo, url: 'https://github.com/Axis-pizza/Axis_MVP' },
     { label: 'Terms', icon: FileText, url: '/terms', isInternal: true },
   ];
 
   return (
     <div className="relative min-h-screen bg-[#080503]">
-      {/* Header */}
-      <div className="flex items-center w-full px-4 py-3 z-50 absolute top-0 md:top-16 left-0 right-0 pointer-events-none">
-        {/* pointer-events-none prevents blocking swipe gestures; buttons use pointer-events-auto */}
-
-        {/* Left: spacer to balance right buttons */}
-        <div className="flex-1" />
-
-        {/* Center: View Mode Toggle */}
-        <div className="pointer-events-auto">
-          <div className="flex items-center bg-black/50 backdrop-blur-md border border-white/10 rounded-full p-1 gap-0.5">
-            <button
-              onClick={() => viewMode !== 'swipe' && toggleView()}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                viewMode === 'swipe'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/40 hover:text-white/70'
-              }`}
-            >
-              <Layers size={13} />
-              <span className="hidden sm:inline">Swipe</span>
-            </button>
-            <button
-              onClick={() => viewMode !== 'list' && toggleView()}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                viewMode === 'list'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/40 hover:text-white/70'
-              }`}
-            >
-              <LayoutGrid size={13} />
-              <span className="hidden sm:inline">List</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Right side: button group */}
-        <div className="flex-1 flex justify-end items-center gap-3 pointer-events-auto">
-          {/* Menu button (Docs, etc.) */}
+      {/* Header — right side buttons only (toggle は FloatingNav PC バーに統合済み) */}
+      <div className="flex items-center justify-end w-full px-4 py-3 z-50 absolute top-0 md:top-16 left-0 right-0 pointer-events-none">
+        <div className="flex items-center gap-3 pointer-events-auto">
+          {/* Menu button */}
           <div className="relative">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -98,14 +69,10 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
               {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
-            {/* Dropdown menu */}
             <AnimatePresence>
               {isMenuOpen && (
                 <>
-                  {/* Invisible overlay to close menu on background click */}
                   <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
-
-                  {/* Menu body */}
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: -10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -156,7 +123,6 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
             className="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 hover:bg-white/10 active:scale-95 transition-all relative group"
           >
             <User className="w-5 h-5 text-[#F2E0C8] group-hover:text-[#F2E0C8] transition-colors" />
-            {/* Notification badge */}
             <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#B8863F] rounded-full border-2 border-[#080503]" />
           </button>
         </div>
@@ -164,18 +130,40 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
 
       {/* Main content */}
       <div className="relative">
-        {viewMode === 'swipe' ? (
-          <SwipeDiscoverView
-            onToggleView={toggleView}
-            onStrategySelect={onStrategySelect}
-            onOverlayChange={onOverlayChange}
-          />
-        ) : (
-          <ListDiscoverView onToggleView={toggleView} onStrategySelect={onStrategySelect} />
-        )}
+        <AnimatePresence mode="wait">
+          {viewMode === 'swipe' ? (
+            <motion.div
+              key="swipe"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
+            >
+              <SwipeDiscoverView
+                onToggleView={toggleView}
+                onStrategySelect={onStrategySelect}
+                onOverlayChange={onOverlayChange}
+                focusedStrategyId={focusedStrategyId}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0, scale: 1.04 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.04 }}
+              transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
+            >
+              <ListDiscoverView
+                onToggleView={toggleView}
+                onStrategySelect={onStrategySelect}
+                onOpenInSwipe={handleOpenInSwipe}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Profile drawer */}
       <ProfileDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
     </div>
   );
