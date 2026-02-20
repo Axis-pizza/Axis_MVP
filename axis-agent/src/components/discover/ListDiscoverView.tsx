@@ -78,6 +78,13 @@ export const ListDiscoverView = ({ onStrategySelect, onOpenInSwipe }: ListDiscov
   const [userMap, setUserMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [filter] = useState<'all' | 'trending' | 'new' | 'top'>('top');
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -255,48 +262,46 @@ export const ListDiscoverView = ({ onStrategySelect, onOpenInSwipe }: ListDiscov
     });
 
   return (
-    <div className="min-h-screen bg-[#030303] text-white px-4 py-6 pb-24">
-      <div className="mb-6 pt-12">
-        <h1 className="text-2xl font-bold mb-1"></h1>
-        <p className="text-white/50 text-sm"></p>
-      </div>
+    <div className="min-h-screen bg-[#030303] text-white px-4 md:px-8 lg:px-12 py-6 pb-24">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-6 pt-12 md:pt-20" />
 
-
-      {/* Content */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 text-amber-500 animate-spin mb-4" />
-          <p className="text-white/50 text-sm">Loading strategies...</p>
-        </div>
-      ) : strategies.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-3">
-            <AnimatePresence mode="popLayout">
-              {filteredStrategies.map((strategy, i) => (
-                <motion.div
-                  key={strategy.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: i * 0.04 }}
-                  className="h-[380px] cursor-pointer"
-                  onClick={() =>
-                    onOpenInSwipe ? onOpenInSwipe(strategy.id) : onStrategySelect(strategy)
-                  }
-                >
-                  <SwipeCardBody strategy={toCardData(strategy)} compact />
-                </motion.div>
-              ))}
-            </AnimatePresence>
+        {/* Content */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 text-amber-500 animate-spin mb-4" />
+            <p className="text-white/50 text-sm">Loading strategies...</p>
           </div>
+        ) : strategies.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <AnimatePresence mode="popLayout">
+                {filteredStrategies.map((strategy, i) => (
+                  <motion.div
+                    key={strategy.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ delay: i * 0.04 }}
+                    className={`cursor-pointer ${isDesktop ? 'h-[520px]' : 'h-[360px]'}`}
+                    onClick={() =>
+                      onOpenInSwipe ? onOpenInSwipe(strategy.id) : onStrategySelect(strategy)
+                    }
+                  >
+                    <SwipeCardBody strategy={toCardData(strategy)} compact={!isDesktop} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
 
-          {filteredStrategies.length === 0 && (
-            <div className="text-center py-12 text-white/40">No strategies found.</div>
-          )}
-        </>
-      )}
+            {filteredStrategies.length === 0 && (
+              <div className="text-center py-12 text-white/40">No strategies found.</div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 };
