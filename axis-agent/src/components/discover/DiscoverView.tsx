@@ -30,14 +30,27 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
   });
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // Menu open/close state
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [focusedStrategyId, setFocusedStrategyId] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, viewMode);
+    // list へ戻った時に focus をリセット
+    if (viewMode === 'list') setFocusedStrategyId(null);
   }, [viewMode]);
 
   const toggleView = () => {
     setViewMode((prev) => (prev === 'swipe' ? 'list' : 'swipe'));
+  };
+
+  // List カードをタップ → Swipe の最前面カードとして表示
+  const handleOpenInSwipe = (strategyId: string) => {
+    setFocusedStrategyId(strategyId);
+    setViewMode('swipe');
+  };
+
+  const handleOverlayChange = (isActive: boolean) => {
+    onOverlayChange?.(isActive);
   };
 
   const navigate = useNavigate();
@@ -56,33 +69,29 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
       <div className="flex items-center w-full px-4 py-3 z-50 absolute top-0 md:top-16 left-0 right-0 pointer-events-none">
         {/* pointer-events-none prevents blocking swipe gestures; buttons use pointer-events-auto */}
 
-        {/* Left: spacer to balance right buttons */}
-        <div className="flex-1" />
+        {/* Left spacer (desktop only, to center the toggle) */}
+        <div className="hidden md:flex flex-1" />
 
-        {/* Center: View Mode Toggle */}
-        <div className="pointer-events-auto">
+        {/* Center: View Mode Toggle — desktop only (mobile uses fixed bottom) */}
+        <div className="hidden md:block pointer-events-auto">
           <div className="flex items-center bg-black/50 backdrop-blur-md border border-white/10 rounded-full p-1 gap-0.5">
             <button
               onClick={() => viewMode !== 'swipe' && toggleView()}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                viewMode === 'swipe'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/40 hover:text-white/70'
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold transition-all active:scale-95 ${
+                viewMode === 'swipe' ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/70'
               }`}
             >
-              <Layers size={13} />
-              <span className="hidden sm:inline">Swipe</span>
+              <Layers size={14} />
+              <span>Swipe</span>
             </button>
             <button
               onClick={() => viewMode !== 'list' && toggleView()}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                viewMode === 'list'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/40 hover:text-white/70'
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold transition-all active:scale-95 ${
+                viewMode === 'list' ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/70'
               }`}
             >
-              <LayoutGrid size={13} />
-              <span className="hidden sm:inline">List</span>
+              <LayoutGrid size={14} />
+              <span>List</span>
             </button>
           </div>
         </div>
@@ -162,17 +171,40 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Main content — AnimatePresence でビュー切り替えをスムーズに */}
       <div className="relative">
-        {viewMode === 'swipe' ? (
-          <SwipeDiscoverView
-            onToggleView={toggleView}
-            onStrategySelect={onStrategySelect}
-            onOverlayChange={onOverlayChange}
-          />
-        ) : (
-          <ListDiscoverView onToggleView={toggleView} onStrategySelect={onStrategySelect} />
-        )}
+        <AnimatePresence mode="wait">
+          {viewMode === 'swipe' ? (
+            <motion.div
+              key="swipe"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
+            >
+              <SwipeDiscoverView
+                onToggleView={toggleView}
+                onStrategySelect={onStrategySelect}
+                onOverlayChange={handleOverlayChange}
+                focusedStrategyId={focusedStrategyId}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0, scale: 1.04 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.04 }}
+              transition={{ type: 'spring', duration: 0.35, bounce: 0 }}
+            >
+              <ListDiscoverView
+                onToggleView={toggleView}
+                onStrategySelect={onStrategySelect}
+                onOpenInSwipe={handleOpenInSwipe}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Profile drawer */}

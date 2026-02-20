@@ -34,11 +34,13 @@ interface SwipeCardProps {
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
   onTap: () => void;
+  onSwipeDown?: () => void;
   isTop: boolean;
   index: number;
 }
 
 const SWIPE_THRESHOLD = 80;
+const DOWN_THRESHOLD = 90;
 const ROTATION_RANGE = 12;
 
 // --- Helpers ---
@@ -81,6 +83,14 @@ export const FormatChange = ({
       {Math.abs(c).toFixed(2)}%
     </span>
   );
+};
+
+export const formatTvl = (value: number): string => {
+  if (value < 0.01) return '< 0.01';
+  if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(1) + 'B';
+  if (value >= 1_000_000) return (value / 1_000_000).toFixed(1) + 'M';
+  if (value >= 1_000) return (value / 1_000).toFixed(1) + 'K';
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 };
 
 export const timeAgo = (timestamp: number) => {
@@ -263,8 +273,16 @@ export const SwipeCardBody = ({
         <span className={`text-white/40 uppercase font-bold tracking-widest mb-0.5 z-10 ${c ? 'text-[8px]' : 'text-[10px]'}`}>
           TVL
         </span>
-        <div className={`font-bold text-white tracking-tight z-10 drop-shadow-sm ${c ? 'text-base' : 'text-2xl'}`}>
-          {strategy.tvl < 0.01 ? '< 0.01' : strategy.tvl.toLocaleString()}
+        <div className={`font-bold text-white tracking-tight z-10 drop-shadow-sm leading-none ${
+          c
+            ? 'text-base'
+            : strategy.tvl >= 1_000_000
+              ? 'text-xl'
+              : strategy.tvl >= 10_000
+                ? 'text-2xl'
+                : 'text-2xl'
+        }`}>
+          {formatTvl(strategy.tvl)}
         </div>
         {!c && <span className="text-[9px] text-white/30 z-10">USDC</span>}
       </div>
@@ -349,14 +367,19 @@ export const SwipeCard = ({
   onSwipeLeft,
   onSwipeRight,
   onTap,
+  onSwipeDown,
   isTop,
   index,
 }: SwipeCardProps) => {
   const x = useMotionValue(0);
+  const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-ROTATION_RANGE, ROTATION_RANGE]);
   const cardOpacity = useTransform(x, [-400, -200, 0, 200, 400], [0, 1, 1, 1, 0]);
   const nopeOpacity = useTransform(x, [-100, -20], [1, 0]);
   const likeOpacity = useTransform(x, [20, 100], [0, 1]);
+  // 下ドラッグ時に縮小 + インジケーター表示
+  const downScale = useTransform(y, [0, 300], [1, 0.78]);
+  const downIndicatorOpacity = useTransform(y, [40, 110], [0, 1]);
 
   const isDragging = useRef(false);
   const swiped = useRef(false);
@@ -369,8 +392,25 @@ export const SwipeCard = ({
     if (swiped.current) return;
 
     const { offset, velocity } = info;
-    const swipeRight = offset.x > SWIPE_THRESHOLD || velocity.x > 600;
-    const swipeLeft = offset.x < -SWIPE_THRESHOLD || velocity.x < -600;
+    const isVertical = Math.abs(offset.y) > Math.abs(offset.x);
+
+    // 下スワイプ判定（縦方向が支配的 & 下方向）
+    if (isVertical && (offset.y > DOWN_THRESHOLD || (offset.y > 50 && velocity.y > 400))) {
+      swiped.current = true;
+      animate(y, window.innerHeight * 0.8, {
+        type: 'spring',
+        stiffness: 200,
+        damping: 25,
+        velocity: velocity.y,
+      }).then(() => onSwipeDown?.());
+      return;
+    }
+
+    // y を元に戻す
+    animate(y, 0, { type: 'spring', stiffness: 500, damping: 28 });
+
+    const swipeRight = !isVertical && (offset.x > SWIPE_THRESHOLD || velocity.x > 600);
+    const swipeLeft = !isVertical && (offset.x < -SWIPE_THRESHOLD || velocity.x < -600);
 
     if (swipeRight) {
       swiped.current = true;
@@ -385,7 +425,6 @@ export const SwipeCard = ({
         () => onSwipeLeft()
       );
     } else {
-      // Snap back to center
       animate(x, 0, { type: 'spring', stiffness: 500, damping: 28 });
     }
     setTimeout(() => {
@@ -402,20 +441,21 @@ export const SwipeCard = ({
       className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"
       style={{
         x: isTop ? x : 0,
+        y: isTop ? y : index * 12,
         rotate: isTop ? rotate : 0,
         opacity: isTop ? cardOpacity : 1,
-        scale: 1 - index * 0.05,
+        scale: isTop ? downScale : 1 - index * 0.05,
         zIndex: 100 - index,
-        y: index * 12,
         willChange: 'transform',
       }}
-      drag={isTop ? 'x' : false}
+      drag={isTop ? true : false}
+      dragDirectionLock
       dragMomentum={false}
       onDragStart={isTop ? handleDragStart : undefined}
       onDragEnd={isTop ? handleDragEnd : undefined}
       onClick={handleClick}
       initial={false}
-      animate={{ scale: 1 - index * 0.05, y: index * 12 }}
+      animate={isTop ? undefined : { scale: 1 - index * 0.05, y: index * 12 }}
       exit={{ opacity: 0, transition: { duration: 0.1 } }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
     >
@@ -436,6 +476,15 @@ export const SwipeCard = ({
             style={{ opacity: nopeOpacity }}
           >
             PASS
+          </motion.div>
+          {/* 下スワイプ → リスト表示インジケーター */}
+          <motion.div
+            className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1.5 pointer-events-none"
+            style={{ opacity: downIndicatorOpacity }}
+          >
+            <div className="bg-black/80 border border-white/20 rounded-full px-4 py-1.5 text-white/80 text-xs font-bold tracking-widest">
+              ↓ LIST
+            </div>
           </motion.div>
         </>
       )}

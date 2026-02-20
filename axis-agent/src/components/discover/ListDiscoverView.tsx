@@ -42,6 +42,7 @@ interface DiscoveredStrategy {
 interface ListDiscoverViewProps {
   onToggleView?: () => void;
   onStrategySelect: (strategy: Strategy) => void;
+  onOpenInSwipe?: (strategyId: string) => void;
 }
 
 const toCardData = (s: DiscoveredStrategy): StrategyCardData => ({
@@ -67,7 +68,7 @@ const toCardData = (s: DiscoveredStrategy): StrategyCardData => ({
   vaultAddress: s.vaultAddress,
 });
 
-export const ListDiscoverView = ({ onStrategySelect }: ListDiscoverViewProps) => {
+export const ListDiscoverView = ({ onStrategySelect, onOpenInSwipe }: ListDiscoverViewProps) => {
   const { publicKey } = useWallet();
 
   const [rawStrategies, setRawStrategies] = useState<any[]>([]);
@@ -256,8 +257,8 @@ export const ListDiscoverView = ({ onStrategySelect }: ListDiscoverViewProps) =>
   return (
     <div className="min-h-screen bg-[#030303] text-white px-4 py-6 pb-24">
       <div className="mb-6 pt-12">
-        <h1 className="text-2xl font-bold mb-1">Discover</h1>
-        <p className="text-white/50 text-sm">Explore community-created strategy pizzas</p>
+        <h1 className="text-2xl font-bold mb-1"></h1>
+        <p className="text-white/50 text-sm"></p>
       </div>
 
 
@@ -281,7 +282,9 @@ export const ListDiscoverView = ({ onStrategySelect }: ListDiscoverViewProps) =>
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ delay: i * 0.04 }}
                   className="h-[380px] cursor-pointer"
-                  onClick={() => onStrategySelect(strategy)}
+                  onClick={() =>
+                    onOpenInSwipe ? onOpenInSwipe(strategy.id) : onStrategySelect(strategy)
+                  }
                 >
                   <SwipeCardBody strategy={toCardData(strategy)} compact />
                 </motion.div>
