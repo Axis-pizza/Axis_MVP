@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Menu, X, BookOpen, FileText, Github } from 'lucide-react';
+import { User, Menu, X, BookOpen, FileText, Github, Layers, LayoutGrid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SwipeDiscoverView } from './SwipeDiscoverView';
@@ -53,14 +53,42 @@ export const DiscoverView = ({ onStrategySelect, onOverlayChange }: DiscoverView
   return (
     <div className="relative min-h-screen bg-[#080503]">
       {/* Header */}
-      <div className="flex items-center justify-between w-full px-4 py-3 z-50 absolute top-0 md:top-16 left-0 right-0 pointer-events-none">
+      <div className="flex items-center w-full px-4 py-3 z-50 absolute top-0 md:top-16 left-0 right-0 pointer-events-none">
         {/* pointer-events-none prevents blocking swipe gestures; buttons use pointer-events-auto */}
 
-        {/* Left side: placeholder for logo (currently empty) */}
-        <div />
+        {/* Left: spacer to balance right buttons */}
+        <div className="flex-1" />
+
+        {/* Center: View Mode Toggle */}
+        <div className="pointer-events-auto">
+          <div className="flex items-center bg-black/50 backdrop-blur-md border border-white/10 rounded-full p-1 gap-0.5">
+            <button
+              onClick={() => viewMode !== 'swipe' && toggleView()}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                viewMode === 'swipe'
+                  ? 'bg-white/15 text-white'
+                  : 'text-white/40 hover:text-white/70'
+              }`}
+            >
+              <Layers size={13} />
+              <span className="hidden sm:inline">Swipe</span>
+            </button>
+            <button
+              onClick={() => viewMode !== 'list' && toggleView()}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                viewMode === 'list'
+                  ? 'bg-white/15 text-white'
+                  : 'text-white/40 hover:text-white/70'
+              }`}
+            >
+              <LayoutGrid size={13} />
+              <span className="hidden sm:inline">List</span>
+            </button>
+          </div>
+        </div>
 
         {/* Right side: button group */}
-        <div className="flex items-center gap-3 pointer-events-auto">
+        <div className="flex-1 flex justify-end items-center gap-3 pointer-events-auto">
           {/* Menu button (Docs, etc.) */}
           <div className="relative">
             <button

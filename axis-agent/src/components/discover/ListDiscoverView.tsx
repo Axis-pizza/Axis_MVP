@@ -1,25 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-// ★追加: useWalletをインポート
 import { useWallet } from '../../hooks/useWallet';
-import {
-  Search,
-  TrendingUp,
-  Users,
-  Crown,
-  ChevronRight,
-  Flame,
-  Loader2,
-  Plus,
-  Target,
-  Shield,
-  Zap,
-  GitFork,
-  Layers,
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { api } from '../../services/api';
-import { PizzaChart } from '../common/PizzaChart';
-import { StrategyDetailModal } from '../common/StrategyDetailModal';
+import { JupiterService } from '../../services/jupiter';
+import { DexScreenerService } from '../../services/dexscreener';
+import { SwipeCardBody, type StrategyCardData } from './SwipeCard';
 
 export interface Strategy {
   id: string;
@@ -29,92 +15,232 @@ export interface Strategy {
   description?: string;
 }
 
-interface DiscoveredStrategy extends Strategy {
+interface DiscoveredToken {
+  symbol: string;
+  weight: number;
+  address?: string;
+  logoURI?: string | null;
+  currentPrice?: number;
+  change24h?: number;
+}
+
+interface DiscoveredStrategy {
+  id: string;
+  name: string;
+  type: 'AGGRESSIVE' | 'BALANCED' | 'CONSERVATIVE';
+  tokens: DiscoveredToken[];
+  description?: string;
   ownerPubkey: string;
   tvl: number;
   createdAt: number;
+  roi: number;
+  creatorPfpUrl?: string | null;
+  mintAddress?: string;
+  vaultAddress?: string;
 }
 
 interface ListDiscoverViewProps {
-  onToggleView: () => void;
+  onToggleView?: () => void;
   onStrategySelect: (strategy: Strategy) => void;
 }
 
-export const ListDiscoverView = ({ onToggleView, onStrategySelect }: ListDiscoverViewProps) => {
+const toCardData = (s: DiscoveredStrategy): StrategyCardData => ({
+  id: s.id,
+  name: s.name,
+  ticker: undefined,
+  type: s.type,
+  tokens: s.tokens.map((t) => ({
+    symbol: t.symbol,
+    weight: t.weight,
+    address: t.address,
+    logoURI: t.logoURI ?? null,
+    currentPrice: t.currentPrice ?? 0,
+    change24h: t.change24h ?? 0,
+  })),
+  roi: s.roi,
+  tvl: s.tvl,
+  creatorAddress: s.ownerPubkey,
+  creatorPfpUrl: s.creatorPfpUrl ?? null,
+  description: s.description,
+  createdAt: s.createdAt,
+  mintAddress: s.mintAddress,
+  vaultAddress: s.vaultAddress,
+});
+
+export const ListDiscoverView = ({ onStrategySelect }: ListDiscoverViewProps) => {
   const { publicKey } = useWallet();
-  const [strategies, setStrategies] = useState<DiscoveredStrategy[]>([]);
-  const [selectedStrategy, setSelectedStrategy] = useState<DiscoveredStrategy | null>(null);
+
+  const [rawStrategies, setRawStrategies] = useState<any[]>([]);
+  const [tokenDataMap, setTokenDataMap] = useState<
+    Record<string, { price: number; change24h: number; logoURI?: string }>
+  >({});
+  const [userMap, setUserMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'trending' | 'new' | 'top'>('all');
+  const [filter] = useState<'all' | 'trending' | 'new' | 'top'>('top');
 
   useEffect(() => {
-    const fetchStrategies = async () => {
+    const loadData = async () => {
       setLoading(true);
       try {
-        const [publicRes, myRes] = await Promise.all([
+        const [publicRes, myRes, tokensRes] = await Promise.all([
           api.discoverStrategies(50).catch(() => ({ strategies: [] })),
           publicKey
             ? api.getUserStrategies(publicKey.toBase58()).catch(() => ({ strategies: [] }))
             : Promise.resolve({ strategies: [] }),
+          api.getTokens().catch(() => ({ tokens: [] })),
         ]);
 
-        let rawList: any[] = [];
-        if (publicRes && Array.isArray(publicRes.strategies)) {
-          rawList = [...rawList, ...publicRes.strategies];
-        }
-
-        const myRawStrategies = myRes.strategies || myRes || [];
-        if (Array.isArray(myRawStrategies)) {
-          rawList = [...rawList, ...myRawStrategies];
-        }
-
-        const normalizedList: DiscoveredStrategy[] = rawList.map((item: any) => {
-          const rawTokens = item.tokens || item.composition || [];
-          const normalizedTokens = Array.isArray(rawTokens)
-            ? rawTokens.map((t: any) => ({ symbol: t.symbol, weight: Number(t.weight) }))
-            : [];
-
-          const ownerAddr = item.ownerPubkey || item.owner_pubkey || item.creator || 'Unknown';
-          return {
-            id: item.id || item.signature || `temp-${Math.random()}`,
-            name: item.name || 'Untitled Strategy',
-            description: item.description || '',
-            type: item.type || 'BALANCED',
-            tokens: normalizedTokens,
-            ownerPubkey: ownerAddr,
-            address: item.address || ownerAddr,
-            owner: ownerAddr,
-            tvl: Number(item.tvl || item.initialInvestment || 0),
-            createdAt: item.createdAt ? Number(item.createdAt) : Date.now() / 1000,
-          };
+        // バックエンドトークン情報を初期マップに
+        const initialMap: Record<
+          string,
+          { price: number; change24h: number; logoURI?: string; symbol: string }
+        > = {};
+        (tokensRes.tokens || []).forEach((t: any) => {
+          if (t.mint) {
+            initialMap[t.mint] = {
+              symbol: t.symbol?.toUpperCase() || 'UNKNOWN',
+              price: t.price || 0,
+              change24h: t.change24h || 0,
+              logoURI: t.logoURI,
+            };
+          }
         });
 
-        const uniqueMap = new Map();
-        normalizedList.forEach((item) => {
-          uniqueMap.set(item.id, item);
+        // ストラテジーをマージ・重複除去
+        const myStrats = myRes.strategies || myRes || [];
+        const combined = [...(Array.isArray(myStrats) ? myStrats : []), ...(publicRes.strategies || [])];
+        const uniqueMap = new Map<string, any>();
+        combined.forEach((item: any) => {
+          const key = item.id || item.address;
+          if (key && !uniqueMap.has(key)) uniqueMap.set(key, item);
         });
-        const finalStrategies = Array.from(uniqueMap.values()) as DiscoveredStrategy[];
+        const uniqueStrategies = Array.from(uniqueMap.values());
+        setRawStrategies(uniqueStrategies);
 
-        setStrategies(finalStrategies);
+        // 全 mint を収集
+        const allMints = new Set<string>(Object.keys(initialMap));
+        uniqueStrategies.forEach((s: any) => {
+          let tokens = s.tokens || s.composition || [];
+          if (typeof tokens === 'string') {
+            try { tokens = JSON.parse(tokens); } catch { tokens = []; }
+          }
+          tokens.forEach((t: any) => {
+            if (t.mint) {
+              allMints.add(t.mint);
+              if (!initialMap[t.mint]) {
+                initialMap[t.mint] = {
+                  symbol: t.symbol?.toUpperCase() || 'UNKNOWN',
+                  price: 0,
+                  change24h: 0,
+                  logoURI: t.logoURI,
+                };
+              }
+            }
+          });
+        });
+
+        // Jupiter + DexScreener で価格を補完
+        const mintArray = Array.from(allMints);
+        if (mintArray.length > 0) {
+          const [jupPrices, dexData] = await Promise.all([
+            JupiterService.getPrices(mintArray).catch(() => ({})) as Promise<Record<string, number>>,
+            DexScreenerService.getMarketData(mintArray).catch(() => ({})) as Promise<
+              Record<string, { price: number; change24h: number }>
+            >,
+          ]);
+          mintArray.forEach((mint) => {
+            const cur = initialMap[mint];
+            if (!cur) return;
+            initialMap[mint] = {
+              ...cur,
+              price: jupPrices[mint] || dexData[mint]?.price || cur.price,
+              change24h: dexData[mint]?.change24h || cur.change24h,
+            };
+          });
+        }
+        setTokenDataMap(initialMap);
+
+        // クリエイタープロフィールを取得
+        const creators = new Set<string>();
+        uniqueStrategies.forEach((s: any) => {
+          if (s.ownerPubkey) creators.add(s.ownerPubkey);
+          if (s.creator) creators.add(s.creator);
+        });
+        if (creators.size > 0) {
+          const userResults = await Promise.all(
+            Array.from(creators).map((pubkey) =>
+              api
+                .getUser(pubkey)
+                .then((res) => (res.success ? res.user : null))
+                .catch(() => null)
+            )
+          );
+          const newUserMap: Record<string, any> = {};
+          userResults.forEach((user) => {
+            if (user?.pubkey) newUserMap[user.pubkey] = user;
+          });
+          setUserMap(newUserMap);
+        }
       } catch {
-        setStrategies([]);
+        setRawStrategies([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStrategies();
+    loadData();
   }, [publicKey]);
 
-  // ... (以下、元のコードと同じ)
+  // rawStrategies + tokenDataMap + userMap からエンリッチされたストラテジーを生成
+  const strategies = useMemo<DiscoveredStrategy[]>(() => {
+    return rawStrategies.map((s: any) => {
+      let tokens = s.tokens || s.composition || [];
+      if (typeof tokens === 'string') {
+        try { tokens = JSON.parse(tokens); } catch { tokens = []; }
+      }
+
+      const enrichedTokens: DiscoveredToken[] = tokens.map((t: any) => {
+        const td = t.mint ? tokenDataMap[t.mint] : null;
+        return {
+          symbol: t.symbol?.toUpperCase() || 'UNKNOWN',
+          weight: Number(t.weight) || 0,
+          address: t.mint || undefined,
+          logoURI: t.logoURI || td?.logoURI || null,
+          currentPrice: td?.price ?? 0,
+          change24h: td?.change24h ?? 0,
+        };
+      });
+
+      let weightedSum = 0;
+      let totalWeight = 0;
+      enrichedTokens.forEach((t) => {
+        const w = t.weight || 0;
+        weightedSum += (t.change24h || 0) * w;
+        totalWeight += w;
+      });
+
+      const ownerPubkey = s.ownerPubkey || s.creator || 'Unknown';
+      const userProfile = userMap[ownerPubkey];
+
+      return {
+        id: s.id || s.address || `temp-${Math.random()}`,
+        name: s.name || 'Untitled Strategy',
+        description: s.description || userProfile?.bio || '',
+        type: (s.type || 'BALANCED') as DiscoveredStrategy['type'],
+        tokens: enrichedTokens,
+        ownerPubkey,
+        tvl: Number(s.tvl || 0),
+        createdAt: s.createdAt ? Number(s.createdAt) : Date.now() / 1000,
+        roi: totalWeight > 0 ? weightedSum / totalWeight : 0,
+        creatorPfpUrl: userProfile?.avatar_url ? api.getProxyUrl(userProfile.avatar_url) : null,
+        mintAddress: s.mintAddress || undefined,
+        vaultAddress: s.vaultAddress || undefined,
+      };
+    });
+  }, [rawStrategies, tokenDataMap, userMap]);
 
   const filteredStrategies = strategies
-    .filter(
-      (s) =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        (s.description && s.description.toLowerCase().includes(search.toLowerCase()))
-    )
+    .slice()
     .sort((a, b) => {
       if (publicKey) {
         const isMineA = a.ownerPubkey === publicKey.toBase58();
@@ -122,224 +248,52 @@ export const ListDiscoverView = ({ onToggleView, onStrategySelect }: ListDiscove
         if (isMineA && !isMineB) return -1;
         if (!isMineA && isMineB) return 1;
       }
-
       if (filter === 'new') return b.createdAt - a.createdAt;
       if (filter === 'top') return (b.tvl || 0) - (a.tvl || 0);
       return 0;
     });
 
-  const formatTVL = (tvl: number) => {
-    if (!tvl) return '0 USDC';
-    if (tvl >= 1000) return `${(tvl / 1000).toFixed(1)}K USDC`;
-    return `${tvl.toFixed(2)} USDC`;
-  };
-
-  const formatDate = (timestamp: number) => {
-    if (!timestamp) return 'Just now';
-    const date = new Date(timestamp * 1000);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const typeIcons = {
-    AGGRESSIVE: Zap,
-    BALANCED: Target,
-    CONSERVATIVE: Shield,
-  };
-
-  const typeColors = {
-    AGGRESSIVE: 'from-orange-500 to-red-500',
-    BALANCED: 'from-blue-500 to-purple-500',
-    CONSERVATIVE: 'from-emerald-500 to-teal-500',
-  };
-
-  const handleSelect = (e: React.MouseEvent, strategy: DiscoveredStrategy) => {
-    e.stopPropagation();
-    onStrategySelect(strategy);
-  };
-
   return (
     <div className="min-h-screen bg-[#030303] text-white px-4 py-6 pb-24">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold mb-1">Discover</h1>
-          <p className="text-white/50 text-sm">Explore community-created strategy pizzas</p>
-        </div>
-        <button
-          onClick={onToggleView}
-          className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors text-white/70 hover:text-white"
-          title="Switch to Swipe View"
-        >
-          <Layers className="w-5 h-5" />
-        </button>
+      <div className="mb-6 pt-12">
+        <h1 className="text-2xl font-bold mb-1">Discover</h1>
+        <p className="text-white/50 text-sm">Explore community-created strategy pizzas</p>
       </div>
 
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search strategies..."
-          className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm focus:outline-none focus:border-orange-500/50 transition-colors"
-        />
-      </div>
 
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
-        {[
-          { key: 'all', label: 'All', icon: null },
-          { key: 'trending', label: 'Hot', icon: Flame },
-          { key: 'top', label: 'Top TVL', icon: Crown },
-          { key: 'new', label: 'New', icon: Plus },
-        ].map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key as typeof filter)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-              filter === key ? 'bg-white text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'
-            }`}
-          >
-            {Icon && <Icon className="w-3.5 h-3.5" />}
-            {label}
-          </button>
-        ))}
-      </div>
-
+      {/* Content */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-4" />
+          <Loader2 className="w-8 h-8 text-amber-500 animate-spin mb-4" />
           <p className="text-white/50 text-sm">Loading strategies...</p>
         </div>
       ) : strategies.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="space-y-3">
-          <AnimatePresence mode="popLayout">
-            {filteredStrategies.map((strategy, i) => {
-              const TypeIcon = typeIcons[strategy.type] || Target;
-              const isMine = publicKey && strategy.ownerPubkey === publicKey.toBase58();
-
-              return (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <AnimatePresence mode="popLayout">
+              {filteredStrategies.map((strategy, i) => (
                 <motion.div
                   key={strategy.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => setSelectedStrategy(strategy)}
-                  className={`relative p-4 bg-white/[0.03] border rounded-2xl cursor-pointer transition-all group overflow-hidden ${
-                    isMine
-                      ? 'border-orange-500/30 bg-orange-500/[0.05]'
-                      : 'border-white/10 hover:border-white/20 hover:bg-white/[0.05]'
-                  }`}
+                  transition={{ delay: i * 0.04 }}
+                  className="h-[380px] cursor-pointer"
+                  onClick={() => onStrategySelect(strategy)}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="shrink-0">
-                      <PizzaChart
-                        slices={strategy.tokens}
-                        size={56}
-                        showLabels={false}
-                        animated={false}
-                      />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-bold truncate text-white">{strategy.name}</h3>
-                        <span
-                          className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gradient-to-r ${typeColors[strategy.type]} text-white flex items-center gap-1`}
-                        >
-                          <TypeIcon className="w-3 h-3" />
-                        </span>
-                        {isMine && (
-                          <span className="text-[10px] bg-orange-500 text-white px-1.5 rounded font-bold">
-                            YOU
-                          </span>
-                        )}
-                      </div>
-
-                      {strategy.description && (
-                        <p className="text-xs text-white/50 truncate mb-1.5">
-                          {strategy.description}
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-3 text-xs text-white/40 font-mono">
-                        <span className="flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          {strategy.ownerPubkey
-                            ? `${strategy.ownerPubkey.slice(0, 4)}...`
-                            : 'Unknown'}
-                        </span>
-                        <span>{formatDate(strategy.createdAt)}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="text-right shrink-0">
-                        <div className="flex items-center justify-end gap-1 font-bold text-emerald-400">
-                          <TrendingUp className="w-3.5 h-3.5" />
-                          {formatTVL(strategy.tvl)}
-                        </div>
-                        <p className="text-[10px] text-white/30 mt-0.5">TVL</p>
-                      </div>
-
-                      <button
-                        onClick={(e) => handleSelect(e, strategy)}
-                        className="p-2.5 rounded-xl bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white transition-all border border-orange-500/20 z-10"
-                        title="Fork Strategy"
-                      >
-                        <GitFork className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-1.5 mt-3 flex-wrap">
-                    {strategy.tokens.slice(0, 5).map((token) => (
-                      <span
-                        key={token.symbol}
-                        className="px-2 py-0.5 bg-white/5 border border-white/5 rounded text-[10px] text-white/60 font-mono"
-                      >
-                        {token.symbol} {token.weight}%
-                      </span>
-                    ))}
-                    {strategy.tokens.length > 5 && (
-                      <span className="px-2 py-0.5 bg-white/5 rounded text-[10px] text-white/40">
-                        +{strategy.tokens.length - 5}
-                      </span>
-                    )}
-                  </div>
+                  <SwipeCardBody strategy={toCardData(strategy)} compact />
                 </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
-      )}
+              ))}
+            </AnimatePresence>
+          </div>
 
-      {filteredStrategies.length === 0 && !loading && strategies.length > 0 && (
-        <div className="text-center py-12 text-white/40">
-          No strategies found matching "{search}"
-        </div>
+          {filteredStrategies.length === 0 && (
+            <div className="text-center py-12 text-white/40">No strategies found.</div>
+          )}
+        </>
       )}
-
-      <StrategyDetailModal
-        isOpen={!!selectedStrategy}
-        strategy={
-          selectedStrategy
-            ? {
-                ...selectedStrategy,
-                address: selectedStrategy.id,
-                pnl: 0,
-              }
-            : null
-        }
-        onClose={() => setSelectedStrategy(null)}
-      />
     </div>
   );
 };
