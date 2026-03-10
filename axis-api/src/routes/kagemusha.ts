@@ -468,7 +468,63 @@ app.get('/strategies/:id/chart', async (c) => {
 app.get('/strategies/:id/performance', async (c) => {
   try {
     const id = c.req.param('id');
-    return c.json({success: true })
+
+    const baseline = await c.env.axis_db.prepare(
+      'SELECT baseline_price FROM strategy_deployment_baseline WHERE strategy_id = ?'
+    ).bind(id).first();
+
+    const current = await c.env.axis_db.prepare(
+      'SELECT index_price, confidence, ts_bucket_utc FROM strategy_price_snapshots WHERE strategy_id = ? ORDER BY ts_bucket_utc DESC LIMIT 1;'
+    ).bind(id).first();
+
+
+    const ago24h = await c.env.axis_db.prepare(
+      'SELECT index_price FROM strategy_price_snapshots WHERE strategy_id = ? AND ts_bucket_utc <= (unixepoch() - 86400) ORDER BY ts_bucket_utc DESC LIMIT 1;'
+    ).bind(id).first();
+
+    const ago7d = await c.env.axis_db.prepare(
+      'SELECT index_price FROM strategy_price_snapshots WHERE strategy_id = ? AND ts_bucket_utc <= (unixepoch() - 604800) ORDER BY ts_bucket_utc DESC LIMIT 1;'
+    ).bind(id).first();
+
+    if (!current) {
+      return c.json({
+        success: true,
+        current_price: null,
+        change_24h: null,
+        change_7d: null,
+        change_since_inception: null,
+        confidence: 'NO_DATA',
+        last_updated: null
+      });
+    } else if (!baseline || baseline.baseline_price === 0) {
+      return c.json({
+        success: true,
+        current_price: null,
+        change_24h: null,
+        change_7d: null,
+        change_since_inception: null,
+        confidence: 'FAIL',
+        last_updated: null
+      });
+    } else {
+      const currentNormalized = (current.index_price / baseline.baseline_price) * 100
+      const normalized24h = ago24h ? (ago24h.index_price / baseline.baseline_price) * 100 : null;
+      const normalized7d = ago7d ? (ago7d.index_price / baseline.baseline_price) * 100 : null;
+
+      const change_24h = normalized24h !== null ? ((currentNormalized - normalized24h) / normalized24h) * 100 : null;
+      const change_7d = normalized7d !== null ? ((currentNormalized - normalized7d) / normalized7d) * 100 : null;
+      const change_since_inception = currentNormalized - 100
+
+      return c.json({
+        success: true,
+        current_price: currentNormalized,
+        change_24h: change_24h,
+        change_7d: change_7d,
+        change_since_inception: change_since_inception,
+        confidence: ago24h && ago7d ? 'OK' : 'PARTIAL',
+        last_updated: current.ts_bucket_utc
+      });
+    }
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500);
   }
