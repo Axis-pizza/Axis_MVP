@@ -8,11 +8,11 @@ import { Bindings } from '../config/env';
 import { StrategyGenerator } from '../services/strategy';
 import { PriceService } from '../services/price';
 import { JitoBundleService } from '../services/blockchain';
-import { 
-    Keypair, Connection, Transaction, PublicKey, 
-    ComputeBudgetProgram 
+import {
+    Keypair, Connection, Transaction, PublicKey,
+    ComputeBudgetProgram
 } from '@solana/web3.js';
-import { 
+import {
     getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction 
 } from '@solana/spl-token';
 import bs58 from 'bs58';
@@ -463,6 +463,15 @@ app.get('/strategies/:id/chart', async (c) => {
     );
   }
   return c.json({ success: true, data, type });
+});
+
+app.get('/strategies/:id/performance', async (c) => {
+  try {
+    const id = c.req.param('id');
+    return c.json({success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
 });
 
 app.get('/prepare-deployment', async (c) => {
