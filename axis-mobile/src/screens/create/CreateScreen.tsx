@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
 import { colors } from '../../config/theme';
@@ -8,8 +8,9 @@ import { ManualBuilder } from './ManualBuilder';
 import { IdentityStep } from './IdentityStep';
 import { DeploymentBlueprint } from './DeploymentBlueprint';
 import { StrategyDashboard } from './StrategyDashboard';
+import { DriftVaultBuilder } from './DriftVaultBuilder';
 
-type Step = 'LANDING' | 'BUILDER' | 'IDENTITY' | 'BLUEPRINT' | 'DASHBOARD';
+type Step = 'LANDING' | 'BUILDER' | 'IDENTITY' | 'BLUEPRINT' | 'DASHBOARD' | 'VAULT';
 
 interface StrategyConfig {
   name: string;
@@ -44,7 +45,7 @@ export function CreateScreen() {
     setStep('DASHBOARD');
   };
 
-  const canGoBack = step !== 'LANDING' && step !== 'DASHBOARD';
+  const canGoBack = step !== 'LANDING' && step !== 'DASHBOARD' && step !== 'VAULT';
 
   const goBack = () => {
     switch (step) {
@@ -54,6 +55,11 @@ export function CreateScreen() {
       default: break;
     }
   };
+
+  // Vault builder handles its own full-screen layout
+  if (step === 'VAULT') {
+    return <DriftVaultBuilder onBack={() => setStep('LANDING')} />;
+  }
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.background, paddingTop: insets.top }}>
@@ -71,7 +77,10 @@ export function CreateScreen() {
 
       {/* Content */}
       {step === 'LANDING' && (
-        <CreateLanding onCreate={() => setStep('BUILDER')} />
+        <CreateLanding
+          onCreate={() => setStep('BUILDER')}
+          onCreateVault={() => setStep('VAULT')}
+        />
       )}
       {step === 'BUILDER' && (
         <ManualBuilder onComplete={handleBuilderComplete} />

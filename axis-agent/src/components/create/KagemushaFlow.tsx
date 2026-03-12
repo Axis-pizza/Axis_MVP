@@ -8,6 +8,7 @@ import React from 'react';
 import { CreateLanding } from './CreateLanding';
 import { ManualDashboard, type ManualData } from './manual/ManualDashboard';
 import { DeploymentBlueprint } from './DeploymentBlueprint';
+import { DriftVaultBuilder } from './DriftVaultBuilder';
 import { ProfileEditModal } from '../common/ProfileEditModal';
 
 // --- Services ---
@@ -45,7 +46,7 @@ class SimpleErrorBoundary extends React.Component<
 }
 
 // ★ Step定義を更新
-type CreateStep = 'LANDING' | 'BUILDER' | 'BLUEPRINT' | 'DASHBOARD' | 'REBALANCE';
+type CreateStep = 'LANDING' | 'BUILDER' | 'BLUEPRINT' | 'DASHBOARD' | 'REBALANCE' | 'VAULT';
 
 interface KagemushaFlowProps {
   onStepChange?: (step: CreateStep) => void;
@@ -174,7 +175,16 @@ export const KagemushaFlow = ({ onStepChange }: KagemushaFlowProps) => {
 
         {/* 1. LANDING */}
         {step === 'LANDING' && (
-          <CreateLanding onCreate={handleStartCreate} isLoading={checkingRegistration} />
+          <CreateLanding
+            onCreate={handleStartCreate}
+            onCreateVault={() => setStep('VAULT')}
+            isLoading={checkingRegistration}
+          />
+        )}
+
+        {/* VAULT */}
+        {step === 'VAULT' && (
+          <DriftVaultBuilder onBack={() => setStep('LANDING')} />
         )}
 
         {/* 2. BUILDER (ManualDashboard + Identity) */}

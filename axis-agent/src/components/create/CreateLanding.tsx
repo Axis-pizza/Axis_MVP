@@ -6,6 +6,7 @@ import { Plus, Loader2 } from 'lucide-react';
 
 interface CreateLandingProps {
   onCreate: () => void;
+  onCreateVault?: () => void;
   isLoading?: boolean;
 }
 
@@ -206,7 +207,7 @@ function Scene() {
 // ─────────────────────────────────────────────────────────────────────────────
 // CreateLanding Component
 // ─────────────────────────────────────────────────────────────────────────────
-export const CreateLanding = ({ onCreate, isLoading }: CreateLandingProps) => {
+export const CreateLanding = ({ onCreate, onCreateVault, isLoading }: CreateLandingProps) => {
   return (
     <div
       className="relative w-full min-h-screen overflow-hidden flex flex-col"
@@ -260,7 +261,50 @@ export const CreateLanding = ({ onCreate, isLoading }: CreateLandingProps) => {
 
         <div className="flex-1 min-h-[6vh]" />
 
-        {/* CTA Button */}
+        {/* CTA Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.65, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full max-w-xs mx-auto mb-4"
+        >
+          <button
+            onClick={onCreateVault}
+            className="group relative w-full transition-all duration-200 active:scale-[0.97]"
+          >
+            <div
+              className="absolute -inset-2 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+              style={{ background: 'radial-gradient(ellipse, rgba(99,130,255,0.25) 0%, transparent 70%)' }}
+            />
+            <div
+              className="absolute inset-0 rounded-2xl transition-transform duration-200 group-active:translate-y-[2px]"
+              style={{
+                transform: 'translateY(6px)',
+                background: '#0f1640',
+                boxShadow: '0 16px 36px rgba(0,0,0,0.75), 0 4px 10px rgba(0,0,0,0.5)',
+              }}
+            />
+            <div
+              className="relative flex items-center justify-center gap-3 overflow-hidden rounded-2xl px-8 py-5 border transition-transform duration-200 group-hover:-translate-y-[3px] group-active:translate-y-[2px]"
+              style={{
+                background: 'linear-gradient(135deg, #1a2060, #3a50cc, #6382FF)',
+                borderColor: 'rgba(150,170,255,0.22)',
+                boxShadow: [
+                  'inset 0 1.5px 0 rgba(150,170,255,0.3)',
+                  'inset 0 -1px 0 rgba(0,0,30,0.45)',
+                ].join(', '),
+              }}
+            >
+              <span
+                className="relative z-10 font-black text-xl tracking-tight select-none"
+                style={{ color: '#fff' }}
+              >
+                Create Your Strategy
+              </span>
+            </div>
+          </button>
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
