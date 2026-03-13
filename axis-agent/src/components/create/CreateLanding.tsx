@@ -262,6 +262,8 @@ export const CreateLanding = ({ onCreate, onCreateVault, isLoading }: CreateLand
         <div className="flex-1 min-h-[6vh]" />
 
         {/* CTA Buttons */}
+
+        {/* Create Your Strategy */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -299,12 +301,13 @@ export const CreateLanding = ({ onCreate, onCreateVault, isLoading }: CreateLand
                 className="relative z-10 font-black text-xl tracking-tight select-none"
                 style={{ color: '#fff' }}
               >
-                Create Your Strategy
+                Create Your Vault
               </span>
             </div>
           </button>
         </motion.div>
 
+        {/* Create Your ETF */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
