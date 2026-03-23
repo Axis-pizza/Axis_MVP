@@ -2,7 +2,7 @@ import { Context } from 'hono';
 import { Bindings } from '../config/env.js';
 
 // チャートデータを返すエンドポイント
-export async function chart(c: Context<{ Bindings: Bindings }>) {
+export async function linechart(c: Context<{ Bindings: Bindings }>) {
     const id = c.req.param('id');
 
     // strategyからcomposition(銘柄と比率)を取得

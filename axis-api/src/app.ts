@@ -10,7 +10,7 @@ import miscRoutes from './routes/misc';
 import kagemushaRoutes from './routes/kagemusha';
 import uploadRoutes from './routes/upload';
 import shareRoutes from './routes/share';
-import { chart } from './routes/chart';
+import { linechart } from './routes/chart';
 import { runPriceSnapshot } from './services/snapshot';
 import dflowRoutes from './routes/dflow';
 import mobileRoutes from './routes/mobile';
@@ -68,7 +68,7 @@ app.get('/init-db', async (c) => {
   }
 });
 
-app.get('/strategies/:id/linechart', chart);
+app.get('/strategies/:id/linechart', linechart);
 
 // --- Mount Routes ---
 app.route('/auth', authRoutes);
