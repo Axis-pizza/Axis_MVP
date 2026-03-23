@@ -33,7 +33,7 @@ export async function chart(c: Context<{ Bindings: Bindings }>) {
     }
 
     // token_prices テーブルから基準日時以降のデータを取得
-    const tokenNamesResult = await db.prepare('SELECT token_name, recorded_at, price_usd FROM token_prices WHERE recorded_at >= ?').bind(fromDate).all();
+    const tokenNamesResult = await db.prepare('SELECT token_name, recorded_at, price_usd FROM token_prices WHERE recorded_at >= ?').bind(fromDate.toISOString()).all();
     const filteredRows = tokenNamesResult.results.filter((row: any) => new Date(String(row.recorded_at)) >= fromDate);
 
     // 取得したデータを recorded_at ごとに token_name と price_usd をマッピング

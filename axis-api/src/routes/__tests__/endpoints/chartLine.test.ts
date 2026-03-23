@@ -83,14 +83,14 @@ const emptyTokenPriceMockRows : any[] = [];
 
 // Hono アプリにルートを登録
 const app = new Hono<{ Bindings: Bindings }>()
-    .get('/:id/chart/line', chart);
+    .get('/:id/linechart', chart);
 
 
-describe('GET /chart/line', () => {
+describe('GET /strategies/:id/linechart', () => {
     // test.1 正常：id と period が両方指定されている
     test('id と period が正しく指定された場合、データを返す', async () => {
         const res = await app.request(
-            '/strategy-123/chart/line?period=7d',
+            '/strategy-123/linechart?period=7d',
             {},
             { axis_db: mockDb },
         );
@@ -107,7 +107,7 @@ describe('GET /chart/line', () => {
     // test.2 正常：period が指定されていない→7日で返す
     test('period が指定されていない場合、デフォルトの7日分のデータを返す', async () => {
         const res = await app.request(
-            '/strategy-123/chart/line',
+            '/strategy-123/linechart',
             {},
             { axis_db: mockDb },
         );
@@ -124,7 +124,7 @@ describe('GET /chart/line', () => {
     // test.3 異常：id が空→404を返す
     test('id が空の場合、404を返す', async () => {
         const res = await app.request(
-            '/chart/line?period=7d',
+            '/linechart?period=7d',
             {},
             { axis_db: mockDb },
         );
@@ -136,7 +136,7 @@ describe('GET /chart/line', () => {
     // test.4 異常：token_priceの1部が空→あるデータのみで計算して返す
     test('token_priceの1部が空の場合、あるデータのみで計算して返す', async () => {
         const res = await app.request(
-            '/strategy-123/chart/line?period=7d',
+            '/strategy-123/linechart?period=7d',
             {},
             { axis_db: partialMockDb },
         );
@@ -153,7 +153,7 @@ describe('GET /chart/line', () => {
     // test.5 異常：token_priceの全てが空→計算結果が空の配列になる
     test('DBにデータが全くない場合、空配列を返す', async () => {
         const res = await app.request(
-            '/strategy-123/chart/line?period=7d',
+            '/strategy-123/linechart?period=7d',
             {},
             { axis_db: emptyMockDb },
         );
