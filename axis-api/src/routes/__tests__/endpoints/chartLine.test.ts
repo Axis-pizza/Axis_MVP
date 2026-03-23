@@ -2,20 +2,9 @@ import { Hono } from 'hono';
 import { chart } from '../../chart.js';
 import type { Bindings } from '../../../config/env.js';
 
+
 // モックデータ
-// strategies テーブルのモックデータ
-const compositionRows = [
-    { id: 'strategy-123', composition: '[{"symbol":"SOL","weight":50,"logoURI":"...","address":"So11111111111111111111111111111111111111112"},{"symbol":"USDC","weight":50,"logoURI":"...","address":"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"}]' },
-];
-
-// token_price テーブルのモックデータ
-const tokenPriceRows = [
-    { token_name: 'SOL', recorded_at: '2026/03/19 10:00:00', price_usd: 60.0 },
-    { token_name: 'USDC', recorded_at: '2026/03/19 10:00:00', price_usd: 1.0 },
-    { token_name: 'SOL', recorded_at: '2026/03/19 10:05:00', price_usd: 59.0 },
-    { token_name: 'USDC', recorded_at: '2026/03/19 10:05:00', price_usd: 0.9 },
-];
-
+// モックDB
 const mockDb = {
     prepare: (sql: string) => ({
         bind: (..._args: any[]) => ({
@@ -28,14 +17,20 @@ const mockDb = {
     }),
 };
 
-// 計算結果のモックデータ
-const mockRows = [
-    { time: 1742378400, value: 30.5 },
-    { time: 1742378700, value: 29.95 },
+// token_price の一部データがないケースのモックDB
+const partialMockDb = {
+    prepare: (sql: string) => ({
+        bind: (..._args: any[]) => ({
+            all: async () => {
+                if (sql.includes('strategies')) return { results: compositionRows };
+                if (sql.includes('token_prices')) return { results: partialTokenPriceRows };
+                return { results: [] };
+            },
+        }),
+    }),
+};
 
-];
-
-// データがない場合のモックDB
+// token_price の全てのデータがないケースのモックDB
 const emptyMockDb = {
     prepare: (_sql: string) => ({
         bind: (..._args: any[]) => ({
@@ -44,9 +39,52 @@ const emptyMockDb = {
     }),
 };
 
+
+// strategies テーブルのモックデータ
+const compositionRows = [
+    { id: 'strategy-123', composition: '[{"symbol":"SOL","weight":50,"logoURI":"...","address":"So11111111111111111111111111111111111111112"},{"symbol":"USDC","weight":50,"logoURI":"...","address":"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"}]' },
+];
+
+// token_price テーブルのモックデータ
+const tokenPriceRows = [
+    { token_name: 'SOL', recorded_at: '2026-03-19T10:00:00Z', price_usd: 60.0 },
+    { token_name: 'USDC', recorded_at: '2026-03-19T10:00:00Z', price_usd: 1.0 },
+    { token_name: 'SOL', recorded_at: '2026-03-19T10:05:00Z', price_usd: 59.0 },
+    { token_name: 'USDC', recorded_at: '2026-03-19T10:05:00Z', price_usd: 0.9 },
+
+    // 8日以上過去のデータ
+    { token_name: 'SOL', recorded_at: '2026-03-10T10:00:00Z', price_usd: 55.0 },
+    { token_name: 'USDC', recorded_at: '2026-03-10T10:00:00Z', price_usd: 1.0 },
+    { token_name: 'SOL', recorded_at: '2026-03-10T10:05:00Z', price_usd: 54.0 },
+    { token_name: 'USDC', recorded_at: '2026-03-10T10:05:00Z', price_usd: 1.0 },
+];
+
+// token_price の一部データがないケース(今回USDCが欠損)
+const partialTokenPriceRows = [
+    { token_name: 'SOL', recorded_at: '2026-03-19T10:00:00Z', price_usd: 60.0 },
+    { token_name: 'SOL', recorded_at: '2026-03-19T10:05:00Z', price_usd: 59.0 },
+];
+
+// 正常時の計算結果のモックデータ
+const mockRows = [
+    { time: 1773914400, value: 30.5 },
+    { time: 1773914700, value: 29.95 },
+];
+
+// 異常：token_priceの一部が空のケースの計算結果のモックデータ
+const partialTokenPriceMockRows = [
+    { time: 1773914400, value: 30.0 },
+    { time: 1773914700, value: 29.5 },
+];
+
+// 異常：token_priceの全てが空のケースの計算結果のモックデータ
+const emptyTokenPriceMockRows : any[] = [];
+
+
 // Hono アプリにルートを登録
 const app = new Hono<{ Bindings: Bindings }>()
     .get('/:id/chart/line', chart);
+
 
 describe('GET /chart/line', () => {
     // test.1 正常：id と period が両方指定されている
@@ -58,6 +96,10 @@ describe('GET /chart/line', () => {
         );
         expect(res.status).toBe(200);
         const json = await res.json() as { success: boolean; data: unknown[] };
+        console.log('=== expected ===');
+        console.log(JSON.stringify(mockRows, null, 2));
+        console.log('=== actual ===');
+        console.log(JSON.stringify(json.data, null, 2));
         expect(json.success).toBe(true);
         expect(json.data).toEqual(mockRows);
     });
@@ -71,6 +113,10 @@ describe('GET /chart/line', () => {
         );
         expect(res.status).toBe(200);
         const json = await res.json() as { success: boolean; data: unknown[] };
+        console.log('=== expected ===');
+        console.log(JSON.stringify(mockRows, null, 2));
+        console.log('=== actual ===');
+        console.log(JSON.stringify(json.data, null, 2));
         expect(json.success).toBe(true);
         expect(json.data).toEqual(mockRows);
     });
@@ -83,6 +129,8 @@ describe('GET /chart/line', () => {
             { axis_db: mockDb },
         );
         expect(res.status).toBe(404);
+        console.log('=== actual status ===');
+        console.log(res.status);
     });
 
     // test.4 異常：token_priceの1部が空→あるデータのみで計算して返す
@@ -90,12 +138,16 @@ describe('GET /chart/line', () => {
         const res = await app.request(
             '/strategy-123/chart/line?period=7d',
             {},
-            { axis_db: emptyMockDb },
+            { axis_db: partialMockDb },
         );
         expect(res.status).toBe(200);
         const json = await res.json() as { success: boolean; data: unknown[] };
+        console.log('=== expected ===');
+        console.log(JSON.stringify(partialTokenPriceMockRows, null, 2));
+        console.log('=== actual ===');
+        console.log(JSON.stringify(json.data, null, 2));
         expect(json.success).toBe(true);
-        expect(json.data).toEqual([]);
+        expect(json.data).toEqual(partialTokenPriceMockRows);
     });
 
     // test.5 異常：token_priceの全てが空→計算結果が空の配列になる
@@ -107,7 +159,11 @@ describe('GET /chart/line', () => {
         );
         expect(res.status).toBe(200);
         const json = await res.json() as { success: boolean; data: unknown[] };
+        console.log('=== expected ===');
+        console.log(JSON.stringify(emptyTokenPriceMockRows, null, 2));
+        console.log('=== actual ===');
+        console.log(JSON.stringify(json.data, null, 2));
         expect(json.success).toBe(true);
-        expect(json.data).toEqual([]);
+        expect(json.data).toEqual(emptyTokenPriceMockRows);
     });
 });
