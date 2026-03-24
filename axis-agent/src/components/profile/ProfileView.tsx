@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet, useConnection, useLoginModal } from '../../hooks/useWallet';
+import { isAndroidChrome } from '../../utils/seekerDetect';
 import { api } from '../../services/api';
 import { getUsdcBalance } from '../../services/usdc';
 import { TokenImage } from '../common/TokenImage';
@@ -158,7 +159,7 @@ interface ProfileViewProps {
 }
 
 export const ProfileView = ({ onStrategySelect }: ProfileViewProps) => {
-  const { publicKey, disconnect } = useWallet();
+  const { publicKey, disconnect, connectMWA, mwaConnecting } = useWallet();
   const { connection } = useConnection();
   const { setVisible: openLogin } = useLoginModal();
 const { showToast } = useToast();
@@ -541,6 +542,32 @@ const { showToast } = useToast();
             </div>
             <span className="relative text-[#9945ff]/40 group-hover:text-[#9945ff]/70 transition-colors text-lg">›</span>
           </motion.button>
+
+          {/* Seeker / MWA Connect Button — shown on Android Chrome only */}
+          {isAndroidChrome() && (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              disabled={mwaConnecting}
+              onClick={async () => {
+                try {
+                  await connectMWA();
+                } catch {
+                  // Error handled by useMobileWalletAdapter
+                }
+              }}
+              className="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl mt-3 transition-all duration-150 active:opacity-80 disabled:opacity-50"
+              style={{
+                background: '#0A0F05',
+                border: '1px solid rgba(100,184,63,0.25)',
+              }}
+            >
+              <img src="/icon.png" alt="Seeker" width={20} height={20} className="shrink-0 rounded opacity-90" />
+              <span style={{ color: '#F2E0C8' }} className="text-sm font-normal flex-1 text-left">
+                {mwaConnecting ? 'Connecting...' : 'Connect with Seeker'}
+              </span>
+              <span style={{ color: 'rgba(100,184,63,0.4)' }} className="text-base leading-none">›</span>
+            </motion.button>
+          )}
 
           <p className="text-center text-[11px] mt-6 leading-relaxed" style={{ color: '#2E1A08' }}>
             By signing in, you agree to our Terms of Service
