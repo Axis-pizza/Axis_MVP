@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { Bindings } from '../config/env.js';
 
-// チャートデータを返すエンドポイント
+// ラインチャート用のデータを返すエンドポイント
 export async function linechart(c: Context<{ Bindings: Bindings }>) {
     const id = c.req.param('id');
 
@@ -23,10 +23,6 @@ export async function linechart(c: Context<{ Bindings: Bindings }>) {
     if (period.endsWith('d')) {
         const days = parseInt(period.slice(0, -1));
         fromDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    // hourの場合は時間を引く
-    } else if (period.endsWith('h')) {
-        const hours = parseInt(period.slice(0, -1));
-        fromDate = new Date(now.getTime() - hours * 60 * 60 * 1000);
     // 形式が不正な場合はエラーを返す
     } else {
         return c.json({ success: false, message: 'format is invalid' });
