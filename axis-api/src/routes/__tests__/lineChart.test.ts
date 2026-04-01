@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { linechart } from '../chart';
+import { getLineChartData } from '../chart';
 import type { Bindings } from '../../config/env.js';
 
 
@@ -124,7 +124,7 @@ const emptyTopMockRows = [
 
 // Hono アプリにルートを登録
 const app = new Hono<{ Bindings: Bindings }>()
-    .get('strategies/:id/linechart', linechart);
+    .get('strategies/:id/linechart', getLineChartData);
 
 
 describe('GET /strategies/:id/linechart', () => {

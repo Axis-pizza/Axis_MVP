@@ -68,6 +68,8 @@ app.get('/init-db', async (c) => {
   }
 });
 
+// チャート用エンドポイント
+// ラインチャート用のデータを返すエンドポイント
 app.get('/strategies/:id/linechart', getLineChartData);
 
 // --- Mount Routes ---
