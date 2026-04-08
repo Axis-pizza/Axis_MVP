@@ -58,15 +58,8 @@ export async function runPriceSnapshot(db: any): Promise<void> {
 
   // 3. Batch fetch all prices (deduplicated by mint)
   const priceMap = await fetchPrices([...allMints]);
-  // 価格取得時刻を YYYY/MM/DD HH:MM:SS 形式で記録
-  const _now = new Date();
-  const priceFetchedAt =
-    `${_now.getUTCFullYear()}/` +
-    `${String(_now.getUTCMonth() + 1).padStart(2, '0')}/` +
-    `${String(_now.getUTCDate()).padStart(2, '0')} ` +
-    `${String(_now.getUTCHours()).padStart(2, '0')}:` +
-    `${String(_now.getUTCMinutes()).padStart(2, '0')}:` +
-    `${String(_now.getUTCSeconds()).padStart(2, '0')}`;
+  // 価格取得時刻をISO 8601形式で記録
+  const priceFetchedAt = new Date().toISOString();
 
   // 4. Build snapshot statements
   const snapshotStmts: any[] = [];

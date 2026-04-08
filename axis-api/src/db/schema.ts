@@ -1,4 +1,25 @@
-import { int, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { int, integer, primaryKey, real, sqliteTable, text, customType } from "drizzle-orm/sqlite-core";
+
+// ──────────────────────────────────────────────────────────
+// DBの型定義とテーブルスキーマ
+// （Drizzle ORMを使用してSQLiteのテーブルを定義）
+// ──────────────────────────────────────────────────────────
+// Drizzleのカスタム型：ISO 8601形式の日時をDBに保存するための型変換ロジック
+const customTimestamp = customType<
+    {
+        data: Date; // TypeScript上の型
+        driverData: string; // DB上の型
+    }
+>({
+    // DB上の型
+    dataType: (): string => "text",
+
+    // TypeScript -> DBの変換
+    toDriver: (value: Date): string => value.toISOString(),
+
+    // DB -> TypeScriptの変換
+    fromDriver: (value: string): Date => new Date(value),
+});
 
 // ──────────────────────────────────────────────────────────
 // ユーザー（認証・プロフィール・投資サマリー）
@@ -159,7 +180,7 @@ export const strategyDeploymentBaselineTable = sqliteTable("strategy_deployment_
 // ──────────────────────────────────────────────────────────
 export const strategyTokenPricesTable = sqliteTable("token_prices", {
     token_name:   text("token_name").notNull(),
-    recorded_at:  text("recorded_at").notNull(),
+    recorded_at:  customTimestamp( "recorded_at" ).notNull(),
     price_usd:    real("price_usd"),
 }, (t) => [
     primaryKey({ columns: [t.token_name, t.recorded_at] }),
