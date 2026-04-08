@@ -22,6 +22,13 @@
       "when": 1772089490956,
       "tag": "0002_create_token_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1775644150299,
+      "tag": "0003_update_token_prices",
+      "breakpoints": true
     }
   ]
 }
