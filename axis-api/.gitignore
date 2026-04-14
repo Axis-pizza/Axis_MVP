@@ -32,5 +32,9 @@ lerna-debug.log*
 # misc
 .DS_Store
 
+# DB dumps (data files, not for version control)
+axis-db-export.sql
+axis-db-core.sql
+
 # API用
 .dev.vars
