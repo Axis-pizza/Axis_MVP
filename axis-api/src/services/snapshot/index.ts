@@ -123,14 +123,30 @@ export async function runPriceSnapshot(db: any): Promise<void> {
   await batchExecute(db, [...snapshotStmts, ...baselineStmts, ...tokenPriceStmts]);
 
   // 7. Purge records older than 1 week
+  //
+  // strategy_price_snapshots:
+  //   - Use LIMIT 5000 per run to avoid D1 30s timeout on large tables
+  //   - index idx_sps_ts_bucket on ts_bucket_utc must exist for this to be fast
+  //
+  // token_prices:
+  //   - recorded_at is stored as ISO 8601 (e.g. "2026-04-14T12:00:00.000Z")
+  //   - Use toISOString() on both sides so string comparison works correctly
+  //   - sqlite datetime('now') returns "YYYY-MM-DD HH:MM:SS" which sorts
+  //     differently from ISO "YYYY-MM-DDTHH:MM:SS.sssZ" due to 'T' vs ' '
   const oneWeekAgo = tsBucket - 7 * 24 * 3600;
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+
   await db.batch([
     db.prepare(
-      'DELETE FROM strategy_price_snapshots WHERE ts_bucket_utc < ?'
+      `DELETE FROM strategy_price_snapshots
+       WHERE rowid IN (
+         SELECT rowid FROM strategy_price_snapshots
+         WHERE ts_bucket_utc < ? LIMIT 5000
+       )`
     ).bind(oneWeekAgo),
     db.prepare(
-      `DELETE FROM token_prices WHERE recorded_at < datetime('now', '-7 days')`
-    ),
+      'DELETE FROM token_prices WHERE recorded_at < ?'
+    ).bind(sevenDaysAgoIso),
   ]);
 
   const elapsed = Date.now() - startMs;
