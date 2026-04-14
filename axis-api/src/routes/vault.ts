@@ -9,7 +9,7 @@ const jitoService = new JitoBundleService();
 
 app.get('/vaults', async (c) => {
   try {
-    const vaults = await VaultModel.getAllVaults(c.env.axis_db);
+    const vaults = await VaultModel.getAllVaults(c.env.axis_db_core);
     return c.json(vaults);
   } catch (e: any) {
     console.error("Fetch Vaults Error:", e);
@@ -40,7 +40,7 @@ app.post('/vaults/deploy', async (c) => {
 
     if (metadata) {
         const { name, symbol, description, creator, strategy, fee, minLiquidity, composition, imageUrl } = metadata;
-        await VaultModel.createVault(c.env.axis_db, {
+        await VaultModel.createVault(c.env.axis_db_core, {
             id: vaultId || crypto.randomUUID(),
             name,
             symbol,
@@ -64,7 +64,7 @@ app.post('/vaults', async (c) => {
   try {
     const body = await c.req.json();
     const id = crypto.randomUUID();
-    await VaultModel.createVault(c.env.axis_db, { ...body, id });
+    await VaultModel.createVault(c.env.axis_db_core, { ...body, id });
     return c.json({ success: true, id });
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500);

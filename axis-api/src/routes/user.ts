@@ -34,14 +34,14 @@ app.post('/register', async (c) => {
     // ★変更点2: 招待コードが入力されている場合のみチェックを実行
     if (invite_code_used) {
         // Check User Code
-        const referrerUser = await c.env.axis_db.prepare('SELECT id FROM users WHERE invite_code = ?').bind(invite_code_used).first();
+        const referrerUser = await c.env.axis_db_core.prepare('SELECT id FROM users WHERE invite_code = ?').bind(invite_code_used).first();
         
         if (referrerUser) {
           // @ts-ignore
           referrerId = referrerUser.id;
         } else {
           // Check System Code
-          const invite = await InviteModel.findInviteByCode(c.env.axis_db, invite_code_used);
+          const invite = await InviteModel.findInviteByCode(c.env.axis_db_core, invite_code_used);
           if (invite) {
             referrerId = (invite.creator_id === 'system') ? null : invite.creator_id;
             isSystemInvite = true;
@@ -62,7 +62,7 @@ app.post('/register', async (c) => {
         params.push(email);
     }
 
-    const existing = await c.env.axis_db.prepare(query)
+    const existing = await c.env.axis_db_core.prepare(query)
       .bind(...params)
       .first()
 
@@ -78,7 +78,7 @@ app.post('/register', async (c) => {
     // ★変更点4: Emailや招待コードがない場合は null を渡して登録
     // (注意: DBのusersテーブルで email, invite_code_used カラムが NULL許容になっている必要があります)
     await UserModel.createRegisteredUser(
-        c.env.axis_db, 
+        c.env.axis_db_core, 
         newId, 
         email || null, 
         wallet_address, 
@@ -90,7 +90,7 @@ app.post('/register', async (c) => {
     );
 
     if (isSystemInvite && invite_code_used) {
-      await InviteModel.markInviteUsed(c.env.axis_db, invite_code_used, newId);
+      await InviteModel.markInviteUsed(c.env.axis_db_core, invite_code_used, newId);
     }
 
     // ★変更点5: Emailがある場合のみ送信
@@ -121,12 +121,12 @@ app.post('/request-invite', async (c) => {
     
     if (!email) return c.json({ error: 'Email is required' }, 400);
 
-    const existingUser = await UserModel.findUserByEmail(c.env.axis_db, email);
+    const existingUser = await UserModel.findUserByEmail(c.env.axis_db_core, email);
     if (existingUser) {
         return c.json({ error: 'User already registered' }, 409);
     }
 
-    const code = await InviteModel.createOneInvite(c.env.axis_db, 'system', email);
+    const code = await InviteModel.createOneInvite(c.env.axis_db_core, 'system', email);
 
     try {
         await sendInviteEmail(c.env, email, code);
@@ -149,7 +149,7 @@ app.get('/user', async (c) => {
   if (!wallet) return c.json({ error: 'Wallet address required' }, 400);
 
   try {
-    const user = await UserModel.findUserByWallet(c.env.axis_db, wallet);
+    const user = await UserModel.findUserByWallet(c.env.axis_db_core, wallet);
 
     // ★修正: クラッシュ防止の安全策
     let isVip = false;
@@ -218,7 +218,7 @@ app.get('/users/:wallet/watchlist', async (c) => {
   const wallet = c.req.param('wallet');
 
   try {
-    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet).first();
+    const user = await c.env.axis_db_core.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet).first();
     
     if (!user) {
       return c.json({ success: true, strategies: [] });
@@ -231,7 +231,7 @@ app.get('/users/:wallet/watchlist', async (c) => {
       ORDER BY w.created_at DESC
     `;
 
-    const { results } = await c.env.axis_db.prepare(query).bind(user.id).all();
+    const { results } = await c.env.axis_db_core.prepare(query).bind(user.id).all();
 
     return c.json({ success: true, strategies: results });
 
@@ -250,32 +250,32 @@ app.post('/strategies/:id/watchlist', async (c) => {
   }
 
   try {
-    let user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userPubkey).first();
+    let user = await c.env.axis_db_core.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userPubkey).first();
     if (!user) {
       const newId = crypto.randomUUID();
       const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       try {
-        await c.env.axis_db.prepare(
+        await c.env.axis_db_core.prepare(
           'INSERT INTO users (id, wallet_address, invite_code, total_xp, rank_tier, last_checkin) VALUES (?, ?, ?, 500, "Bronze", 0)'
         ).bind(newId, userPubkey, inviteCode).run();
         user = { id: newId };
       } catch (err) {
-        user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userPubkey).first();
+        user = await c.env.axis_db_core.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userPubkey).first();
         if (!user) return c.json({ error: 'Failed to create user' }, 500);
       }
     }
 
-    const existing = await c.env.axis_db.prepare(
+    const existing = await c.env.axis_db_core.prepare(
       'SELECT id FROM watchlist WHERE user_id = ? AND strategy_id = ?'
     ).bind(user.id, strategyId).first();
 
     if (existing) {
-      await c.env.axis_db.prepare(
+      await c.env.axis_db_core.prepare(
         'DELETE FROM watchlist WHERE user_id = ? AND strategy_id = ?'
       ).bind(user.id, strategyId).run();
       return c.json({ success: true, isWatchlisted: false, message: 'Removed from watchlist' });
     } else {
-      await c.env.axis_db.prepare(
+      await c.env.axis_db_core.prepare(
         'INSERT INTO watchlist (id, user_id, strategy_id, created_at) VALUES (?, ?, ?, ?)'
       ).bind(crypto.randomUUID(), user.id, strategyId, Math.floor(Date.now() / 1000)).run();
       return c.json({ success: true, isWatchlisted: true, message: 'Added to watchlist' });
@@ -294,10 +294,10 @@ app.get('/strategies/:id/watchlist', async (c) => {
   if (!userWallet) return c.json({ isWatchlisted: false });
 
   try {
-    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userWallet).first();
+    const user = await c.env.axis_db_core.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(userWallet).first();
     if (!user) return c.json({ isWatchlisted: false });
 
-    const existing = await c.env.axis_db.prepare(
+    const existing = await c.env.axis_db_core.prepare(
       'SELECT id FROM watchlist WHERE user_id = ? AND strategy_id = ?'
     ).bind(user.id, strategyId).first();
 
@@ -320,13 +320,13 @@ app.post('/user', async (c) => {
   if (!wallet_address) return c.json({ success: false, error: 'Wallet address is required' }, 400);
 
   try {
-    const existing = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
+    const existing = await UserModel.findUserByWallet(c.env.axis_db_core, wallet_address);
 
     if (!existing) {
       const id = crypto.randomUUID();
       const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       await UserModel.createRegisteredUser(
-        c.env.axis_db,
+        c.env.axis_db_core,
         id,
         null,
         wallet_address,
@@ -341,7 +341,7 @@ app.post('/user', async (c) => {
 
     const badgesStr = Array.isArray(badges) ? JSON.stringify(badges) : (badges || null);
 
-    await UserModel.updateUser(c.env.axis_db, wallet_address, { name, bio, avatar_url, badges: badgesStr });
+    await UserModel.updateUser(c.env.axis_db_core, wallet_address, { name, bio, avatar_url, badges: badgesStr });
 
     return c.json({ success: true, message: "Profile updated successfully" });
 
@@ -354,7 +354,7 @@ app.post('/user', async (c) => {
 app.post('/users/:wallet/checkin', async (c) => {
   const wallet = c.req.param('wallet');
   try {
-      const user = await UserModel.findUserByWallet(c.env.axis_db, wallet);
+      const user = await UserModel.findUserByWallet(c.env.axis_db_core, wallet);
       if (!user) return c.json({ success: false, message: 'User not found' }, 404);
 
       const now = Math.floor(Date.now() / 1000);
@@ -387,10 +387,10 @@ app.post('/users/:wallet/checkin', async (c) => {
       // 楽観的に新XPを計算してランクを決定（DBの相対加算と齟齬なし）
       const estimatedNewXp = (user.total_xp ?? 0) + earnedPoints;
       const newRankTier = calcRankTier(estimatedNewXp);
-      await UserModel.updateUserXp(c.env.axis_db, wallet, earnedPoints, now, newRankTier);
+      await UserModel.updateUserXp(c.env.axis_db_core, wallet, earnedPoints, now, newRankTier);
 
       // 更新後の実際のXPをDBから再読み取りしてレスポンスに返す
-      const updatedUser = await UserModel.findUserByWallet(c.env.axis_db, wallet);
+      const updatedUser = await UserModel.findUserByWallet(c.env.axis_db_core, wallet);
       const actualXp = updatedUser?.total_xp ?? estimatedNewXp;
 
       return c.json({
@@ -407,9 +407,9 @@ app.post('/users/:wallet/checkin', async (c) => {
 app.get('/my-invites', async (c) => { 
     const email = c.req.query('email');
     if(!email) return c.json([]);
-    const user = await UserModel.findUserByEmail(c.env.axis_db, email);
+    const user = await UserModel.findUserByEmail(c.env.axis_db_core, email);
     if(!user) return c.json([]);
-    const invites = await InviteModel.findInvitesByCreator(c.env.axis_db, user.id);
+    const invites = await InviteModel.findInvitesByCreator(c.env.axis_db_core, user.id);
     return c.json(invites);
 });
 
@@ -437,7 +437,7 @@ app.get('/leaderboard', async (c) => {
       LIMIT ?
     `;
 
-    const { results } = await c.env.axis_db.prepare(query).bind(limit).all();
+    const { results } = await c.env.axis_db_core.prepare(query).bind(limit).all();
 
     return c.json({ 
       success: true, 
@@ -461,17 +461,17 @@ app.post('/user/stats', async (c) => {
     if (!wallet_address) return c.json({ error: 'Wallet required' }, 400);
 
     // a) ユーザー全体の合計額を更新（加算するように修正）
-    await c.env.axis_db.prepare(
+    await c.env.axis_db_core.prepare(
       `UPDATE users SET total_invested_usd = total_invested_usd + ?, last_snapshot_at = ? WHERE wallet_address = ?`
     ).bind(total_invested_usd || 0, Math.floor(Date.now() / 1000), wallet_address).run();
 
     // b) 個別の投資履歴を記録 (strategy_id が送られてきた場合)
     if (strategy_id) {
-      const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet_address).first();
+      const user = await c.env.axis_db_core.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet_address).first();
       if (user) {
         // すでに投資済みなら金額を加算、なければ新規挿入 (UPSERT)
         const invId = crypto.randomUUID();
-        await c.env.axis_db.prepare(`
+        await c.env.axis_db_core.prepare(`
           INSERT INTO investments (id, user_id, strategy_id, amount_usd)
           VALUES (?, ?, ?, ?)
           ON CONFLICT(user_id, strategy_id) DO UPDATE SET amount_usd = amount_usd + ?
@@ -490,7 +490,7 @@ app.get('/users/:wallet/invested', async (c) => {
   const wallet = c.req.param('wallet');
 
   try {
-    const user = await c.env.axis_db.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet).first();
+    const user = await c.env.axis_db_core.prepare('SELECT id FROM users WHERE wallet_address = ?').bind(wallet).first();
     if (!user) return c.json({ success: true, strategies: [] });
 
     // investmentsテーブルとstrategiesテーブルをJOINして取得
@@ -501,7 +501,7 @@ app.get('/users/:wallet/invested', async (c) => {
       ORDER BY i.created_at DESC
     `;
 
-    const { results } = await c.env.axis_db.prepare(query).bind(user.id).all();
+    const { results } = await c.env.axis_db_core.prepare(query).bind(user.id).all();
     return c.json({ success: true, strategies: results });
   } catch (e: any) {
     return c.json({ success: false, error: e.message });
@@ -514,7 +514,7 @@ app.get('/users/:wallet/invested', async (c) => {
 app.post('/admin/xp-reconcile', async (c) => {
   try {
     // xp_ledger から user_pubkey 別に合計を集計
-    const { results } = await c.env.axis_db.prepare(`
+    const { results } = await c.env.axis_db_core.prepare(`
       SELECT user_pubkey, SUM(amount) as total
       FROM xp_ledger
       GROUP BY user_pubkey
@@ -531,7 +531,7 @@ app.post('/admin/xp-reconcile', async (c) => {
       if (!pubkey || ledgerTotal <= 0) continue;
 
       // users.total_xp が ledger合計より小さい場合のみ上書き（減らさない）
-      const user = await c.env.axis_db.prepare(
+      const user = await c.env.axis_db_core.prepare(
         'SELECT total_xp FROM users WHERE wallet_address = ?'
       ).bind(pubkey).first();
 
@@ -540,7 +540,7 @@ app.post('/admin/xp-reconcile', async (c) => {
       const currentXp = Math.floor((user.total_xp as number) ?? 0);
       if (ledgerTotal > currentXp) {
         const rankTier = calcRankTier(ledgerTotal);
-        await c.env.axis_db.prepare(
+        await c.env.axis_db_core.prepare(
           'UPDATE users SET total_xp = ?, rank_tier = ? WHERE wallet_address = ?'
         ).bind(ledgerTotal, rankTier, pubkey).run();
         updated++;
