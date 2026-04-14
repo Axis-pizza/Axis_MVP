@@ -32,7 +32,7 @@ export async function runPriceSnapshot(coreDb: D1Database, analyticsDb: D1Databa
   // 1. Fetch all strategies
   const { results: rows } = await coreDb.prepare(
     'SELECT id, composition, config FROM strategies'
-  ).all();
+  ).all<StrategyRow>();
 
   if (!rows || rows.length === 0) {
     console.log('[Snapshot] No strategies found.');
