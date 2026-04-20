@@ -505,8 +505,9 @@ export const StrategyDetailView = ({ initialData, onBack }: StrategyDetailViewPr
   };
 
   const handleShareToX = () => {
-    const text = `Check out ${strategy.name} ($${strategy.ticker}) on Axis! 🚀`;
-    const shareUrl = `${window.location.origin}/strategy/${strategy.id}`;
+    const text = `Check out ${strategy.name} ($${strategy.ticker}) on Axis!`;
+    const apiBase = import.meta.env.VITE_API_URL || 'https://axis-api.yusukekikuta-05.workers.dev';
+    const shareUrl = `${apiBase}/share/strategy/${strategy.id}`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`,
       '_blank'

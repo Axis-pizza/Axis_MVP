@@ -5,11 +5,12 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
-    "test:price": "tsx src/services/snapshot/price-fetcher-test.ts", 
+    "test:price": "tsx src/services/snapshot/price-fetcher-test.ts",
     "test": "jest"
   },
   "dependencies": {
     "@metaplex-foundation/mpl-token-metadata": "^2.13.0",
+    "@resvg/resvg-wasm": "^2.6.2",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "arctic": "^3.7.0",
