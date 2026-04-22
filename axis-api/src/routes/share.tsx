@@ -6,6 +6,8 @@ import React from 'react';
 // @ts-ignore
 import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
+// @ts-ignore — bundled via wrangler Data rule for *.png
+import bgPngBuf from '../assets/AxisOGPchart.png';
 
 let resvgInitialized = false;
 async function svgToPng(svg: string): Promise<Uint8Array> {
@@ -33,8 +35,6 @@ const loadFont = async (family: string, weight: string = '400;700') => {
 
   return fetch(fontUrl).then(r => r.arrayBuffer());
 };
-
-const BG_IMAGE_URL = 'https://axis-agent.pages.dev/AxisOGPchart.png';
 
 function bufToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
@@ -99,15 +99,8 @@ app.get('/strategy-image/:id', async (c) => {
     const { path: chartPath, isPositive } = generateLineChart(chartW, chartH, id);
     const lineColor = isPositive ? '#4cc38a' : '#ef4444';
 
-    const [fontBuf, bgBuf] = await Promise.all([
-      loadFont('Lora', '400'),
-      fetch(BG_IMAGE_URL).then(r => {
-        if (!r.ok) throw new Error(`BG fetch failed: ${r.status}`);
-        return r.arrayBuffer();
-      }),
-    ]);
-
-    const bgDataUri = `data:image/png;base64,${bufToBase64(bgBuf)}`;
+    const fontBuf = await loadFont('Lora', '400');
+    const bgDataUri = `data:image/png;base64,${bufToBase64(bgPngBuf)}`;
 
     const chartSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${chartW}" height="${chartH}" viewBox="0 0 ${chartW} ${chartH}"><path d="${chartPath}" fill="none" stroke="${lineColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     const chartDataUri = `data:image/svg+xml;base64,${btoa(chartSvg)}`;

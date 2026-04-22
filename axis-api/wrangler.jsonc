@@ -59,6 +59,11 @@
 			"type": "CompiledWasm",
 			"globs": ["**/*.wasm"],
 			"fallthrough": true
+		},
+		{
+			"type": "Data",
+			"globs": ["**/*.png"],
+			"fallthrough": true
 		}
 	]
 }
