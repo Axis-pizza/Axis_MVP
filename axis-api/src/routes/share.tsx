@@ -19,6 +19,7 @@ async function svgToPng(svg: string): Promise<Uint8Array> {
 
 const app = new Hono<{ Bindings: Bindings }>();
 
+
 const loadFont = async () => {
   // Use old Firefox UA to get WOFF (v1) instead of WOFF2 — satori uses opentype.js which doesn't support WOFF2
   const css = await fetch(
@@ -33,211 +34,112 @@ const loadFont = async () => {
   return fetch(fontUrl).then(r => r.arrayBuffer());
 };
 
-// Mock chart data generator — returns normalized SVG path points
-function generateChartPath(width: number, height: number, seed: string): string {
-  // Deterministic pseudo-random from seed (strategy id)
+// Generate mock chart values from strategy id as seed.
+// Returns { path, isPositive } — path is an SVG path string, isPositive based on first→last trend.
+function generateLineChart(
+  w: number,
+  h: number,
+  seed: string
+): { path: string; isPositive: boolean } {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = ((hash << 5) - hash) + seed.charCodeAt(i);
     hash |= 0;
   }
-
-  const points = 20;
+  const points = 40;
   const values: number[] = [];
-  let val = 100;
+  let val = 50;
   for (let i = 0; i < points; i++) {
-    hash = ((hash << 5) - hash) + i * 7;
+    hash = ((hash << 5) - hash) + i * 13;
     hash |= 0;
-    const rand = ((hash & 0xffff) / 0xffff) * 0.14 - 0.05;
-    val = val * (1 + rand);
+    val = Math.max(5, Math.min(95, val + (((hash & 0xffff) / 0xffff) * 16 - 6)));
     values.push(val);
   }
-
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
-
-  const pad = 8;
+  const pad = 4;
   const pts = values.map((v, i) => {
-    const x = pad + (i / (points - 1)) * (width - pad * 2);
-    const y = height - pad - ((v - min) / range) * (height - pad * 2);
+    const x = (i / (points - 1)) * (w - pad * 2) + pad;
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
-
-  return `M ${pts.join(' L ')}`;
+  return {
+    path: `M ${pts.join(' L ')}`,
+    isPositive: values[values.length - 1] >= values[0],
+  };
 }
 
-// Gradient avatar color from pubkey
-function pubkeyToColor(pubkey: string): string {
-  const colors = ['#c9a84c', '#30a46c', '#6e56cf', '#e54d2e', '#0090ff', '#e93d82'];
-  let h = 0;
-  for (let i = 0; i < pubkey.length; i++) {
-    h = ((h << 5) - h) + pubkey.charCodeAt(i);
-    h |= 0;
-  }
-  return colors[Math.abs(h) % colors.length];
-}
 
 // 1. Strategy OGP image endpoint
 app.get('/strategy-image/:id', async (c) => {
   try {
-  const id = c.req.param('id');
+    const id = c.req.param('id');
 
-  const row = await c.env.axis_db.prepare(
-    `SELECT name, ticker, type, owner_pubkey, tvl FROM strategies WHERE id = ? LIMIT 1`
-  ).bind(id).first();
+    const row = await c.env.axis_db.prepare(
+      `SELECT name, ticker FROM strategies WHERE id = ? LIMIT 1`
+    ).bind(id).first();
 
-  const name = (row?.name as string) || 'Unknown Strategy';
-  const ticker = (row?.ticker as string) || 'ETF';
-  const stratType = (row?.type as string) || 'BALANCED';
-  const ownerPubkey = (row?.owner_pubkey as string) || '';
-  const tvl = (row?.tvl as number) || 0;
+    const name = (row?.name as string) || 'Unknown Strategy';
+    const ticker = (row?.ticker as string) || 'ETF';
 
-  const isPositive = true; // mock: always positive for new strategies
+    const chartW = 1080;
+    const chartH = 160;
+    const { path: chartPath, isPositive } = generateLineChart(chartW, chartH, id);
+    const lineColor = isPositive ? '#4cc38a' : '#ff6369';
 
-  const typeColor: Record<string, string> = {
-    AGGRESSIVE: '#e54d2e',
-    BALANCED: '#0090ff',
-    CONSERVATIVE: '#30a46c',
-  };
-  const accentColor = typeColor[stratType] || '#c9a84c';
+    const fontData = await loadFont();
 
-  const avatarColor = ownerPubkey ? pubkeyToColor(ownerPubkey) : '#c9a84c';
-  const shortAddr = ownerPubkey
-    ? `${ownerPubkey.slice(0, 4)}...${ownerPubkey.slice(-4)}`
-    : 'Anonymous';
-
-  const chartW = 1060;
-  const chartH = 140;
-  const chartPath = generateChartPath(chartW, chartH, id);
-
-  const fontData = await loadFont();
-
-  const svg = await satori(
-    <div
-      style={{
+    const svg = await satori(
+      <div style={{
         display: 'flex',
+        flexDirection: 'column',
         width: '100%',
         height: '100%',
-        backgroundColor: '#0a0a09',
-        backgroundImage: 'linear-gradient(135deg, #0a0a09 0%, #111110 100%)',
-        color: '#eeeeec',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        padding: '48px 70px',
+        // Recreate AxisOGPchart.png look: near-black bg with radial glow top-left
+        background: 'radial-gradient(ellipse 70% 60% at 20% 30%, rgba(40,40,35,0.9) 0%, #080807 70%)',
+        padding: '60px',
         fontFamily: 'Inter',
+        justifyContent: 'space-between',
         position: 'relative',
-      }}
-    >
-      {/* Background glow blobs */}
-      <div style={{ position: 'absolute', top: -80, right: -80, width: 360, height: 360, background: 'rgba(201,168,76,0.12)', borderRadius: '50%', filter: 'blur(90px)' }} />
-      <div style={{ position: 'absolute', bottom: -60, left: -60, width: 280, height: 280, background: `${accentColor}22`, borderRadius: '50%', filter: 'blur(80px)' }} />
-
-      {/* Header row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #c9a84c, #7a5c18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
-          <span style={{ fontSize: 22, fontWeight: 700, color: '#c9a84c', letterSpacing: '0.08em' }}>AXIS PROTOCOL</span>
-        </div>
-        <div style={{
-          display: 'flex',
-          background: `${accentColor}22`,
-          border: `1px solid ${accentColor}55`,
-          borderRadius: 20,
-          padding: '6px 18px',
-          fontSize: 16,
-          fontWeight: 700,
-          color: accentColor,
-          letterSpacing: '0.12em',
-        }}>
-          {stratType}
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontSize: 22, color: '#b5b3ad', letterSpacing: '0.06em' }}>ETF STRATEGY</div>
-        <div style={{ fontSize: 80, fontWeight: 700, color: '#c9a84c', lineHeight: 1, letterSpacing: '-0.01em' }}>
-          ${ticker.toUpperCase()}
-        </div>
-        <div style={{ fontSize: 30, color: '#eeeeec', fontWeight: 400, marginTop: 4 }}>{name}</div>
-      </div>
-
-      {/* Chart */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ position: 'relative', width: chartW, height: chartH }}>
-          <svg
-            width={chartW}
-            height={chartH}
-            style={{ position: 'absolute', top: 0, left: 0 }}
-          >
-            <defs>
-              <linearGradient id="chartLine" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor={accentColor} stopOpacity="0.4" />
-                <stop offset="100%" stopColor={accentColor} stopOpacity="1" />
-              </linearGradient>
-            </defs>
-            <path
-              d={chartPath}
-              fill="none"
-              stroke={`url(#chartLine)`}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+      }}>
+        {/* Ticker + Name — top left */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span style={{ fontSize: 84, fontWeight: 700, color: '#ffffff', lineHeight: 1 }}>
+            {`$${ticker.toUpperCase()}`}
+          </span>
+          <span style={{ fontSize: 28, color: 'rgba(255,255,255,0.65)', fontWeight: 400 }}>
+            {name}
+          </span>
         </div>
 
-        {/* Footer row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: avatarColor }} />
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 13, color: '#b5b3ad', letterSpacing: '0.05em' }}>CREATED BY</span>
-              <span style={{ fontSize: 18, fontWeight: 600 }}>{shortAddr}</span>
-            </div>
+        {/* Bottom row: chart + Axis branding */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {/* Line chart */}
+          <div style={{ display: 'flex', width: `${chartW}px`, height: `${chartH}px` }}>
+            <svg width={chartW} height={chartH}>
+              <path d={chartPath} fill="none" stroke={lineColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            {tvl > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <span style={{ fontSize: 13, color: '#b5b3ad', letterSpacing: '0.05em' }}>TVL</span>
-                <span style={{ fontSize: 22, fontWeight: 700 }}>${tvl.toLocaleString()}</span>
-              </div>
-            )}
-            <div style={{
-              display: 'flex',
-              background: isPositive ? 'rgba(48,164,108,0.2)' : 'rgba(229,77,46,0.2)',
-              color: isPositive ? '#4cc38a' : '#ff6369',
-              borderRadius: 20,
-              padding: '8px 20px',
-              fontSize: 22,
-              fontWeight: 700,
-            }}>
-              {isPositive ? '▲' : '▼'} Live
-            </div>
+          {/* Axis logo — bottom right, matches AxisOGPchart.png position */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.35)', fontWeight: 400, letterSpacing: '0.08em' }}>Axis</span>
+            <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.2)' }}>©</span>
           </div>
         </div>
-      </div>
-    </div>,
-    {
-      width: 1200,
-      height: 630,
-      fonts: [
-        {
-          name: 'Inter',
-          data: fontData,
-          weight: 400,
-          style: 'normal',
-        },
-      ],
-    }
-  );
+      </div>,
+      {
+        width: 1200,
+        height: 630,
+        fonts: [{ name: 'Inter', data: fontData, weight: 400, style: 'normal' }],
+      }
+    );
 
-  const png = await svgToPng(svg);
-  return c.body(png, 200, {
-    'Content-Type': 'image/png',
-    'Cache-Control': 'public, max-age=3600',
-  });
+    const png = await svgToPng(svg);
+    return c.body(png, 200, {
+      'Content-Type': 'image/png',
+      'Cache-Control': 'public, max-age=3600',
+    });
   } catch (e: any) {
     return c.json({ error: e?.message || String(e), stack: e?.stack?.slice(0, 300) }, 500);
   }
@@ -329,7 +231,7 @@ app.get('/image', async (c) => {
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontSize: 24, color: 'rgba(255,255,255,0.5)', marginBottom: 10, letterSpacing: '0.1em' }}>TOTAL NET WORTH</div>
-        <div style={{ fontSize: 96, fontWeight: 'bold', lineHeight: 1 }}>${netWorth}</div>
+        <div style={{ display: 'flex', fontSize: 96, fontWeight: 'bold', lineHeight: 1 }}>{`$${netWorth}`}</div>
         <div style={{
             display: 'flex',
             marginTop: 20,
