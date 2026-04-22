@@ -6,15 +6,48 @@ import React from 'react';
 // @ts-ignore
 import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
+// @ts-ignore
+import UPNG from 'upng-js';
 
 let resvgInitialized = false;
-async function svgToPng(svg: string): Promise<Uint8Array> {
+async function svgToPng(svg: string, transparent = false): Promise<Uint8Array> {
   if (!resvgInitialized) {
     await initWasm(resvgWasm);
     resvgInitialized = true;
   }
-  const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: 1200 } });
+  const opts: any = { fitTo: { mode: 'width', value: 1200 } };
+  if (!transparent) opts.background = '#ffffff';
+  const resvg = new Resvg(svg, opts);
   return resvg.render().asPng();
+}
+
+// Alpha-composite overlay PNG on top of background PNG using UPNG
+function compositePng(bgBuf: ArrayBuffer, overlayPng: Uint8Array): ArrayBuffer {
+  const bg = UPNG.decode(bgBuf);
+  const bgRgba = new Uint8Array(UPNG.toRGBA8(bg)[0] as ArrayBuffer);
+
+  const ov = UPNG.decode(overlayPng.buffer as ArrayBuffer);
+  const ovRgba = new Uint8Array(UPNG.toRGBA8(ov)[0] as ArrayBuffer);
+
+  const w = bg.width as number;
+  const h = bg.height as number;
+  const out = new Uint8Array(w * h * 4);
+
+  for (let i = 0; i < w * h * 4; i += 4) {
+    const fgA = ovRgba[i + 3] / 255;
+    const bgA = bgRgba[i + 3] / 255;
+    const outA = fgA + bgA * (1 - fgA);
+    if (outA === 0) {
+      out[i] = out[i + 1] = out[i + 2] = out[i + 3] = 0;
+    } else {
+      out[i]     = Math.round((ovRgba[i]     * fgA + bgRgba[i]     * bgA * (1 - fgA)) / outA);
+      out[i + 1] = Math.round((ovRgba[i + 1] * fgA + bgRgba[i + 1] * bgA * (1 - fgA)) / outA);
+      out[i + 2] = Math.round((ovRgba[i + 2] * fgA + bgRgba[i + 2] * bgA * (1 - fgA)) / outA);
+      out[i + 3] = Math.round(outA * 255);
+    }
+  }
+
+  return UPNG.encode([out.buffer], w, h, 0) as ArrayBuffer;
 }
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -35,20 +68,6 @@ const loadFont = async (family: string, weight: string = '400;700') => {
 };
 
 const BG_IMAGE_URL = 'https://axis-agent.pages.dev/AxisOGPchart.png';
-
-function bufToBase64(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  const chunkSize = 8192;
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  return btoa(binary);
-}
-
-function escapeSvgText(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 // Returns { path, isPositive } — path is an SVG path string, isPositive based on first→last trend.
 function generateLineChart(
@@ -111,32 +130,61 @@ app.get('/strategy-image/:id', async (c) => {
       }),
     ]);
 
-    const fontBase64 = bufToBase64(fontBuf);
-    const bgBase64 = bufToBase64(bgBuf);
+    // Render overlay (text + chart) on transparent background via satori
+    const overlaySvg = await satori(
+      <div style={{ display: 'flex', width: 1200, height: 630 }}>
+        {/* Ticker + Name — top left */}
+        <div style={{
+          position: 'absolute',
+          top: 60,
+          left: 64,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}>
+          <span style={{ fontSize: 88, fontWeight: 400, color: '#ffffff', lineHeight: 1 }}>
+            {`$${ticker.toUpperCase()}`}
+          </span>
+          <span style={{ fontSize: 30, fontWeight: 400, color: 'rgba(255,255,255,0.6)' }}>
+            {name}
+          </span>
+        </div>
 
-    // chart top-left Y: leave 90px at bottom for Axis logo
-    const chartY = 630 - 90 - chartH;
-
-    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
-  <defs>
-    <style>
-      @font-face {
-        font-family: 'Lora';
-        src: url('data:font/woff;base64,${fontBase64}') format('woff');
-        font-weight: 400;
+        {/* Line chart — bottom area, above Axis logo */}
+        <div style={{
+          position: 'absolute',
+          bottom: 90,
+          left: 60,
+          display: 'flex',
+          width: chartW,
+          height: chartH,
+        }}>
+          <svg width={chartW} height={chartH} xmlns="http://www.w3.org/2000/svg">
+            <path
+              d={chartPath}
+              fill="none"
+              stroke={lineColor}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      </div>,
+      {
+        width: 1200,
+        height: 630,
+        fonts: [{ name: 'Lora', data: fontBuf, weight: 400, style: 'normal' }],
       }
-    </style>
-  </defs>
-  <image href="data:image/png;base64,${bgBase64}" x="0" y="0" width="1200" height="630"/>
-  <text x="64" y="152" font-family="Lora" font-size="88" font-weight="400" fill="#ffffff">$${escapeSvgText(ticker.toUpperCase())}</text>
-  <text x="64" y="202" font-family="Lora" font-size="30" font-weight="400" fill="rgba(255,255,255,0.6)">${escapeSvgText(name)}</text>
-  <g transform="translate(60,${chartY})">
-    <path d="${chartPath}" fill="none" stroke="${lineColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
-</svg>`;
+    );
 
-    const png = await svgToPng(svgStr);
-    return c.body(png, 200, {
+    // Render overlay to PNG with transparent background
+    const overlayPng = await svgToPng(overlaySvg, true);
+
+    // Composite overlay onto AxisOGPchart.png background
+    const compositedBuf = compositePng(bgBuf, overlayPng);
+
+    return c.body(new Uint8Array(compositedBuf), 200, {
       'Content-Type': 'image/png',
       'Cache-Control': 'public, max-age=3600',
     });
