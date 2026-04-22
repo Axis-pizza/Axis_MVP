@@ -34,7 +34,19 @@ const loadFont = async () => {
   return fetch(fontUrl).then(r => r.arrayBuffer());
 };
 
-// Generate mock chart values from strategy id as seed.
+const BG_IMAGE_URL = 'https://axis-agent.pages.dev/AxisOGPchart.png';
+let bgImageBase64: string | null = null;
+
+async function loadBgImage(): Promise<string> {
+  if (bgImageBase64) return bgImageBase64;
+  const buf = await fetch(BG_IMAGE_URL).then(r => r.arrayBuffer());
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  bgImageBase64 = `data:image/png;base64,${btoa(binary)}`;
+  return bgImageBase64;
+}
+
 // Returns { path, isPositive } — path is an SVG path string, isPositive based on first→last trend.
 function generateLineChart(
   w: number,
@@ -84,54 +96,69 @@ app.get('/strategy-image/:id', async (c) => {
     const ticker = (row?.ticker as string) || 'ETF';
 
     const chartW = 1080;
-    const chartH = 160;
+    const chartH = 180;
     const { path: chartPath, isPositive } = generateLineChart(chartW, chartH, id);
-    const lineColor = isPositive ? '#4cc38a' : '#ff6369';
+    // green for positive, blue for negative
+    const lineColor = isPositive ? '#4cc38a' : '#60a5fa';
 
-    const fontData = await loadFont();
+    const [fontData, bgDataUrl] = await Promise.all([loadFont(), loadBgImage()]);
 
     const svg = await satori(
       <div style={{
         display: 'flex',
-        flexDirection: 'column',
-        width: '100%',
-        height: '100%',
-        // Recreate AxisOGPchart.png look: near-black bg with radial glow top-left
-        background: 'radial-gradient(ellipse 70% 60% at 20% 30%, rgba(40,40,35,0.9) 0%, #080807 70%)',
-        padding: '60px',
-        fontFamily: 'Inter',
-        justifyContent: 'space-between',
+        width: '1200px',
+        height: '630px',
         position: 'relative',
+        fontFamily: 'Inter',
       }}>
+        {/* Base background image */}
+        <img
+          src={bgDataUrl}
+          style={{ position: 'absolute', top: 0, left: 0, width: '1200px', height: '630px' }}
+        />
+
         {/* Ticker + Name — top left */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <span style={{ fontSize: 84, fontWeight: 700, color: '#ffffff', lineHeight: 1 }}>
+        <div style={{
+          position: 'absolute',
+          top: 60,
+          left: 64,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}>
+          <span style={{ fontSize: 88, fontWeight: 700, color: '#ffffff', lineHeight: 1 }}>
             {`$${ticker.toUpperCase()}`}
           </span>
-          <span style={{ fontSize: 28, color: 'rgba(255,255,255,0.65)', fontWeight: 400 }}>
+          <span style={{ fontSize: 30, color: 'rgba(255,255,255,0.6)', fontWeight: 400 }}>
             {name}
           </span>
         </div>
 
-        {/* Bottom row: chart + Axis branding */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {/* Line chart */}
-          <div style={{ display: 'flex', width: `${chartW}px`, height: `${chartH}px` }}>
-            <svg width={chartW} height={chartH}>
-              <path d={chartPath} fill="none" stroke={lineColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          {/* Axis logo — bottom right, matches AxisOGPchart.png position */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.35)', fontWeight: 400, letterSpacing: '0.08em' }}>Axis</span>
-            <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.2)' }}>©</span>
-          </div>
+        {/* Line chart — center-bottom area */}
+        <div style={{
+          position: 'absolute',
+          bottom: 90,
+          left: 60,
+          display: 'flex',
+          width: `${chartW}px`,
+          height: `${chartH}px`,
+        }}>
+          <svg width={chartW} height={chartH}>
+            <path
+              d={chartPath}
+              fill="none"
+              stroke={lineColor}
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
         </div>
       </div>,
       {
         width: 1200,
         height: 630,
-        fonts: [{ name: 'Inter', data: fontData, weight: 400, style: 'normal' }],
+        fonts: [{ name: 'Inter', data: fontData, weight: 700, style: 'normal' }],
       }
     );
 
