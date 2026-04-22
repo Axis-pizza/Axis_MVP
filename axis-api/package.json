@@ -22,8 +22,7 @@
     "mimetext": "^3.0.27",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "satori": "^0.19.1",
-    "upng-js": "^2.1.0"
+    "satori": "^0.19.1"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
