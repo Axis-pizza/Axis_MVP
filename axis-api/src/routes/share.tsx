@@ -8,6 +8,8 @@ import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
 // @ts-ignore — bundled via wrangler Data rule for *.png
 import bgPngBuf from '../assets/AxisOGPchart.png';
+import { JupiterService } from '../services/jupiter';
+import { resolveMint } from '../services/snapshot/price-fetcher';
 
 let resvgInitialized = false;
 async function svgToPng(svg: string): Promise<Uint8Array> {
@@ -44,6 +46,78 @@ function bufToBase64(buf: ArrayBuffer): string {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
   return btoa(binary);
+}
+
+function formatTvl(n: number): string {
+  if (!isFinite(n) || n <= 0) return '$0';
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+// Satori only handles PNG/JPEG reliably in data URIs; reject SVGs and unknowns.
+async function fetchLogoDataUri(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    let mime = 'image/png';
+    if (ct.includes('jpeg') || ct.includes('jpg')) mime = 'image/jpeg';
+    else if (ct.includes('png')) mime = 'image/png';
+    else if (ct.includes('webp')) mime = 'image/webp';
+    else if (ct.includes('svg')) return null; // satori struggles with remote SVG
+    else return null;
+    const buf = await r.arrayBuffer();
+    return `data:${mime};base64,${bufToBase64(buf)}`;
+  } catch {
+    return null;
+  }
+}
+
+type CompositionEntry = { symbol: string; weight: number; mint: string | null; logo: string | null };
+
+async function resolveComposition(
+  rawComposition: string | null,
+  apiKey: string | undefined,
+  maxEntries: number
+): Promise<CompositionEntry[]> {
+  if (!rawComposition) return [];
+  let parsed: any;
+  try { parsed = JSON.parse(rawComposition); } catch { return []; }
+  if (!Array.isArray(parsed)) return [];
+
+  const entries = parsed
+    .filter((t: any) => t && t.symbol && typeof t.weight === 'number')
+    .map((t: any) => ({
+      symbol: String(t.symbol).toUpperCase(),
+      weight: Number(t.weight),
+      mint: resolveMint(t),
+    }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, maxEntries);
+
+  if (entries.length === 0) return [];
+
+  // Build mint → logoURI map from Jupiter verified list (cached in JupiterService)
+  let logoByMint: Map<string, string> = new Map();
+  try {
+    const tokens = await JupiterService.getTokens(apiKey);
+    for (const t of tokens) {
+      if (t.address && t.logoURI) logoByMint.set(t.address, t.logoURI);
+    }
+  } catch {
+    // proceed with no logos — fallback circle will be rendered
+  }
+
+  const logos = await Promise.all(
+    entries.map(e => {
+      const url = e.mint ? logoByMint.get(e.mint) : undefined;
+      return url ? fetchLogoDataUri(url) : Promise.resolve(null);
+    })
+  );
+
+  return entries.map((e, i) => ({ ...e, logo: logos[i] }));
 }
 
 // Returns { path, isPositive } — path is an SVG path string, isPositive based on first→last trend.
@@ -88,18 +162,24 @@ app.get('/strategy-image/:id', async (c) => {
     const id = c.req.param('id');
 
     const row = await c.env.axis_db.prepare(
-      `SELECT name, ticker FROM strategies WHERE id = ? LIMIT 1`
+      `SELECT name, ticker, composition, tvl, total_deposited FROM strategies WHERE id = ? LIMIT 1`
     ).bind(id).first();
 
     const name = (row?.name as string) || 'Unknown Strategy';
     const ticker = (row?.ticker as string) || 'ETF';
+    const rawComposition = (row?.composition as string) || null;
+    const tvlNum = Number(row?.tvl ?? row?.total_deposited ?? 0);
+    const tvlLabel = formatTvl(tvlNum);
 
     const chartW = 1080;
     const chartH = 180;
     const { path: chartPath, isPositive } = generateLineChart(chartW, chartH, id);
     const lineColor = isPositive ? '#4cc38a' : '#ef4444';
 
-    const fontBuf = await loadFont('Lora', '400');
+    const [fontBuf, composition] = await Promise.all([
+      loadFont('Lora', '400'),
+      resolveComposition(rawComposition, c.env.JUPITER_API_KEY, 4),
+    ]);
     const bgDataUri = `data:image/png;base64,${bufToBase64(bgPngBuf)}`;
 
     const chartSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${chartW}" height="${chartH}" viewBox="0 0 ${chartW} ${chartH}"><path d="${chartPath}" fill="none" stroke="${lineColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -107,6 +187,14 @@ app.get('/strategy-image/:id', async (c) => {
 
     // chart top-left Y: leave 90px at bottom for Axis logo
     const chartY = 630 - 90 - chartH;
+
+    // Deterministic fallback color for logo circle when no image is available
+    const fallbackColor = (sym: string): string => {
+      let h = 0;
+      for (let i = 0; i < sym.length; i++) h = (h * 31 + sym.charCodeAt(i)) & 0xffffff;
+      const hue = h % 360;
+      return `hsl(${hue}, 55%, 45%)`;
+    };
 
     const svg = await satori(
       <div
@@ -140,6 +228,74 @@ app.get('/strategy-image/:id', async (c) => {
             {name}
           </div>
         </div>
+
+        {/* TVL (top right) */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            position: 'absolute',
+            top: 60,
+            right: 64,
+          }}
+        >
+          <div style={{ display: 'flex', color: 'rgba(255,255,255,0.5)', fontSize: 22, letterSpacing: 4 }}>
+            TVL
+          </div>
+          <div style={{ display: 'flex', color: '#ffffff', fontSize: 56, fontWeight: 400, lineHeight: 1, marginTop: 6 }}>
+            {tvlLabel}
+          </div>
+        </div>
+
+        {/* Composition row */}
+        {composition.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              position: 'absolute',
+              top: 240,
+              left: 64,
+              gap: 28,
+            }}
+          >
+            {composition.map((t) => (
+              <div key={t.symbol} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {t.logo ? (
+                  <img
+                    src={t.logo}
+                    width={40}
+                    height={40}
+                    style={{ borderRadius: 20, display: 'flex' }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      display: 'flex',
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      background: fallbackColor(t.symbol),
+                      color: '#ffffff',
+                      fontSize: 18,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {t.symbol.slice(0, 1)}
+                  </div>
+                )}
+                <div style={{ display: 'flex', color: '#ffffff', fontSize: 24 }}>
+                  {t.symbol}
+                </div>
+                <div style={{ display: 'flex', color: 'rgba(255,255,255,0.55)', fontSize: 22 }}>
+                  {`${Math.round(t.weight)}%`}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <img
           src={chartDataUri}
           width={chartW}
