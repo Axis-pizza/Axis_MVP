@@ -36,18 +36,18 @@ const loadFont = async (family: string, weight: string = '400;700') => {
 
 const BG_IMAGE_URL = 'https://axis-agent.pages.dev/AxisOGPchart.png';
 
-async function loadBgImage(): Promise<string> {
-  const res = await fetch(BG_IMAGE_URL);
-  if (!res.ok) throw new Error(`Failed to fetch bg image: ${res.status}`);
-  const buf = await res.arrayBuffer();
-  // Use Uint8Array → base64 via btoa in chunks to avoid stack overflow on large images
+function bufToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   const chunkSize = 8192;
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i += chunkSize) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
-  return `data:image/png;base64,${btoa(binary)}`;
+  return btoa(binary);
+}
+
+function escapeSvgText(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // Returns { path, isPositive } — path is an SVG path string, isPositive based on first→last trend.
@@ -101,74 +101,41 @@ app.get('/strategy-image/:id', async (c) => {
     const chartW = 1080;
     const chartH = 180;
     const { path: chartPath, isPositive } = generateLineChart(chartW, chartH, id);
-    // green for positive, blue for negative
     const lineColor = isPositive ? '#4cc38a' : '#60a5fa';
 
-    const [fontRegular, fontBold, bgDataUrl] = await Promise.all([
+    const [fontBuf, bgBuf] = await Promise.all([
       loadFont('Lora', '400'),
-      loadFont('Lora', '700'),
-      loadBgImage(),
+      fetch(BG_IMAGE_URL).then(r => {
+        if (!r.ok) throw new Error(`BG fetch failed: ${r.status}`);
+        return r.arrayBuffer();
+      }),
     ]);
 
-    const svg = await satori(
-      <div style={{
-        display: 'flex',
-        width: 1200,
-        height: 630,
-        backgroundImage: `url(${bgDataUrl})`,
-        backgroundSize: '1200px 630px',
-        fontFamily: 'Lora',
-        position: 'relative',
-      }}>
-        {/* Ticker + Name — top left */}
-        <div style={{
-          position: 'absolute',
-          top: 60,
-          left: 64,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-        }}>
-          <span style={{ fontSize: 88, fontWeight: 700, color: '#ffffff', lineHeight: 1 }}>
-            {`$${ticker.toUpperCase()}`}
-          </span>
-          <span style={{ fontSize: 30, color: 'rgba(255,255,255,0.6)', fontWeight: 400 }}>
-            {name}
-          </span>
-        </div>
+    const fontBase64 = bufToBase64(fontBuf);
+    const bgBase64 = bufToBase64(bgBuf);
 
-        {/* Line chart — center-bottom, stays above Axis logo bottom-right */}
-        <div style={{
-          position: 'absolute',
-          bottom: 90,
-          left: 60,
-          display: 'flex',
-          width: chartW,
-          height: chartH,
-        }}>
-          <svg width={chartW} height={chartH} xmlns="http://www.w3.org/2000/svg">
-            <path
-              d={chartPath}
-              fill="none"
-              stroke={lineColor}
-              strokeWidth={3}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-      </div>,
-      {
-        width: 1200,
-        height: 630,
-        fonts: [
-          { name: 'Lora', data: fontRegular, weight: 400, style: 'normal' },
-          { name: 'Lora', data: fontBold, weight: 700, style: 'normal' },
-        ],
+    // chart top-left Y: leave 90px at bottom for Axis logo
+    const chartY = 630 - 90 - chartH;
+
+    const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
+  <defs>
+    <style>
+      @font-face {
+        font-family: 'Lora';
+        src: url('data:font/woff;base64,${fontBase64}') format('woff');
+        font-weight: 400;
       }
-    );
+    </style>
+  </defs>
+  <image href="data:image/png;base64,${bgBase64}" x="0" y="0" width="1200" height="630"/>
+  <text x="64" y="152" font-family="Lora" font-size="88" font-weight="400" fill="#ffffff">$${escapeSvgText(ticker.toUpperCase())}</text>
+  <text x="64" y="202" font-family="Lora" font-size="30" font-weight="400" fill="rgba(255,255,255,0.6)">${escapeSvgText(name)}</text>
+  <g transform="translate(60,${chartY})">
+    <path d="${chartPath}" fill="none" stroke="${lineColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>`;
 
-    const png = await svgToPng(svg);
+    const png = await svgToPng(svgStr);
     return c.body(png, 200, {
       'Content-Type': 'image/png',
       'Cache-Control': 'public, max-age=3600',
