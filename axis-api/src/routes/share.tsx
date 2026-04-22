@@ -25,7 +25,12 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 
 // Use old Firefox UA to get WOFF (v1) — satori uses opentype.js which doesn't support WOFF2
+const fontCache = new Map<string, ArrayBuffer>();
 const loadFont = async (family: string, weight: string = '400;700') => {
+  const key = `${family}:${weight}`;
+  const hit = fontCache.get(key);
+  if (hit) return hit;
+
   const css = await fetch(
     `https://fonts.googleapis.com/css2?family=${family}:wght@${weight}&display=swap`,
     { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 5.1; rv:23.0) Gecko/20100101 Firefox/23.0' } }
@@ -35,7 +40,9 @@ const loadFont = async (family: string, weight: string = '400;700') => {
     ?? css.match(/url\(([^)]+\.woff)\)/)?.[1];
   if (!fontUrl) throw new Error(`No WOFF font URL in CSS: ${css.slice(0, 200)}`);
 
-  return fetch(fontUrl).then(r => r.arrayBuffer());
+  const buf = await fetch(fontUrl).then(r => r.arrayBuffer());
+  fontCache.set(key, buf);
+  return buf;
 };
 
 function bufToBase64(buf: ArrayBuffer): string {
@@ -159,6 +166,13 @@ function generateLineChart(
 // 1. Strategy OGP image endpoint
 app.get('/strategy-image/:id', async (c) => {
   try {
+    // Serve from edge cache if available — a raw Cache-Control header alone
+    // is NOT enough in Workers; we have to put/match the Cache API ourselves.
+    const cache = caches.default;
+    const cacheKey = new Request(c.req.url, { method: 'GET' });
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
+
     const id = c.req.param('id');
 
     const row = await c.env.axis_db.prepare(
@@ -318,10 +332,19 @@ app.get('/strategy-image/:id', async (c) => {
     );
 
     const png = await svgToPng(svg);
-    return c.body(png, 200, {
-      'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=3600',
+    const response = new Response(png, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+      },
     });
+
+    // Write-through to edge cache so subsequent requests (especially
+    // Twitterbot's) skip the 2-5s regeneration entirely.
+    c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+
+    return response;
   } catch (e: any) {
     return c.json({ error: e?.message || String(e), stack: e?.stack?.slice(0, 300) }, 500);
   }
