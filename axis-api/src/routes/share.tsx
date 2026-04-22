@@ -20,10 +20,10 @@ async function svgToPng(svg: string): Promise<Uint8Array> {
 const app = new Hono<{ Bindings: Bindings }>();
 
 
-const loadFont = async () => {
-  // Use old Firefox UA to get WOFF (v1) instead of WOFF2 — satori uses opentype.js which doesn't support WOFF2
+// Use old Firefox UA to get WOFF (v1) — satori uses opentype.js which doesn't support WOFF2
+const loadFont = async (family: string, weight: string = '400;700') => {
   const css = await fetch(
-    'https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap',
+    `https://fonts.googleapis.com/css2?family=${family}:wght@${weight}&display=swap`,
     { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 5.1; rv:23.0) Gecko/20100101 Firefox/23.0' } }
   ).then(r => r.text());
 
@@ -35,16 +35,19 @@ const loadFont = async () => {
 };
 
 const BG_IMAGE_URL = 'https://axis-agent.pages.dev/AxisOGPchart.png';
-let bgImageBase64: string | null = null;
 
 async function loadBgImage(): Promise<string> {
-  if (bgImageBase64) return bgImageBase64;
-  const buf = await fetch(BG_IMAGE_URL).then(r => r.arrayBuffer());
+  const res = await fetch(BG_IMAGE_URL);
+  if (!res.ok) throw new Error(`Failed to fetch bg image: ${res.status}`);
+  const buf = await res.arrayBuffer();
+  // Use Uint8Array → base64 via btoa in chunks to avoid stack overflow on large images
   const bytes = new Uint8Array(buf);
+  const chunkSize = 8192;
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-  bgImageBase64 = `data:image/png;base64,${btoa(binary)}`;
-  return bgImageBase64;
+  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return `data:image/png;base64,${btoa(binary)}`;
 }
 
 // Returns { path, isPositive } — path is an SVG path string, isPositive based on first→last trend.
@@ -101,22 +104,22 @@ app.get('/strategy-image/:id', async (c) => {
     // green for positive, blue for negative
     const lineColor = isPositive ? '#4cc38a' : '#60a5fa';
 
-    const [fontData, bgDataUrl] = await Promise.all([loadFont(), loadBgImage()]);
+    const [fontRegular, fontBold, bgDataUrl] = await Promise.all([
+      loadFont('Lora', '400'),
+      loadFont('Lora', '700'),
+      loadBgImage(),
+    ]);
 
     const svg = await satori(
       <div style={{
         display: 'flex',
-        width: '1200px',
-        height: '630px',
+        width: 1200,
+        height: 630,
+        backgroundImage: `url(${bgDataUrl})`,
+        backgroundSize: '1200px 630px',
+        fontFamily: 'Lora',
         position: 'relative',
-        fontFamily: 'Inter',
       }}>
-        {/* Base background image */}
-        <img
-          src={bgDataUrl}
-          style={{ position: 'absolute', top: 0, left: 0, width: '1200px', height: '630px' }}
-        />
-
         {/* Ticker + Name — top left */}
         <div style={{
           position: 'absolute',
@@ -124,7 +127,7 @@ app.get('/strategy-image/:id', async (c) => {
           left: 64,
           display: 'flex',
           flexDirection: 'column',
-          gap: 10,
+          gap: 12,
         }}>
           <span style={{ fontSize: 88, fontWeight: 700, color: '#ffffff', lineHeight: 1 }}>
             {`$${ticker.toUpperCase()}`}
@@ -134,23 +137,23 @@ app.get('/strategy-image/:id', async (c) => {
           </span>
         </div>
 
-        {/* Line chart — center-bottom area */}
+        {/* Line chart — center-bottom, stays above Axis logo bottom-right */}
         <div style={{
           position: 'absolute',
           bottom: 90,
           left: 60,
           display: 'flex',
-          width: `${chartW}px`,
-          height: `${chartH}px`,
+          width: chartW,
+          height: chartH,
         }}>
-          <svg width={chartW} height={chartH}>
+          <svg width={chartW} height={chartH} xmlns="http://www.w3.org/2000/svg">
             <path
               d={chartPath}
               fill="none"
               stroke={lineColor}
-              stroke-width="3"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
           </svg>
         </div>
@@ -158,7 +161,10 @@ app.get('/strategy-image/:id', async (c) => {
       {
         width: 1200,
         height: 630,
-        fonts: [{ name: 'Inter', data: fontData, weight: 700, style: 'normal' }],
+        fonts: [
+          { name: 'Lora', data: fontRegular, weight: 400, style: 'normal' },
+          { name: 'Lora', data: fontBold, weight: 700, style: 'normal' },
+        ],
       }
     );
 
