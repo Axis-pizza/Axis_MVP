@@ -201,7 +201,7 @@ app.get('/image', async (c) => {
   const netWorth = c.req.query('worth') || '0';
   const isPositive = parseFloat(pnl) >= 0;
 
-  const fontData = await loadFont();
+  const fontData = await loadFont('Inter', '400;700');
 
   const svg = await satori(
     <div
