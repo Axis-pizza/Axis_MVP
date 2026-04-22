@@ -3,24 +3,231 @@ import { Hono } from 'hono';
 import satori from 'satori';
 import { Bindings } from '../config/env';
 import React from 'react';
+// @ts-ignore
+import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
+import { initWasm, Resvg } from '@resvg/resvg-wasm';
+// @ts-ignore — bundled via wrangler Data rule for *.png
+import bgPngBuf from '../assets/AxisOGPchart.png';
+
+let resvgInitialized = false;
+async function svgToPng(svg: string): Promise<Uint8Array> {
+  if (!resvgInitialized) {
+    await initWasm(resvgWasm);
+    resvgInitialized = true;
+  }
+  const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: 1200 } });
+  return resvg.render().asPng();
+}
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// フォントデータを読み込む（Google Fonts等から取得するのが一般的だが、ここでは簡易的にシステムフォント等を指定するか、ArrayBufferで読み込む必要がある）
-// Cloudflare Workersではfetchでフォントを取ってくるのが定石
-const loadFont = async () => {
-  const response = await fetch('https://github.com/google/fonts/raw/main/apache/robotoslab/RobotoSlab[wght].ttf');
-  return await response.arrayBuffer();
+
+// Use old Firefox UA to get WOFF (v1) — satori uses opentype.js which doesn't support WOFF2
+const loadFont = async (family: string, weight: string = '400;700') => {
+  const css = await fetch(
+    `https://fonts.googleapis.com/css2?family=${family}:wght@${weight}&display=swap`,
+    { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 5.1; rv:23.0) Gecko/20100101 Firefox/23.0' } }
+  ).then(r => r.text());
+
+  const fontUrl = css.match(/src: url\(([^)]+)\) format\('woff'\)/)?.[1]
+    ?? css.match(/url\(([^)]+\.woff)\)/)?.[1];
+  if (!fontUrl) throw new Error(`No WOFF font URL in CSS: ${css.slice(0, 200)}`);
+
+  return fetch(fontUrl).then(r => r.arrayBuffer());
 };
 
-// 1. OGP画像生成エンドポイント
+function bufToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  const chunkSize = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+// Returns { path, isPositive } — path is an SVG path string, isPositive based on first→last trend.
+function generateLineChart(
+  w: number,
+  h: number,
+  seed: string
+): { path: string; isPositive: boolean } {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  const points = 40;
+  const values: number[] = [];
+  let val = 50;
+  for (let i = 0; i < points; i++) {
+    hash = ((hash << 5) - hash) + i * 13;
+    hash |= 0;
+    val = Math.max(5, Math.min(95, val + (((hash & 0xffff) / 0xffff) * 16 - 6)));
+    values.push(val);
+  }
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pad = 4;
+  const pts = values.map((v, i) => {
+    const x = (i / (points - 1)) * (w - pad * 2) + pad;
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return {
+    path: `M ${pts.join(' L ')}`,
+    isPositive: values[values.length - 1] >= values[0],
+  };
+}
+
+
+// 1. Strategy OGP image endpoint
+app.get('/strategy-image/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+
+    const row = await c.env.axis_db.prepare(
+      `SELECT name, ticker FROM strategies WHERE id = ? LIMIT 1`
+    ).bind(id).first();
+
+    const name = (row?.name as string) || 'Unknown Strategy';
+    const ticker = (row?.ticker as string) || 'ETF';
+
+    const chartW = 1080;
+    const chartH = 180;
+    const { path: chartPath, isPositive } = generateLineChart(chartW, chartH, id);
+    const lineColor = isPositive ? '#4cc38a' : '#ef4444';
+
+    const fontBuf = await loadFont('Lora', '400');
+    const bgDataUri = `data:image/png;base64,${bufToBase64(bgPngBuf)}`;
+
+    const chartSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${chartW}" height="${chartH}" viewBox="0 0 ${chartW} ${chartH}"><path d="${chartPath}" fill="none" stroke="${lineColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const chartDataUri = `data:image/svg+xml;base64,${btoa(chartSvg)}`;
+
+    // chart top-left Y: leave 90px at bottom for Axis logo
+    const chartY = 630 - 90 - chartH;
+
+    const svg = await satori(
+      <div
+        style={{
+          display: 'flex',
+          position: 'relative',
+          width: '1200px',
+          height: '630px',
+          fontFamily: 'Lora',
+        }}
+      >
+        <img
+          src={bgDataUri}
+          width={1200}
+          height={630}
+          style={{ position: 'absolute', top: 0, left: 0 }}
+        />
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'absolute',
+            top: 60,
+            left: 64,
+          }}
+        >
+          <div style={{ display: 'flex', color: '#ffffff', fontSize: 88, fontWeight: 400, lineHeight: 1 }}>
+            {`$${ticker.toUpperCase()}`}
+          </div>
+          <div style={{ display: 'flex', color: 'rgba(255,255,255,0.6)', fontSize: 30, fontWeight: 400, marginTop: 12 }}>
+            {name}
+          </div>
+        </div>
+        <img
+          src={chartDataUri}
+          width={chartW}
+          height={chartH}
+          style={{ position: 'absolute', top: chartY, left: 60 }}
+        />
+      </div>,
+      {
+        width: 1200,
+        height: 630,
+        fonts: [
+          {
+            name: 'Lora',
+            data: fontBuf,
+            weight: 400,
+            style: 'normal',
+          },
+        ],
+      }
+    );
+
+    const png = await svgToPng(svg);
+    return c.body(png, 200, {
+      'Content-Type': 'image/png',
+      'Cache-Control': 'public, max-age=3600',
+    });
+  } catch (e: any) {
+    return c.json({ error: e?.message || String(e), stack: e?.stack?.slice(0, 300) }, 500);
+  }
+});
+
+// 2. Strategy share cushion page (OGP meta tags + redirect)
+app.get('/strategy/:id', async (c) => {
+  const id = c.req.param('id');
+
+  const row = await c.env.axis_db.prepare(
+    `SELECT name, ticker FROM strategies WHERE id = ? LIMIT 1`
+  ).bind(id).first();
+
+  const name = (row?.name as string) || 'Axis Strategy';
+  const ticker = (row?.ticker as string) || 'ETF';
+
+  const origin = new URL(c.req.url).origin;
+  const imageUrl = `${origin}/share/strategy-image/${id}`;
+  const redirectUrl = `${c.env.FRONTEND_URL || 'https://axis-agent.pages.dev'}/strategy/${id}`;
+  const pageUrl = c.req.url;
+
+  const title = `$${ticker.toUpperCase()} — ${name} | Axis Protocol`;
+  const description = `Check out the ${name} ($${ticker.toUpperCase()}) ETF strategy on Axis Protocol.`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${title}</title>
+  <meta name="description" content="${description}">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${pageUrl}">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description}">
+  <meta property="og:image" content="${imageUrl}">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="${pageUrl}">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  <meta name="twitter:image" content="${imageUrl}">
+
+  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
+</head>
+<body style="background:#0a0a09;color:#eeeeec;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
+  <p>Redirecting to Axis...</p>
+  <script>window.location.href = "${redirectUrl}";</script>
+</body>
+</html>`;
+
+  return c.html(html);
+});
+
+// 3. Portfolio OGP image endpoint (existing)
 app.get('/image', async (c) => {
   const address = c.req.query('address') || 'Unknown';
   const pnl = c.req.query('pnl') || '0';
   const netWorth = c.req.query('worth') || '0';
   const isPositive = parseFloat(pnl) >= 0;
 
-  const fontData = await loadFont();
+  const fontData = await loadFont('Inter', '400;700');
 
   const svg = await satori(
     <div
@@ -34,10 +241,9 @@ app.get('/image', async (c) => {
         flexDirection: 'column',
         justifyContent: 'space-between',
         padding: '60px',
-        fontFamily: 'Roboto Slab',
+        fontFamily: 'Inter',
       }}
     >
-      {/* Background Decor */}
       <div style={{ position: 'absolute', top: -100, right: -100, width: 400, height: 400, background: 'rgba(217,119,6,0.2)', borderRadius: '50%', filter: 'blur(80px)' }} />
       <div style={{ position: 'absolute', bottom: -100, left: -100, width: 300, height: 300, background: isPositive ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)', borderRadius: '50%', filter: 'blur(80px)' }} />
 
@@ -51,13 +257,13 @@ app.get('/image', async (c) => {
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontSize: 24, color: 'rgba(255,255,255,0.5)', marginBottom: 10, letterSpacing: '0.1em' }}>TOTAL NET WORTH</div>
-        <div style={{ fontSize: 96, fontWeight: 'bold', lineHeight: 1 }}>${netWorth}</div>
-        <div style={{ 
-            display: 'flex', 
-            marginTop: 20, 
-            background: isPositive ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)', 
+        <div style={{ display: 'flex', fontSize: 96, fontWeight: 'bold', lineHeight: 1 }}>{`$${netWorth}`}</div>
+        <div style={{
+            display: 'flex',
+            marginTop: 20,
+            background: isPositive ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)',
             color: isPositive ? '#4ADE80' : '#F87171',
-            padding: '10px 30px', 
+            padding: '10px 30px',
             borderRadius: '50px',
             fontSize: 32,
             fontWeight: 'bold',
@@ -79,7 +285,7 @@ app.get('/image', async (c) => {
       height: 630,
       fonts: [
         {
-          name: 'Roboto Slab',
+          name: 'Inter',
           data: fontData,
           weight: 400,
           style: 'normal',
@@ -88,21 +294,21 @@ app.get('/image', async (c) => {
     }
   );
 
-  // SVGを返す (TwitterはSVG OGPを一部サポートしているが、完璧を期すならResvgでPNG化推奨。今回はMVPとしてSVGで返す)
-  return c.body(svg, 200, {
-    'Content-Type': 'image/svg+xml',
+  const png = await svgToPng(svg);
+  return c.body(png, 200, {
+    'Content-Type': 'image/png',
     'Cache-Control': 'public, max-age=3600',
   });
 });
 
-// 2. シェア用クッションページ
+// 4. Portfolio share cushion page (existing)
 app.get('/', async (c) => {
     const address = c.req.query('address') || '';
     const pnl = c.req.query('pnl') || '0';
     const worth = c.req.query('worth') || '0';
-    
+
     const imageUrl = `${new URL(c.req.url).origin}/share/image?address=${address}&pnl=${pnl}&worth=${worth}`;
-    const redirectUrl = `https://axis-agent.pages.dev/?ref=${address}`; // フロントエンドのURLに変更してください
+    const redirectUrl = `https://axis-agent.pages.dev/?ref=${address}`;
 
     const html = `
       <!DOCTYPE html>
@@ -111,7 +317,7 @@ app.get('/', async (c) => {
         <meta charset="UTF-8">
         <title>Axis Portfolio - ${address}</title>
         <meta name="description" content="Check out my portfolio on Axis Protocol.">
-        
+
         <meta property="og:type" content="website">
         <meta property="og:url" content="${c.req.url}">
         <meta property="og:title" content="My Axis Portfolio">
@@ -123,7 +329,7 @@ app.get('/', async (c) => {
         <meta property="twitter:title" content="My Axis Portfolio">
         <meta property="twitter:description" content="Net Worth: $${worth} | PnL: ${pnl}%">
         <meta property="twitter:image" content="${imageUrl}">
-        
+
         <meta http-equiv="refresh" content="0;url=${redirectUrl}">
       </head>
       <body style="background: #000; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">

@@ -53,5 +53,17 @@
 			"*/5 * * * *",
 			"0 * * * *"
 		]
-	}
+	},
+	"rules": [
+		{
+			"type": "CompiledWasm",
+			"globs": ["**/*.wasm"],
+			"fallthrough": true
+		},
+		{
+			"type": "Data",
+			"globs": ["**/*.png"],
+			"fallthrough": true
+		}
+	]
 }
