@@ -8,13 +8,23 @@
 	],
 	"d1_databases": [
 		{
+			// 旧DB（比較・移行確認用、次バージョンで削除予定）
 			"binding": "axis_db",
 			"database_name": "axis-db",
-			"database_id": "30e73485-4507-447b-a4a0-6f1b7a10812b",
-			"migrations_dir": "./migrations"
+			"database_id": "30e73485-4507-447b-a4a0-6f1b7a10812b"
 		},
 		{
-			// ★追加: VIPリスト管理用DB
+			"binding": "axis_db_core",
+			"database_name": "axis-db-core",
+			"database_id": "8e147ffb-344a-402e-bf70-18b21a076bfe"
+		},
+		{
+			"binding": "axis_db_analytics",
+			"database_name": "axis-db-analytics",
+			"database_id": "74937424-daf6-45a2-9965-bd929264f442"
+		},
+		{
+			// VIPリスト管理用DB
 			"binding": "whitelist_db",
 			"database_name": "axis-wlv2",
 			"database_id": "ae62cf10-e8b1-4cfb-8823-91da78d51220",
@@ -42,12 +52,12 @@
 		}
 	],
 	"r2_buckets": [
-    {
-      "binding": "IMAGES",
-      "bucket_name": "axis-images",
-      "preview_bucket_name": "axis-images-preview"
-    }
-],
+		{
+			"binding": "IMAGES",
+			"bucket_name": "axis-images",
+			"preview_bucket_name": "axis-images-preview"
+		}
+	],
 	"triggers": {
 		"crons": [
 			"*/5 * * * *",

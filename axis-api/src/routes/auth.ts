@@ -19,13 +19,13 @@ app.post('/request-invite', async (c) => {
     // email が undefined/null/空文字 ならエラーを返す
     if (!email) return c.json({ error: 'Email is required' }, 400);
 
-    const existingUser = await UserModel.findUserByEmail(c.env.axis_db, email);
+    const existingUser = await UserModel.findUserByEmail(c.env.axis_db_core, email);
     if (existingUser) {
         return c.json({ success: true, message: 'Invite code sent (if account available)' });
     }
 
     // ★重要: ここで email を渡す！ (これが抜けていた原因です)
-    const code = await InviteModel.createOneInvite(c.env.axis_db, 'system', email);
+    const code = await InviteModel.createOneInvite(c.env.axis_db_core, 'system', email);
 
     if (c.env.EMAIL) {
       c.executionCtx.waitUntil(sendInviteEmail(c.env, email, code).catch(e => console.error(e)));
@@ -47,28 +47,28 @@ app.post('/register', async (c) => {
       return c.json({ error: 'Missing fields' }, 400);
     }
 
-    const invite = await InviteModel.findInviteByCode(c.env.axis_db, invite_code_used);
+    const invite = await InviteModel.findInviteByCode(c.env.axis_db_core, invite_code_used);
     const isDev = invite_code_used === 'AXIS-DEV';
 
     if (!invite && !isDev) {
       return c.json({ error: 'Invalid invite code' }, 400);
     }
 
-    const existing = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
+    const existing = await UserModel.findUserByWallet(c.env.axis_db_core, wallet_address);
     if (existing) {
       return c.json({ success: true, user: existing });
     }
 
     const newId = crypto.randomUUID();
     // 自分の招待コード発行時も email が必要
-    const newInviteCode = await InviteModel.createOneInvite(c.env.axis_db, newId, email);
+    const newInviteCode = await InviteModel.createOneInvite(c.env.axis_db_core, newId, email);
 
     await UserModel.createRegisteredUser(
-      c.env.axis_db, newId, email, wallet_address, newInviteCode, invite_code_used, avatar_url, name, bio
+      c.env.axis_db_core, newId, email, wallet_address, newInviteCode, invite_code_used, avatar_url, name, bio
     );
 
     if (!isDev) {
-      await InviteModel.markInviteUsed(c.env.axis_db, invite_code_used, newId);
+      await InviteModel.markInviteUsed(c.env.axis_db_core, invite_code_used, newId);
     }
 
     if (c.env.EMAIL) {

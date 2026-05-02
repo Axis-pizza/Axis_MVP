@@ -7,6 +7,8 @@ declare namespace Cloudflare {
 	}
 	interface Env {
 		axis_db: D1Database;
+		axis_db_core: D1Database;
+		axis_db_analytics: D1Database;
 		EMAIL: SendEmail;
 	}
 }

@@ -9,7 +9,7 @@ const mobile = new Hono<{ Bindings: Bindings }>();
  */
 mobile.get('/init-db', async (c) => {
   try {
-    const db = c.env.axis_db;
+    const db = c.env.axis_db_core;
 
     await db.prepare(`
       CREATE TABLE IF NOT EXISTS mobile_sessions (
@@ -67,7 +67,7 @@ mobile.post('/auth/siws', async (c) => {
     const expiresAt = now + 86400 * 7; // 7 days
 
     // Store session in D1
-    const db = c.env.axis_db;
+    const db = c.env.axis_db_core;
     await db.prepare(
       `INSERT OR REPLACE INTO mobile_sessions (token, wallet_address, expires_at, created_at)
        VALUES (?, ?, ?, ?)`
@@ -101,7 +101,7 @@ mobile.post('/auth/verify', async (c) => {
       return c.json({ success: false, valid: false }, 400);
     }
 
-    const db = c.env.axis_db;
+    const db = c.env.axis_db_core;
     const session = await db.prepare(
       'SELECT wallet_address, expires_at FROM mobile_sessions WHERE token = ?'
     ).bind(session_token).first();
@@ -145,7 +145,7 @@ mobile.post('/device/register', async (c) => {
       return c.json({ success: false, error: 'Missing required fields' }, 400);
     }
 
-    const db = c.env.axis_db;
+    const db = c.env.axis_db_core;
     const now = Math.floor(Date.now() / 1000);
     const id = crypto.randomUUID();
 
@@ -172,7 +172,7 @@ mobile.post('/device/unregister', async (c) => {
       return c.json({ success: false, error: 'Missing required fields' }, 400);
     }
 
-    const db = c.env.axis_db;
+    const db = c.env.axis_db_core;
     await db.prepare(
       'DELETE FROM device_tokens WHERE wallet_address = ? AND device_token = ?'
     ).bind(wallet_address, device_token).run();

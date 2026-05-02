@@ -2,7 +2,9 @@ import { D1Database, R2Bucket, VectorizeIndex } from '@cloudflare/workers-types'
 
 export type Bindings = {
   // Main Database
-  axis_db: D1Database
+  axis_db: D1Database      // 旧DB（比較用、次バージョンで削除予定）
+  axis_db_core: D1Database
+  axis_db_analytics: D1Database
   
   // ★追加: VIPリスト管理用 Database
   whitelist_db: D1Database

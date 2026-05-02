@@ -60,19 +60,19 @@ app.post("/claim", async (c) => {
 
     try {
       // 未登録ウォレットでも rate limit を適用するため、レコードがなければ自動作成
-      let user = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
+      let user = await UserModel.findUserByWallet(c.env.axis_db_core, wallet_address);
 
       if (!user) {
           const newId = crypto.randomUUID();
           const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
           try {
-              await c.env.axis_db.prepare(
+              await c.env.axis_db_core.prepare(
                   'INSERT INTO users (id, wallet_address, invite_code, total_xp, rank_tier, last_checkin, last_faucet_at) VALUES (?, ?, ?, 500, "Bronze", 0, 0)'
               ).bind(newId, wallet_address, inviteCode).run();
           } catch {
               // INSERT 競合（並列リクエスト等）の場合は無視して再取得
           }
-          user = await UserModel.findUserByWallet(c.env.axis_db, wallet_address);
+          user = await UserModel.findUserByWallet(c.env.axis_db_core, wallet_address);
       }
 
       // 日本時間(UTC+9)基準で同じ日かチェック（登録済み・未登録問わず）
@@ -92,7 +92,7 @@ app.post("/claim", async (c) => {
       }
 
       // rate limit 記録を先に更新してから送金（二重クレーム防止）
-      await c.env.axis_db.prepare(
+      await c.env.axis_db_core.prepare(
           "UPDATE users SET last_faucet_at = ? WHERE wallet_address = ?"
       ).bind(Math.floor(Date.now() / 1000), wallet_address).run();
 
@@ -160,7 +160,7 @@ app.get('/verify-invite', async (c) => {
     const code = c.req.query('code');
     if (!code) return c.json({ valid: false });
   
-    const invite = await InviteModel.findInviteByCode(c.env.axis_db, code);
+    const invite = await InviteModel.findInviteByCode(c.env.axis_db_core, code);
     
     if (invite) {
       return c.json({ valid: true });
@@ -171,7 +171,7 @@ app.get('/verify-invite', async (c) => {
 
 app.get('/verify', async (c) => {
     const code = c.req.query('code')
-    const valid = await AuthService.verifyUsersInvite(c.env.axis_db, code || "");
+    const valid = await AuthService.verifyUsersInvite(c.env.axis_db_core, code || "");
     if (valid) {
       return c.json({ valid: true })
     } else {
@@ -211,9 +211,9 @@ app.post('/submit-bug', async (c) => {
 app.post('/admin/snapshot/trigger', async (c) => {
 try {
         const startMs = Date.now()
-        const countResult = await c.env.axis_db.prepare('SELECT COUNT(*) as count FROM strategies').first();
+        const countResult = await c.env.axis_db_core.prepare('SELECT COUNT(*) as count FROM strategies').first();
         const strategyCount = countResult?.count ?? 0;
-        await runPriceSnapshot( c.env.axis_db);
+        await runPriceSnapshot(c.env.axis_db_core, c.env.axis_db_analytics);
 
         return c.json({ success: true, elapsed_ms: Date.now() - startMs, strategies: strategyCount })
     } catch (e: any) {

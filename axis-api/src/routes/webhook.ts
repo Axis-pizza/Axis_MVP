@@ -41,7 +41,7 @@ app.post('/', async (c) => {
                 // 3. 入金先(Vault)が、我々のStrategyのものかDBで確認
                 // ※ MVPでは vault_address = serverWallet.publicKey になっている場合が多いので、
                 // strategyテーブルの vault_address と一致するか確認します。
-                const strategy = await c.env.axis_db.prepare(
+                const strategy = await c.env.axis_db_core.prepare(
                     'SELECT id, mint_address, ticker FROM strategies WHERE vault_address = ?'
                 ).bind(toVault).first();
 
@@ -51,7 +51,7 @@ app.post('/', async (c) => {
                 }
 
                 // 4. 二重処理防止 (Idempotency)
-                const processed = await c.env.axis_db.prepare(
+                const processed = await c.env.axis_db_core.prepare(
                     'SELECT signature FROM processed_deposits WHERE signature = ?'
                 ).bind(signature).first();
 
@@ -115,7 +115,7 @@ app.post('/', async (c) => {
                 console.log(`[Webhook] Transferred ${mintAmount} ${strategy.ticker} to ${fromUser}`);
 
                 // 6. 処理済みとしてDBに記録
-                await c.env.axis_db.prepare(
+                await c.env.axis_db_core.prepare(
                     `INSERT INTO processed_deposits (signature, strategy_id, user_address, amount_lamports, mint_amount) 
                      VALUES (?, ?, ?, ?, ?)`
                 ).bind(signature, strategy.id, fromUser, amountLamports, mintAmount.toString()).run();

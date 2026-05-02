@@ -25,14 +25,14 @@ interface StrategyRow {
 /**
  * Main entry point. Called by the scheduled handler.
  */
-export async function runPriceSnapshot(db: any): Promise<void> {
+export async function runPriceSnapshot(coreDb: D1Database, analyticsDb: D1Database): Promise<void> {
   const startMs = Date.now();
   const tsBucket = Math.floor(startMs / 1000 / BUCKET_SECONDS) * BUCKET_SECONDS;
 
   // 1. Fetch all strategies
-  const { results: rows } = await db.prepare(
+  const { results: rows } = await coreDb.prepare(
     'SELECT id, composition, config FROM strategies'
-  ).all();
+  ).all<StrategyRow>();
 
   if (!rows || rows.length === 0) {
     console.log('[Snapshot] No strategies found.');
@@ -70,7 +70,7 @@ export async function runPriceSnapshot(db: any): Promise<void> {
     const snapshot = buildSnapshot(row.id, tsBucket, tokens, priceMap);
 
     snapshotStmts.push(
-      db.prepare(`
+      analyticsDb.prepare(`
         INSERT OR REPLACE INTO strategy_price_snapshots
           (strategy_id, ts_bucket_utc, index_price, prices_json, weights_json,
           source_json, confidence, version, metadata_json, created_at)
@@ -90,7 +90,7 @@ export async function runPriceSnapshot(db: any): Promise<void> {
 
     // Baseline: INSERT OR IGNORE ensures only the first snapshot becomes baseline
     baselineStmts.push(
-      db.prepare(`
+      coreDb.prepare(`
         INSERT OR IGNORE INTO strategy_deployment_baseline
           (strategy_id, baseline_ts_bucket_utc, baseline_price, baseline_confidence, created_at)
         VALUES (?, ?, ?, ?, ?)
@@ -111,7 +111,7 @@ export async function runPriceSnapshot(db: any): Promise<void> {
     const symbol = mintToSymbol.get(mint.toLowerCase());
     if (price && price.price_usd > 0 && symbol) {
       tokenPriceStmts.push(
-        db.prepare(`
+        analyticsDb.prepare(`
           INSERT OR REPLACE INTO token_prices (token_name, recorded_at, price_usd)
           VALUES (?, ?, ?)
         `).bind(symbol, priceFetchedAt, price.price_usd)
@@ -120,17 +120,30 @@ export async function runPriceSnapshot(db: any): Promise<void> {
   }
 
   // 6. Execute in batches (D1 batch limit)
-  await batchExecute(db, [...snapshotStmts, ...baselineStmts, ...tokenPriceStmts]);
+  await batchExecute(coreDb, [...baselineStmts]);
+  await batchExecute(analyticsDb, [...snapshotStmts, ...tokenPriceStmts]);
 
   // 7. Purge records older than 1 week
+  //
+  // strategy_price_snapshots:
+  //   - Use LIMIT 5000 per run to avoid D1 30s timeout on large tables
+  //   - index idx_sps_ts_bucket on ts_bucket_utc must exist for this to be fast
+  //
+  // token_prices:
+  //   - recorded_at is stored as ISO 8601 (e.g. "2026-04-14T12:00:00.000Z")
+  //   - Use toISOString() on both sides so string comparison works correctly
+  //   - sqlite datetime('now') returns "YYYY-MM-DD HH:MM:SS" which sorts
+  //     differently from ISO "YYYY-MM-DDTHH:MM:SS.sssZ" due to 'T' vs ' '
   const oneWeekAgo = tsBucket - 7 * 24 * 3600;
-  await db.batch([
-    db.prepare(
-      'DELETE FROM strategy_price_snapshots WHERE ts_bucket_utc < ?'
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+
+  await analyticsDb.batch([
+    analyticsDb.prepare(
+      `DELETE FROM strategy_price_snapshots WHERE rowid IN (SELECT rowid FROM strategy_price_snapshots WHERE ts_bucket_utc < ? LIMIT 5000)`
     ).bind(oneWeekAgo),
-    db.prepare(
-      `DELETE FROM token_prices WHERE recorded_at < datetime('now', '-7 days')`
-    ),
+    analyticsDb.prepare(
+      'DELETE FROM token_prices WHERE recorded_at < ?'
+    ).bind(sevenDaysAgoIso),
   ]);
 
   const elapsed = Date.now() - startMs;
@@ -308,7 +321,7 @@ export function buildSnapshot(
 /**
  * Execute D1 prepared statements in batches to respect D1 limits.
  */
-async function batchExecute(db: any, stmts: any[]): Promise<void> {
+async function batchExecute(db: D1Database, stmts: D1PreparedStatement[]): Promise<void> {
   for (let i = 0; i < stmts.length; i += D1_BATCH_LIMIT) {
     const chunk = stmts.slice(i, i + D1_BATCH_LIMIT);
     await db.batch(chunk);
