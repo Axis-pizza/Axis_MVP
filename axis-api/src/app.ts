@@ -10,6 +10,7 @@ import miscRoutes from './routes/misc';
 import kagemushaRoutes from './routes/kagemusha';
 import uploadRoutes from './routes/upload';
 import shareRoutes from './routes/share';
+import { getLineChartData } from './routes/chart';
 import { runPriceSnapshot } from './services/snapshot';
 import dflowRoutes from './routes/dflow';
 import mobileRoutes from './routes/mobile';
@@ -66,6 +67,10 @@ app.get('/init-db', async (c) => {
     return c.json({ success: false, error: e.message });
   }
 });
+
+// チャート用エンドポイント
+// ラインチャート用のデータを返すエンドポイント
+app.get('/strategies/:id/linechart', getLineChartData);
 
 // --- Mount Routes ---
 app.route('/auth', authRoutes);
